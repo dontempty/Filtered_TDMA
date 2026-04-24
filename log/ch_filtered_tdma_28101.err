@@ -1,0 +1,25 @@
+terminate called after throwing an instance of 'std::length_error'
+  what():  basic_string::_M_create
+[cpu02:805722] *** Process received signal ***
+[cpu02:805722] Signal: Aborted (6)
+[cpu02:805722] Signal code:  (-6)
+[cpu02:805722] [ 0] /lib/x86_64-linux-gnu/libpthread.so.0(+0x14420)[0x7fd63ef9b420]
+[cpu02:805722] [ 1] /lib/x86_64-linux-gnu/libc.so.6(gsignal+0xcb)[0x7fd63e75b00b]
+[cpu02:805722] [ 2] /lib/x86_64-linux-gnu/libc.so.6(abort+0x12b)[0x7fd63e73a859]
+[cpu02:805722] [ 3] /lib/x86_64-linux-gnu/libstdc++.so.6(+0x9e8d1)[0x7fd6400518d1]
+[cpu02:805722] [ 4] /lib/x86_64-linux-gnu/libstdc++.so.6(+0xaa37c)[0x7fd64005d37c]
+[cpu02:805722] [ 5] /lib/x86_64-linux-gnu/libstdc++.so.6(+0xaa3e7)[0x7fd64005d3e7]
+[cpu02:805722] [ 6] /lib/x86_64-linux-gnu/libstdc++.so.6(+0xaa699)[0x7fd64005d699]
+[cpu02:805722] [ 7] /lib/x86_64-linux-gnu/libstdc++.so.6(_ZSt20__throw_length_errorPKc+0x41)[0x7fd6400542e4]
+[cpu02:805722] [ 8] /lib/x86_64-linux-gnu/libstdc++.so.6(+0x142f0c)[0x7fd6400f5f0c]
+[cpu02:805722] [ 9] /shared/home/wel1come1234/workspace/Filtered_TDMA/build/bin/channel.out[0x47236a]
+[cpu02:805722] [10] /lib/x86_64-linux-gnu/libc.so.6(__libc_start_main+0xf3)[0x7fd63e73c083]
+[cpu02:805722] [11] /shared/home/wel1come1234/workspace/Filtered_TDMA/build/bin/channel.out[0x40f16e]
+[cpu02:805722] *** End of error message ***
+--------------------------------------------------------------------------
+Primary job  terminated normally, but 1 process returned
+a non-zero exit code. Per user-direction, the job has been aborted.
+--------------------------------------------------------------------------
+--------------------------------------------------------------------------
+mpirun noticed that process rank 0 with PID 805722 on node cpu02 exited on signal 6 (Aborted).
+--------------------------------------------------------------------------

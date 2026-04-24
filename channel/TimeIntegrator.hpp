@@ -1,0 +1,76 @@
+// channel/TimeIntegrator.hpp
+//
+// Top-level time loop: orchestrates momentum, pressure, forcing, statistics,
+// field output, and restart IO.
+
+#ifndef CHANNEL_TIME_INTEGRATOR_HPP
+#define CHANNEL_TIME_INTEGRATOR_HPP
+
+#include "Field.hpp"
+#include <utility>
+
+namespace channel {
+
+class MpiTopology;
+class Subdomain;
+class Grid;
+class HaloExchanger;
+class BoundaryCondition;
+class MomentumSolver;
+class PressureSolver;
+class ChannelForcing;
+class Statistics;
+class RestartIO;
+class FieldOutput;
+struct Config;
+struct RestartState;
+
+class TimeIntegrator {
+public:
+    TimeIntegrator(const Config& cfg,
+                   const MpiTopology& topo,
+                   const Subdomain& sub,
+                   const Grid& grid,
+                   const HaloExchanger& halo,
+                   const BoundaryCondition& bc,
+                   MomentumSolver& momentum,
+                   PressureSolver& pressure,
+                   ChannelForcing& forcing,
+                   Statistics& stats,
+                   RestartIO& restart,
+                   FieldOutput& field_out);
+
+    void run(Field<double>& U, Field<double>& V, Field<double>& W,
+             Field<double>& P, RestartState& state);
+
+private:
+    double cfl_dt_(const Field<double>& U, const Field<double>& V,
+                   const Field<double>& W) const;
+
+    // Returns {rho_max (dz_min, wall), rho_min (dz_max, centre)}
+    std::pair<double,double> rho_diagnostic_(double dt) const;
+
+    double wss_diagnostic_(const Field<double>& U) const;
+
+    double bulk_velocity_(const Field<double>& U) const;
+
+    double max_div_u_(const Field<double>& U, const Field<double>& V,
+                      const Field<double>& W) const;
+
+    const Config&           cfg_;
+    const MpiTopology&      topo_;
+    const Subdomain&        sub_;
+    const Grid&             grid_;
+    const HaloExchanger&    halo_;
+    const BoundaryCondition& bc_;
+    MomentumSolver&         momentum_;
+    PressureSolver&         pressure_;
+    ChannelForcing&         forcing_;
+    Statistics&             stats_;
+    RestartIO&              restart_;
+    FieldOutput&            field_out_;
+};
+
+} // namespace channel
+
+#endif // CHANNEL_TIME_INTEGRATOR_HPP

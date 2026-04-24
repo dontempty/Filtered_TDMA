@@ -1,0 +1,81 @@
+# ============================================================
+#  Channel solver — INI-style input (1:1 mapped to PaScaL_TCS
+#  Fortran namelist groups; only the syntax differs).
+#
+#  Coordinate convention (this code, fixed):
+#    x : streamwise  (periodic, FFT direction, dP/dx forcing)
+#    y : spanwise    (periodic, FFT direction)
+#    z : wall-normal (no-slip wall, TDMA direction — Filtered_TDMA)
+# ============================================================
+
+# === group: meshes ===
+n1m = 256
+n2m = 256
+n3m = 256
+
+# === group: MPI_procs ===
+np1 = 4
+np2 = 4
+np3 = 2
+
+# === group: periodic_boundary ===
+pbc1 = true
+pbc2 = true
+pbc3 = false
+
+# === group: uniform_mesh ===
+uniform1 = 1
+uniform2 = 1
+uniform3 = 0
+
+# === group: mesh_stretch ===
+gamma1 = 0.0
+gamma2 = 0.0
+gamma3 = 1.3
+
+# === group: aspect_ratio ===
+H       = 2.0
+Aspect1 = 6.28318530718
+Aspect2 = 3.14159265359
+
+# === group: sim_parameter ===
+Re_b   = 2857.0
+MaxCFL = 1.0
+
+# === group: sim_control ===
+dtStart             = 0.05
+tStart              = 0.0
+Timestepmax = 10
+
+# === group: sim_continue ===
+ContinueFilein = 0
+ContinueFileout  = 1
+dir_cont_filein = ./restart_in/
+dir_cont_fileout = ./restart_out/
+dir_instantfield = ./instant/
+dir_statistics   = ./statistics/
+
+# === group: channel_forcing ===
+forcing_mode         = MASS_FLOW
+target_bulk_velocity = 1.0
+target_dPdx          = 0.0
+
+# === group: output (v2 convention) ===
+# nmonitor    : monitor print interval (steps)
+# nstat_start : step at which stats accumulation begins
+# nstat       : stats accumulation interval (counted from nstat_start)
+# nout_stats  : stats file write interval  (counted from nstat_start)
+# nout        : instant 3-D field output interval (steps)
+# out_stats   : 1 = write stats files, 0 = skip
+# out_field   : 1 = write instant field files, 0 = skip
+nmonitor    = 1
+nstat_start = 0
+nstat       = 1
+nout_stats  = 10
+nout        = 10
+out_stats   = 1
+out_field   = 1
+
+# === group: tdma ===
+# momentum ADI TDMA backend: "filtered" (Filtered_TDMA) or "pascal" (PaScaL_TDMA)
+tdma_backend = filtered

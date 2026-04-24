@@ -1,0 +1,262 @@
+#include "MomentumSolver.hpp"
+
+#include "Config.hpp"
+#include "Grid.hpp"
+#include "MpiTopology.hpp"
+#include "Subdomain.hpp"
+
+#include <algorithm>
+#include <cmath>
+
+namespace channel {
+
+MomentumSolver::MomentumSolver(const Config& cfg,
+                               const MpiTopology& topo,
+                               const Subdomain& sub,
+                               const Grid& grid)
+    : cfg_(&cfg), sub_(&sub), grid_(&grid),
+      dU_(sub.nx(), sub.ny(), sub.nz()),
+      dV_(sub.nx(), sub.ny(), sub.nz()),
+      dW_(sub.nx(), sub.ny(), sub.nz())
+{
+    inv_Re_ = 1.0 / cfg.Re_b;
+    np3_    = topo.dim(2);
+    rank_z_ = topo.rank_in(2);
+
+    nx_ = sub.nx(); ny_ = sub.ny(); nz_ = sub.nz();
+
+    // FilteredTdmaSolver for each axis
+    //   x: n_sys = ny*nz, n_row = nx, periodic in x
+    //   y: n_sys = nx*nz, n_row = ny, periodic in y
+    //   z: n_sys = nx*ny, n_row = nz, wall BC
+    fdma_x_ = std::make_unique<FilteredTdmaSolver>(
+        topo, 0, ny_*nz_, nx_, cfg.pbc1);
+    fdma_y_ = std::make_unique<FilteredTdmaSolver>(
+        topo, 1, nx_*nz_, ny_, cfg.pbc2);
+    fdma_z_ = std::make_unique<FilteredTdmaSolver>(
+        topo, 2, nx_*ny_, nz_, /*periodic=*/false);
+
+    Ax_.resize((std::size_t)nx_ * ny_*nz_);
+    Bx_.resize((std::size_t)nx_ * ny_*nz_);
+    Cx_.resize((std::size_t)nx_ * ny_*nz_);
+    Dx_.resize((std::size_t)nx_ * ny_*nz_);
+
+    Ay_.resize((std::size_t)ny_ * nx_*nz_);
+    By_.resize((std::size_t)ny_ * nx_*nz_);
+    Cy_.resize((std::size_t)ny_ * nx_*nz_);
+    Dy_.resize((std::size_t)ny_ * nx_*nz_);
+
+    Az_.resize((std::size_t)nz_ * nx_*ny_);
+    Bz_.resize((std::size_t)nz_ * nx_*ny_);
+    Cz_.resize((std::size_t)nz_ * nx_*ny_);
+    Dz_.resize((std::size_t)nz_ * nx_*ny_);
+}
+
+// ---------- RHS: explicit convection + diffusion + pressure + forcing ------
+void MomentumSolver::compute_rhs_(Component which,
+                                  Field<double>& dQ,
+                                  const Field<double>& U,
+                                  const Field<double>& V,
+                                  const Field<double>& W,
+                                  const Field<double>& P,
+                                  double dt, double mean_dPdx)
+{
+    const int nx = nx_, ny = ny_, nz = nz_;
+    const auto& dx  = grid_->dx (0); const auto& dmx = grid_->dmx(0);
+    const auto& dy  = grid_->dx (1); const auto& dmy = grid_->dmx(1);
+    const auto& dz  = grid_->dx (2); const auto& dmz = grid_->dmx(2);
+
+    auto qref = [&](int i, int j, int k) -> double {
+        if (which == COMP_U) return U(i,j,k);
+        if (which == COMP_V) return V(i,j,k);
+        return W(i,j,k);
+    };
+
+    for (int k = 1; k <= nz; ++k)
+        for (int j = 1; j <= ny; ++j)
+            for (int i = 1; i <= nx; ++i) {
+                double diff_x = (qref(i+1,j,k) - 2*qref(i,j,k) + qref(i-1,j,k))
+                                / (dx[i]*dmx[i]);
+                double diff_y = (qref(i,j+1,k) - 2*qref(i,j,k) + qref(i,j-1,k))
+                                / (dy[j]*dmy[j]);
+                double diff_z = ((qref(i,j,k+1)-qref(i,j,k))/dmz[k+1]
+                               - (qref(i,j,k  )-qref(i,j,k-1))/dmz[k  ])
+                                / dz[k];
+                double diff = inv_Re_ * (diff_x + diff_y + diff_z);
+
+                double press = 0.0, force = 0.0;
+                if (which == COMP_U) {
+                    press = (P(i,j,k) - P(i-1,j,k)) / dmx[i];
+                    force = -mean_dPdx;
+                } else if (which == COMP_V) {
+                    press = (P(i,j,k) - P(i,j-1,k)) / dmy[j];
+                } else {
+                    if (k > 1) press = (P(i,j,k) - P(i,j,k-1)) / dmz[k];
+                }
+
+                double uc = 0.5*(U(i,j,k) + U(i+1,j,k));
+                double vc = 0.5*(V(i,j,k) + V(i,j+1,k));
+                double wc = 0.5*(W(i,j,k) + W(i,j,k+1));
+                double dqdx = (qref(i+1,j,k)-qref(i-1,j,k)) / (dx[i]*2.0);
+                double dqdy = (qref(i,j+1,k)-qref(i,j-1,k)) / (dy[j]*2.0);
+                double dqdz = (qref(i,j,k+1)-qref(i,j,k-1)) / (dz[k]*2.0);
+                double conv = uc*dqdx + vc*dqdy + wc*dqdz;
+
+                dQ(i,j,k) = dt * (-conv + diff - press + force);
+            }
+}
+
+// ---------------------------------------------------------------------------
+// ADI x-sweep: implicit diffusion in x via FilteredTdmaSolver
+// TDMA layout [n_row × n_sys] = [nx × (ny*nz)], row=i-1, sys=(j-1)*nz+(k-1)
+// ---------------------------------------------------------------------------
+void MomentumSolver::adi_sweep_x_(Component, Field<double>& dQ, double dt)
+{
+    const int nx = nx_, ny = ny_, nz = nz_;
+    const auto& dx  = grid_->dx (0);
+    const auto& dmx = grid_->dmx(0);
+    const double alpha = 0.5 * dt * inv_Re_;
+    const int ns = ny * nz;
+
+    for (int k = 1; k <= nz; ++k)
+        for (int j = 1; j <= ny; ++j) {
+            int s = (j-1)*nz + (k-1);
+            for (int i = 1; i <= nx; ++i) {
+                int row = i-1;
+                double am = -alpha / (dx[i]*dmx[i]);
+                double ap = -alpha / (dx[i]*dmx[i+1]);
+                Ax_[row*ns + s] = am;
+                Cx_[row*ns + s] = ap;
+                Bx_[row*ns + s] = 1.0 - am - ap;
+                Dx_[row*ns + s] = dQ(i,j,k);
+            }
+        }
+
+    fdma_x_->set_rho(Ax_.data(), Bx_.data(), Cx_.data(), ns);
+    if (cfg_->pbc1)
+        fdma_x_->solve_cycl(Ax_.data(), Bx_.data(), Cx_.data(), Dx_.data());
+    else
+        fdma_x_->solve(Ax_.data(), Bx_.data(), Cx_.data(), Dx_.data());
+
+    for (int k = 1; k <= nz; ++k)
+        for (int j = 1; j <= ny; ++j) {
+            int s = (j-1)*nz + (k-1);
+            for (int i = 1; i <= nx; ++i)
+                dQ(i,j,k) = Dx_[(i-1)*ns + s];
+        }
+}
+
+// ---------------------------------------------------------------------------
+// ADI y-sweep: [ny × (nx*nz)], row=j-1, sys=(i-1)*nz+(k-1)
+// ---------------------------------------------------------------------------
+void MomentumSolver::adi_sweep_y_(Component, Field<double>& dQ, double dt)
+{
+    const int nx = nx_, ny = ny_, nz = nz_;
+    const auto& dy  = grid_->dx (1);
+    const auto& dmy = grid_->dmx(1);
+    const double alpha = 0.5 * dt * inv_Re_;
+    const int ns = nx * nz;
+
+    for (int k = 1; k <= nz; ++k)
+        for (int i = 1; i <= nx; ++i) {
+            int s = (i-1)*nz + (k-1);
+            for (int j = 1; j <= ny; ++j) {
+                int row = j-1;
+                double am = -alpha / (dy[j]*dmy[j]);
+                double ap = -alpha / (dy[j]*dmy[j+1]);
+                Ay_[row*ns + s] = am;
+                Cy_[row*ns + s] = ap;
+                By_[row*ns + s] = 1.0 - am - ap;
+                Dy_[row*ns + s] = dQ(i,j,k);
+            }
+        }
+
+    fdma_y_->set_rho(Ay_.data(), By_.data(), Cy_.data(), ns);
+    if (cfg_->pbc2)
+        fdma_y_->solve_cycl(Ay_.data(), By_.data(), Cy_.data(), Dy_.data());
+    else
+        fdma_y_->solve(Ay_.data(), By_.data(), Cy_.data(), Dy_.data());
+
+    for (int k = 1; k <= nz; ++k)
+        for (int i = 1; i <= nx; ++i) {
+            int s = (i-1)*nz + (k-1);
+            for (int j = 1; j <= ny; ++j)
+                dQ(i,j,k) = Dy_[(j-1)*ns + s];
+        }
+}
+
+// ---------------------------------------------------------------------------
+// ADI z-sweep: [nz × (nx*ny)], row=k-1, sys=(i-1)*ny+(j-1)
+// Wall BCs: row 0 pinned to 0 (bottom wall, rank_z_==0)
+//           top c=0 (rank_z_==np3_-1)
+// ---------------------------------------------------------------------------
+void MomentumSolver::adi_sweep_z_(Component, Field<double>& dQ, double dt)
+{
+    const int nx = nx_, ny = ny_, nz = nz_;
+    const auto& dz  = grid_->dx (2);
+    const auto& dmz = grid_->dmx(2);
+    const double alpha = 0.5 * dt * inv_Re_;
+    const int ns = nx * ny;
+
+    for (int j = 1; j <= ny; ++j)
+        for (int i = 1; i <= nx; ++i) {
+            int s = (i-1)*ny + (j-1);
+            for (int k = 1; k <= nz; ++k) {
+                int row = k-1;
+                double am = -alpha / (dz[k]*dmz[k]);
+                double ap = -alpha / (dz[k]*dmz[k+1]);
+                Az_[row*ns + s] = am;
+                Cz_[row*ns + s] = ap;
+                Bz_[row*ns + s] = 1.0 - am - ap;
+                Dz_[row*ns + s] = dQ(i,j,k);
+            }
+        }
+
+    // Bottom wall: pin row 0 to zero (matches original scalar Thomas behaviour)
+    if (rank_z_ == 0) {
+        for (int s = 0; s < ns; ++s) {
+            Az_[0*ns+s] = 0.0; Cz_[0*ns+s] = 0.0;
+            Bz_[0*ns+s] = 1.0; Dz_[0*ns+s] = 0.0;
+        }
+    }
+    // Top wall: zero upper off-diagonal of last row
+    if (rank_z_ == np3_-1) {
+        for (int s = 0; s < ns; ++s)
+            Cz_[(nz-1)*ns+s] = 0.0;
+    }
+
+    fdma_z_->set_rho(Az_.data(), Bz_.data(), Cz_.data(), ns);
+    fdma_z_->solve(Az_.data(), Bz_.data(), Cz_.data(), Dz_.data());
+
+    for (int j = 1; j <= ny; ++j)
+        for (int i = 1; i <= nx; ++i) {
+            int s = (i-1)*ny + (j-1);
+            for (int k = 1; k <= nz; ++k)
+                dQ(i,j,k) = Dz_[(k-1)*ns + s];
+        }
+}
+
+// ---------------------------------------------------------------------------
+void MomentumSolver::advance(Field<double>& U, Field<double>& V, Field<double>& W,
+                             const Field<double>& P,
+                             double dt, double mean_dPdx)
+{
+    const int nx = nx_, ny = ny_, nz = nz_;
+
+    auto run_one = [&](Component c, Field<double>& Q, Field<double>& dQ) {
+        compute_rhs_(c, dQ, U, V, W, P, dt, mean_dPdx);
+        adi_sweep_x_(c, dQ, dt);
+        adi_sweep_y_(c, dQ, dt);
+        adi_sweep_z_(c, dQ, dt);
+        for (int k = 1; k <= nz; ++k)
+            for (int j = 1; j <= ny; ++j)
+                for (int i = 1; i <= nx; ++i)
+                    Q(i,j,k) += dQ(i,j,k);
+    };
+
+    run_one(COMP_U, U, dU_);
+    run_one(COMP_V, V, dV_);
+    run_one(COMP_W, W, dW_);
+}
+
+} // namespace channel
