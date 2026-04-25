@@ -1,0 +1,24 @@
+# Build artifacts
+build/
+*.o
+*.d
+*.a
+*.so
+*.out
+
+# Solver runtime output (created by channel.sh / Makefile rm target)
+channel/instant/
+channel/statistics/
+channel/restart_in/
+channel/restart_out/
+
+# SLURM logs
+log/
+*.err
+
+# Editor / IDE
+.vscode/
+.idea/
+*.swp
+*~
+.DS_Store
