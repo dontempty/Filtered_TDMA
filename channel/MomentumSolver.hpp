@@ -50,6 +50,16 @@ private:
     void adi_sweep_z_(Component which, Field<double>& dQ, double dt,
                       const Field<double>& U, const Field<double>& V, const Field<double>& W);
 
+    // BW cross-component RHS injection (N'^n off-diagonal). Called after
+    // compute_rhs_ and before ADI sweeps. Uses increments from components
+    // already solved in this step:
+    //   V : uses dU    → adds -0.5*dt*dU*(∂V/∂x)
+    //   W : uses dU,dV → adds -0.5*dt*(dU*(∂W/∂x) + dV*(∂W/∂y))
+    // U has no prior increment, so it's a no-op for COMP_U.
+    void add_cross_BW_(Component which, Field<double>& dQ, double dt,
+                       const Field<double>& U, const Field<double>& V, const Field<double>& W,
+                       const Field<double>* dU_prev, const Field<double>* dV_prev);
+
     const Config*    cfg_  = nullptr;
     const Subdomain* sub_  = nullptr;
     const Grid*      grid_ = nullptr;

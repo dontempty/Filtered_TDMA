@@ -115,7 +115,7 @@ int main(int argc, char** argv)
             forcing.set_mean_dPdx(state.dPdx);
         } else {
             laminar_init(U, V, W, P, sub, grid,
-                         cfg.Lz, cfg.target_bulk_velocity, /*pert=*/0.05);
+                         cfg.Lz, cfg.target_bulk_velocity, cfg.pert_amp);
         }
 
         halo.exchange(U); halo.exchange(V); halo.exchange(W);

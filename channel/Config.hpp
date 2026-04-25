@@ -81,6 +81,11 @@ struct Config {
     double      target_bulk_velocity = 1.0;
     double      target_dPdx          = 0.0;
 
+    // ---- initial condition ---------------------------------------------
+    // Random perturbation amplitude added to laminar parabolic U profile
+    // (as a fraction of Umax). 0 = pure Poiseuille.
+    double      pert_amp = 0.01;
+
     // ---- output timing (v2 convention) ---------------------------------
     //   nmonitor     : print monitor line every N steps
     //   nstat_start  : step at which stats accumulation begins

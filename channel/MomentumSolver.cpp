@@ -105,6 +105,16 @@ void MomentumSolver::compute_rhs_(Component which,
         return W(i,j,k);
     };
 
+    // Beam-Warming: keep the 0.5·∂q/∂d "self-derivative" coefficient ONLY in
+    // the direction `d` whose convecting velocity equals the solved component
+    // (PaScaL_TCS convention).  In cross directions, the convecting velocity
+    // is a different field, and the 0.5·∂q/∂d contribution is non-physical
+    // — it adds a spurious u·∂u/∂z-type term to U eq even when W = 0, which
+    // breaks Poiseuille equilibrium.
+    const double sx = (which == COMP_U) ? 1.0 : 0.0;
+    const double sy = (which == COMP_V) ? 1.0 : 0.0;
+    const double sz = (which == COMP_W) ? 1.0 : 0.0;
+
     for (int k = 1; k <= nz; ++k)
         for (int j = 1; j <= ny; ++j)
             for (int i = 1; i <= nx; ++i) {
@@ -142,10 +152,10 @@ void MomentumSolver::compute_rhs_(Component which,
                     ux1 = 0.5*(U(i,j,k-1)   + U(i,j,k));      // z-interp
                     ux2 = 0.5*(U(i+1,j,k-1) + U(i+1,j,k));
                 }
-                double mAMI = -nu_h/(cvx*spxm) + 0.25*(-ux1/spxm + 0.5*dqdx1);
-                double mAPI = -nu_h/(cvx*spxp)  + 0.25*( ux2/spxp + 0.5*dqdx2);
+                double mAMI = -nu_h/(cvx*spxm) + 0.25*(-ux1/spxm + sx*0.5*dqdx1);
+                double mAPI = -nu_h/(cvx*spxp)  + 0.25*( ux2/spxp + sx*0.5*dqdx2);
                 double mACI =  nu_h/cvx*(1.0/spxm + 1.0/spxp)
-                             + 0.25*(0.5*dqdx2 + 0.5*dqdx1 - ux2/spxp + ux1/spxm);
+                             + 0.25*(sx*(0.5*dqdx2 + 0.5*dqdx1) - ux2/spxp + ux1/spxm);
 
                 // ==============================================================
                 // y-direction BW coefficients
@@ -171,10 +181,10 @@ void MomentumSolver::compute_rhs_(Component which,
                     vy1 = 0.5*(V(i,j,k-1)   + V(i,j,k));      // z-interp
                     vy2 = 0.5*(V(i,j+1,k-1) + V(i,j+1,k));
                 }
-                double mAMJ = -nu_h/(cvy*spym) + 0.25*(-vy1/spym + 0.5*dqdy1);
-                double mAPJ = -nu_h/(cvy*spyp)  + 0.25*( vy2/spyp + 0.5*dqdy2);
+                double mAMJ = -nu_h/(cvy*spym) + 0.25*(-vy1/spym + sy*0.5*dqdy1);
+                double mAPJ = -nu_h/(cvy*spyp)  + 0.25*( vy2/spyp + sy*0.5*dqdy2);
                 double mACJ =  nu_h/cvy*(1.0/spym + 1.0/spyp)
-                             + 0.25*(0.5*dqdy2 + 0.5*dqdy1 - vy2/spyp + vy1/spym);
+                             + 0.25*(sy*(0.5*dqdy2 + 0.5*dqdy1) - vy2/spyp + vy1/spym);
 
                 // ==============================================================
                 // z-direction BW coefficients (non-uniform z)
@@ -200,17 +210,21 @@ void MomentumSolver::compute_rhs_(Component which,
                     wz1 = 0.5*(W(i,j-1,k)   + W(i,j,k));      // y-interp
                     wz2 = 0.5*(W(i,j-1,k+1) + W(i,j,k+1));
                 }
-                double mAMK = -nu_h/(cvz*spzm) + 0.25*(-wz1/spzm + 0.5*dqdz1);
-                double mAPK = -nu_h/(cvz*spzp)  + 0.25*( wz2/spzp + 0.5*dqdz2);
+                double mAMK = -nu_h/(cvz*spzm) + 0.25*(-wz1/spzm + sz*0.5*dqdz1);
+                double mAPK = -nu_h/(cvz*spzp)  + 0.25*( wz2/spzp + sz*0.5*dqdz2);
                 double mACK =  nu_h/cvz*(1.0/spzm + 1.0/spzp)
-                             + 0.25*(0.5*dqdz2 + 0.5*dqdz1 - wz2/spzp + wz1/spzm);
+                             + 0.25*(sz*(0.5*dqdz2 + 0.5*dqdz1) - wz2/spzp + wz1/spzm);
 
                 // ==============================================================
-                // Explicit viscous ν∇²q (consistent with the BW operator above)
+                // Explicit viscous (½)·ν∇²q.  The factor ½ matches PaScaL_TCS
+                // line 341 (invRhocCmu_half · ...).  After subtracting imp_res
+                // = M_all·u^n = -½·A·u + N(u^n)  (quadratic N), the net RHS
+                // becomes dt·(A·u − N(u) + force − ∇p), consistent with full
+                // Crank–Nicolson + Beam–Warming.
                 // ==============================================================
-                double diff_x = nu * ((qxp - q)/spxp - (q - qxm)/spxm) / cvx;
-                double diff_y = nu * ((qyp - q)/spyp - (q - qym)/spym) / cvy;
-                double diff_z = nu * ((qzp - q)/spzp - (q - qzm)/spzm) / cvz;
+                double diff_x = nu_h * ((qxp - q)/spxp - (q - qxm)/spxm) / cvx;
+                double diff_y = nu_h * ((qyp - q)/spyp - (q - qym)/spym) / cvy;
+                double diff_z = nu_h * ((qzp - q)/spzp - (q - qzm)/spzm) / cvz;
 
                 // ==============================================================
                 // Pressure gradient
@@ -252,6 +266,7 @@ void MomentumSolver::adi_sweep_x_(Component which, Field<double>& dQ, double dt,
     const auto& dmx = grid_->dmx(0);
     const double nu_h = 0.5 * inv_Re_;
     const int ns = ny * nz;
+    const double sx = (which == COMP_U) ? 1.0 : 0.0;   // BW self-derivative gate
 
     for (int k = 1; k <= nz; ++k)
         for (int j = 1; j <= ny; ++j) {
@@ -287,10 +302,10 @@ void MomentumSolver::adi_sweep_x_(Component which, Field<double>& dQ, double dt,
                     ux2 = 0.5*(U(i+1,j,k-1) + U(i+1,j,k));
                 }
 
-                double mAMI = -nu_h/(cvx*spxm) + 0.25*(-ux1/spxm + 0.5*dqdx1);
-                double mAPI = -nu_h/(cvx*spxp)  + 0.25*( ux2/spxp + 0.5*dqdx2);
+                double mAMI = -nu_h/(cvx*spxm) + 0.25*(-ux1/spxm + sx*0.5*dqdx1);
+                double mAPI = -nu_h/(cvx*spxp)  + 0.25*( ux2/spxp + sx*0.5*dqdx2);
                 double mACI =  nu_h/cvx*(1.0/spxm + 1.0/spxp)
-                             + 0.25*(0.5*dqdx2 + 0.5*dqdx1 - ux2/spxp + ux1/spxm);
+                             + 0.25*(sx*(0.5*dqdx2 + 0.5*dqdx1) - ux2/spxp + ux1/spxm);
 
                 Ax_[row*ns + s] = mAMI * dt;
                 Cx_[row*ns + s] = mAPI * dt;
@@ -330,6 +345,7 @@ void MomentumSolver::adi_sweep_y_(Component which, Field<double>& dQ, double dt,
     const auto& dmy = grid_->dmx(1);
     const double nu_h = 0.5 * inv_Re_;
     const int ns = nx * nz;
+    const double sy = (which == COMP_V) ? 1.0 : 0.0;   // BW self-derivative gate
 
     for (int k = 1; k <= nz; ++k)
         for (int i = 1; i <= nx; ++i) {
@@ -364,10 +380,10 @@ void MomentumSolver::adi_sweep_y_(Component which, Field<double>& dQ, double dt,
                     vy2 = 0.5*(V(i,j+1,k-1) + V(i,j+1,k));
                 }
 
-                double mAMJ = -nu_h/(cvy*spym) + 0.25*(-vy1/spym + 0.5*dqdy1);
-                double mAPJ = -nu_h/(cvy*spyp)  + 0.25*( vy2/spyp + 0.5*dqdy2);
+                double mAMJ = -nu_h/(cvy*spym) + 0.25*(-vy1/spym + sy*0.5*dqdy1);
+                double mAPJ = -nu_h/(cvy*spyp)  + 0.25*( vy2/spyp + sy*0.5*dqdy2);
                 double mACJ =  nu_h/cvy*(1.0/spym + 1.0/spyp)
-                             + 0.25*(0.5*dqdy2 + 0.5*dqdy1 - vy2/spyp + vy1/spym);
+                             + 0.25*(sy*(0.5*dqdy2 + 0.5*dqdy1) - vy2/spyp + vy1/spym);
 
                 Ay_[row*ns + s] = mAMJ * dt;
                 Cy_[row*ns + s] = mAPJ * dt;
@@ -408,6 +424,7 @@ void MomentumSolver::adi_sweep_z_(Component which, Field<double>& dQ, double dt,
     const auto& dmz = grid_->dmx(2);
     const double nu_h = 0.5 * inv_Re_;
     const int ns = nx * ny;
+    const double sz = (which == COMP_W) ? 1.0 : 0.0;   // BW self-derivative gate
 
     for (int j = 1; j <= ny; ++j)
         for (int i = 1; i <= nx; ++i) {
@@ -444,10 +461,10 @@ void MomentumSolver::adi_sweep_z_(Component which, Field<double>& dQ, double dt,
                     wz2 = 0.5*(W(i,j-1,k+1) + W(i,j,k+1));
                 }
 
-                double mAMK = -nu_h/(cvz*spzm) + 0.25*(-wz1/spzm + 0.5*dqdz1);
-                double mAPK = -nu_h/(cvz*spzp)  + 0.25*( wz2/spzp + 0.5*dqdz2);
+                double mAMK = -nu_h/(cvz*spzm) + 0.25*(-wz1/spzm + sz*0.5*dqdz1);
+                double mAPK = -nu_h/(cvz*spzp)  + 0.25*( wz2/spzp + sz*0.5*dqdz2);
                 double mACK =  nu_h/cvz*(1.0/spzm + 1.0/spzp)
-                             + 0.25*(0.5*dqdz2 + 0.5*dqdz1 - wz2/spzp + wz1/spzm);
+                             + 0.25*(sz*(0.5*dqdz2 + 0.5*dqdz1) - wz2/spzp + wz1/spzm);
 
                 Az_[row*ns + s] = mAMK * dt;
                 Cz_[row*ns + s] = mAPK * dt;
@@ -456,17 +473,35 @@ void MomentumSolver::adi_sweep_z_(Component which, Field<double>& dQ, double dt,
             }
         }
 
-    // Bottom wall BC: pin first row (k=1) → dQ = 0
+    // Wall BCs for the z-sweep:
+    //   W (z-face):  W(k=1) is the bottom wall face (=0); W(k=nz+1) is the top
+    //                wall face (=0). Pin first row at bottom; zero ap at top row.
+    //   U,V (cell):  antisymmetric ghost U(k=0) = -U(k=1), U(k=nz+1) = -U(k=nz).
+    //                Fold the am·U(0) = -am·U(1) into ac (ac -= am), then am = 0
+    //                at bottom. Same for ap at top.
     if (rank_z_ == 0) {
-        for (int s = 0; s < ns; ++s) {
-            Az_[0*ns+s] = 0.0;  Cz_[0*ns+s] = 0.0;
-            Bz_[0*ns+s] = 1.0;  Dz_[0*ns+s] = 0.0;
+        if (which == COMP_W) {
+            for (int s = 0; s < ns; ++s) {
+                Az_[0*ns+s] = 0.0;  Cz_[0*ns+s] = 0.0;
+                Bz_[0*ns+s] = 1.0;  Dz_[0*ns+s] = 0.0;
+            }
+        } else {
+            for (int s = 0; s < ns; ++s) {
+                Bz_[0*ns+s] -= Az_[0*ns+s];
+                Az_[0*ns+s]  = 0.0;
+            }
         }
     }
-    // Top wall BC: zero upper off-diagonal at last row
     if (rank_z_ == np3_-1) {
-        for (int s = 0; s < ns; ++s)
-            Cz_[(nz-1)*ns+s] = 0.0;
+        if (which == COMP_W) {
+            for (int s = 0; s < ns; ++s)
+                Cz_[(nz-1)*ns+s] = 0.0;
+        } else {
+            for (int s = 0; s < ns; ++s) {
+                Bz_[(nz-1)*ns+s] -= Cz_[(nz-1)*ns+s];
+                Cz_[(nz-1)*ns+s]  = 0.0;
+            }
+        }
     }
 
     {
@@ -485,6 +520,83 @@ void MomentumSolver::adi_sweep_z_(Component which, Field<double>& dQ, double dt,
 }
 
 // ---------------------------------------------------------------------------
+// add_cross_BW_
+//
+// Beam-Warming cross-component (N'^n off-diagonal) explicit injection using
+// increments from components already solved within the same time step.
+//   V : uses dU    → dQ -= 0.5·dt · dU_at_V · (∂V/∂x)
+//   W : uses dU,dV → dQ -= 0.5·dt · (dU_at_W·∂W/∂x + dV_at_W·∂W/∂y)
+// The diagonal part of N'^n (e.g., δv·∂v^n/∂y for V) is already inside the
+// per-component ADI matrix; this routine only adds the off-diagonal terms.
+// Boundary indices are clamped to one-sided differences (dU, dV halos are
+// not MPI-exchanged inside MomentumSolver).
+// ---------------------------------------------------------------------------
+void MomentumSolver::add_cross_BW_(Component which, Field<double>& dQ, double dt,
+                                   const Field<double>& U, const Field<double>& V, const Field<double>& W,
+                                   const Field<double>* dU_prev, const Field<double>* dV_prev)
+{
+    const int nx = nx_, ny = ny_, nz = nz_;
+    const auto& dmx = grid_->dmx(0);
+    const auto& dmy = grid_->dmx(1);
+
+    // dU/dV halos are NOT MPI-exchanged inside MomentumSolver; clamp all
+    // out-of-bound index accesses (i±1, j±1, k±1) to interior range.
+    if (which == COMP_V && dU_prev != nullptr) {
+        const Field<double>& dU = *dU_prev;
+        for (int k = 1; k <= nz; ++k)
+            for (int j = 1; j <= ny; ++j)
+                for (int i = 1; i <= nx; ++i) {
+                    const int im  = std::max(i - 1, 1);
+                    const int ip  = std::min(i + 1, nx);
+                    const int ip2 = std::min(i + 1, nx);   // dU x-face: i+1 clamped
+                    const int jm  = std::max(j - 1, 1);
+                    const double dU_V = 0.25 *
+                        (dU(i,   jm, k) + dU(ip2, jm, k) +
+                         dU(i,   j,  k) + dU(ip2, j,  k));
+                    const double dVdx = (V(ip, j, k) - V(im, j, k))
+                                      / (dmx[ip] + dmx[i]);
+                    dQ(i, j, k) -= 0.5 * dt * dU_V * dVdx;
+                }
+    }
+    else if (which == COMP_W) {
+        if (dU_prev != nullptr) {
+            const Field<double>& dU = *dU_prev;
+            for (int k = 1; k <= nz; ++k)
+                for (int j = 1; j <= ny; ++j)
+                    for (int i = 1; i <= nx; ++i) {
+                        const int im  = std::max(i - 1, 1);
+                        const int ip  = std::min(i + 1, nx);
+                        const int ip2 = std::min(i + 1, nx);
+                        const int km  = std::max(k - 1, 1);
+                        const double dU_W = 0.25 *
+                            (dU(i,   j, km) + dU(ip2, j, km) +
+                             dU(i,   j, k)  + dU(ip2, j, k));
+                        const double dWdx = (W(ip, j, k) - W(im, j, k))
+                                          / (dmx[ip] + dmx[i]);
+                        dQ(i, j, k) -= 0.5 * dt * dU_W * dWdx;
+                    }
+        }
+        if (dV_prev != nullptr) {
+            const Field<double>& dV = *dV_prev;
+            for (int k = 1; k <= nz; ++k)
+                for (int j = 1; j <= ny; ++j)
+                    for (int i = 1; i <= nx; ++i) {
+                        const int jm  = std::max(j - 1, 1);
+                        const int jp  = std::min(j + 1, ny);
+                        const int jp2 = std::min(j + 1, ny);
+                        const int km  = std::max(k - 1, 1);
+                        const double dV_W = 0.25 *
+                            (dV(i, j,   km) + dV(i, jp2, km) +
+                             dV(i, j,   k)  + dV(i, jp2, k));
+                        const double dWdy = (W(i, jp, k) - W(i, jm, k))
+                                          / (dmy[jp] + dmy[j]);
+                        dQ(i, j, k) -= 0.5 * dt * dV_W * dWdy;
+                    }
+        }
+    }
+}
+
+// ---------------------------------------------------------------------------
 void MomentumSolver::advance(Field<double>& U, Field<double>& V, Field<double>& W,
                              const Field<double>& P,
                              double dt, double mean_dPdx)
@@ -497,20 +609,40 @@ void MomentumSolver::advance(Field<double>& U, Field<double>& V, Field<double>& 
     fdma_y_->set_eps_constant(dt);
     fdma_z_->set_eps_constant(dt);
 
-    auto run_one = [&](Component c, Field<double>& Q, Field<double>& dQ) {
-        compute_rhs_(c, dQ, U, V, W, P, dt, mean_dPdx);
-        adi_sweep_x_(c, dQ, dt, U, V, W);
-        adi_sweep_y_(c, dQ, dt, U, V, W);
-        adi_sweep_z_(c, dQ, dt, U, V, W);
-        for (int k = 1; k <= nz; ++k)
-            for (int j = 1; j <= ny; ++j)
-                for (int i = 1; i <= nx; ++i)
-                    Q(i,j,k) += dQ(i,j,k);
-    };
+    // Sequential Gauss-Seidel with Beam-Warming cross-coupling (MPM-STD /
+    // PaScaL_TCS style).  All matrices are built from OLD (u^n, v^n, w^n);
+    // already-solved increments enter the NEXT component's RHS via
+    // add_cross_BW_ (the N'^n off-diagonal block).  Increments are applied
+    // atomically at the end to preserve time consistency.
 
-    run_one(COMP_U, U, dU_);
-    run_one(COMP_V, V, dV_);
-    run_one(COMP_W, W, dW_);
+    // --- U -------------------------------------------------------------
+    compute_rhs_(COMP_U, dU_, U, V, W, P, dt, mean_dPdx);
+    adi_sweep_x_(COMP_U, dU_, dt, U, V, W);
+    adi_sweep_y_(COMP_U, dU_, dt, U, V, W);
+    adi_sweep_z_(COMP_U, dU_, dt, U, V, W);
+
+    // --- V  (cross-term disabled; dU halo is stale at rank boundaries) -
+    compute_rhs_(COMP_V, dV_, U, V, W, P, dt, mean_dPdx);
+    // add_cross_BW_(COMP_V, dV_, dt, U, V, W, &dU_, nullptr);   // DISABLED
+    adi_sweep_x_(COMP_V, dV_, dt, U, V, W);
+    adi_sweep_y_(COMP_V, dV_, dt, U, V, W);
+    adi_sweep_z_(COMP_V, dV_, dt, U, V, W);
+
+    // --- W  (cross-terms disabled) -------------------------------------
+    compute_rhs_(COMP_W, dW_, U, V, W, P, dt, mean_dPdx);
+    // add_cross_BW_(COMP_W, dW_, dt, U, V, W, &dU_, &dV_);      // DISABLED
+    adi_sweep_x_(COMP_W, dW_, dt, U, V, W);
+    adi_sweep_y_(COMP_W, dW_, dt, U, V, W);
+    adi_sweep_z_(COMP_W, dW_, dt, U, V, W);
+
+    // --- Apply all increments atomically -------------------------------
+    for (int k = 1; k <= nz; ++k)
+        for (int j = 1; j <= ny; ++j)
+            for (int i = 1; i <= nx; ++i) {
+                U(i,j,k) += dU_(i,j,k);
+                V(i,j,k) += dV_(i,j,k);
+                W(i,j,k) += dW_(i,j,k);
+            }
 }
 
 } // namespace channel

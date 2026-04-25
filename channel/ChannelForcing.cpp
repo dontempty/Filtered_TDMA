@@ -45,44 +45,26 @@ double ChannelForcing::correct(Field<double>& U, double dt)
     if (cfg_.forcing_mode == ForcingMode::PRESSURE_GRADIENT)
         return dPdx_;       // constant — applied via momentum RHS
 
-    // MASS_FLOW: enforce bulk velocity by a direct constant shift.
-    //
-    // Adding a spatially-uniform constant to U does not change div(U),
-    // so this can safely be applied at any point in the time loop.
-    //
-    // The equivalent pressure gradient increment is -dU/dt, but when
-    // dt is very small (CFL-limited) that ratio explodes. We instead
-    // clamp the dPdx update independently of the velocity shift.
+    // MASS_FLOW: MPM-STD cuda_momentum_masscorrection pattern.
+    //   Ub_pseudo = bulk(u*).
+    //   DMpresg   = (Ub_pseudo − Ub_target) / dt   (with sign convention
+    //               matching MPM-STD: presgrad1 += DMpresg, then
+    //               body force term in next-step RHS is −presgrad1).
+    //   Apply uniform shift  u ← u − dt·DMpresg = u + (Ub_target − Ub_pseudo)
+    //   so that bulk(u) = Ub_target after the shift.
+    // No clamping (matches MPM-STD): the increment is the exact instantaneous
+    // pressure-gradient correction needed; clamping would introduce phase lag.
+    const double Ub        = bulk_velocity_(U);
+    const double DMpresg   = (dt > 1.0e-15) ? (Ub - cfg_.target_bulk_velocity) / dt : 0.0;
+    const double shift     = -dt * DMpresg;       // = Ub_target − Ub
 
-    const double Ub  = bulk_velocity_(U);
-    const double dU  = cfg_.target_bulk_velocity - Ub;   // velocity correction
-
-    // Apply direct shift to every cell (preserves divergence-free field)
     const int nx = sub_.nx(), ny = sub_.ny(), nz = sub_.nz();
     for (int k = 1; k <= nz; ++k)
         for (int j = 1; j <= ny; ++j)
             for (int i = 1; i <= nx; ++i)
-                U(i, j, k) += dU;
+                U(i, j, k) += shift;
 
-    // Update dPdx_ with a bounded increment.
-    // For Poiseuille flow at Re_b: dPdx_lam = -12 * nu / h^2
-    // where h = Lz/2 (half-channel height).  We use this as scale.
-    const double half_h  = 0.5 * cfg_.Lz;
-    const double nu      = 1.0 / cfg_.Re_b;
-    const double dPdx_lam = 12.0 * nu / (half_h * half_h);   // O(1) scale
-
-    // The instantaneous equivalent increment: -dU/dt
-    // Clamp to ±50 × laminar value so dt doesn't amplify noise
-    double raw_inc = (dt > 1.0e-15) ? (-dU / dt) : 0.0;
-    double max_inc = 50.0 * dPdx_lam;
-    double clamped_inc = std::max(-max_inc, std::min(max_inc, raw_inc));
-
-    dPdx_ += clamped_inc;
-
-    // Also clamp the accumulated dPdx_ itself to prevent run-away
-    double max_dPdx = 200.0 * dPdx_lam;
-    dPdx_ = std::max(-max_dPdx, std::min(max_dPdx, dPdx_));
-
+    dPdx_ += DMpresg;
     return dPdx_;
 }
 
