@@ -19,6 +19,7 @@ namespace channel {
 class MpiTopology;
 class Subdomain;
 class Grid;
+class HaloExchanger;
 struct Config;
 
 class MomentumSolver {
@@ -26,7 +27,8 @@ public:
     MomentumSolver(const Config& cfg,
                    const MpiTopology& topo,
                    const Subdomain& sub,
-                   const Grid& grid);
+                   const Grid& grid,
+                   const HaloExchanger& halo);
 
     void advance(Field<double>& U, Field<double>& V, Field<double>& W,
                  const Field<double>& P,
@@ -50,19 +52,21 @@ private:
     void adi_sweep_z_(Component which, Field<double>& dQ, double dt,
                       const Field<double>& U, const Field<double>& V, const Field<double>& W);
 
-    // BW cross-component RHS injection (N'^n off-diagonal). Called after
-    // compute_rhs_ and before ADI sweeps. Uses increments from components
-    // already solved in this step:
-    //   V : uses dU    → adds -0.5*dt*dU*(∂V/∂x)
-    //   W : uses dU,dV → adds -0.5*dt*(dU*(∂W/∂x) + dV*(∂W/∂y))
-    // U has no prior increment, so it's a no-op for COMP_U.
-    void add_cross_BW_(Component which, Field<double>& dQ, double dt,
-                       const Field<double>& U, const Field<double>& V, const Field<double>& W,
-                       const Field<double>* dU_prev, const Field<double>* dV_prev);
+    // Beam-Warming cross-component coupling (MPM-STD blockLdU / blockLdV).
+    // Adds the off-diagonal block N'^n contribution to dQ AFTER all three
+    // components have been independently solved.
+    //   V eq:   dV -= dt · M23 · dW          (cross from W in z)
+    //   U eq:   dU -= dt · (M12·dV + M13·dW) (cross from V in y, W in z)
+    //   W eq:   no cross (Gauss-Seidel chain head)
+    void cross_BW_V_(Field<double>& dV, const Field<double>& V,
+                     const Field<double>& dW, double dt);
+    void cross_BW_U_(Field<double>& dU, const Field<double>& U,
+                     const Field<double>& dV, const Field<double>& dW, double dt);
 
-    const Config*    cfg_  = nullptr;
-    const Subdomain* sub_  = nullptr;
-    const Grid*      grid_ = nullptr;
+    const Config*        cfg_  = nullptr;
+    const Subdomain*     sub_  = nullptr;
+    const Grid*          grid_ = nullptr;
+    const HaloExchanger* halo_ = nullptr;
 
     double inv_Re_ = 0.0;
 

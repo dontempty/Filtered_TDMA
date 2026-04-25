@@ -25,6 +25,7 @@
 
 #include "Config.hpp"
 #include "Grid.hpp"
+#include "HaloExchanger.hpp"
 #include "MpiTopology.hpp"
 #include "Subdomain.hpp"
 
@@ -37,8 +38,9 @@ namespace channel {
 MomentumSolver::MomentumSolver(const Config& cfg,
                                const MpiTopology& topo,
                                const Subdomain& sub,
-                               const Grid& grid)
-    : cfg_(&cfg), sub_(&sub), grid_(&grid),
+                               const Grid& grid,
+                               const HaloExchanger& halo)
+    : cfg_(&cfg), sub_(&sub), grid_(&grid), halo_(&halo),
       dU_(sub.nx(), sub.ny(), sub.nz()),
       dV_(sub.nx(), sub.ny(), sub.nz()),
       dW_(sub.nx(), sub.ny(), sub.nz())
@@ -243,11 +245,30 @@ void MomentumSolver::compute_rhs_(Component which,
 
                 // ==============================================================
                 // Implicit residual: M_all·q^n
+                //   M_uu·q only captures the diagonal block of N'(u^n).
+                //   For the U eq:  (∂N_U/∂U)·U = 2·N_x + N_y + N_z
+                //   The cross blocks (∂N_U/∂V)·V = N_y_cross  and
+                //                    (∂N_U/∂W)·W = N_z_cross  are NOT captured.
+                //   Add them explicitly so 0.5·N'·u^n = N(u^n) holds (CN form),
+                //   matching MPM-STD's M12Vn / M13Wn subtractions
+                //   (core_momentum.f90:877-883).
                 // ==============================================================
                 double imp_res = (mACI + mACJ + mACK) * q
                                + mAPI * qxp + mAMI * qxm
                                + mAPJ * qyp + mAMJ * qym
                                + mAPK * qzp + mAMK * qzm;
+
+                // Cross-block contributions (CN factor 0.5, face-avg factor 0.5 → 0.25)
+                if (which == COMP_U) {
+                    imp_res += 0.25 * (vy1*dqdy1 + vy2*dqdy2);   // 0.5·N_y cross
+                    imp_res += 0.25 * (wz1*dqdz1 + wz2*dqdz2);   // 0.5·N_z cross
+                } else if (which == COMP_V) {
+                    imp_res += 0.25 * (ux1*dqdx1 + ux2*dqdx2);   // 0.5·N_x cross
+                    imp_res += 0.25 * (wz1*dqdz1 + wz2*dqdz2);   // 0.5·N_z cross
+                } else { // COMP_W
+                    imp_res += 0.25 * (ux1*dqdx1 + ux2*dqdx2);   // 0.5·N_x cross
+                    imp_res += 0.25 * (vy1*dqdy1 + vy2*dqdy2);   // 0.5·N_y cross
+                }
 
                 dQ(i,j,k) = dt * (diff_x + diff_y + diff_z - press + force - imp_res);
             }
@@ -520,78 +541,124 @@ void MomentumSolver::adi_sweep_z_(Component which, Field<double>& dQ, double dt,
 }
 
 // ---------------------------------------------------------------------------
-// add_cross_BW_
+// cross_BW_V_  (MPM-STD blockLdV_kernel — core_momentum.f90:1624-1700)
 //
-// Beam-Warming cross-component (N'^n off-diagonal) explicit injection using
-// increments from components already solved within the same time step.
-//   V : uses dU    → dQ -= 0.5·dt · dU_at_V · (∂V/∂x)
-//   W : uses dU,dV → dQ -= 0.5·dt · (dU_at_W·∂W/∂x + dV_at_W·∂W/∂y)
-// The diagonal part of N'^n (e.g., δv·∂v^n/∂y for V) is already inside the
-// per-component ADI matrix; this routine only adds the off-diagonal terms.
-// Boundary indices are clamped to one-sided differences (dU, dV halos are
-// not MPI-exchanged inside MomentumSolver).
+//   dV -= dt · M23 · dW   where  M23·dW = convection_cross + stress_tensor_cross
+//
+//   M23dW = 0.25·(dwm5·∂V/∂z|_5 + dwm6·∂V/∂z|_6)
+//         - nu_h·(∂(dW)/∂y|_6 - ∂(dW)/∂y|_5) / dz_k
+//
+//   dwm5/dwm6 : dW interpolated to V's location at z-face k-1/2 / k+1/2.
+//   ∂(dW)/∂y at z-face uses (dW(j) - dW(jm))/dmy[j] — both at z-face k or kp.
+//
+//   Wall flags (kvm/kvp) zero out cross terms touching wall ghost cells.
 // ---------------------------------------------------------------------------
-void MomentumSolver::add_cross_BW_(Component which, Field<double>& dQ, double dt,
-                                   const Field<double>& U, const Field<double>& V, const Field<double>& W,
-                                   const Field<double>* dU_prev, const Field<double>* dV_prev)
+void MomentumSolver::cross_BW_V_(Field<double>& dV, const Field<double>& V,
+                                 const Field<double>& dW, double dt)
 {
     const int nx = nx_, ny = ny_, nz = nz_;
-    const auto& dmx = grid_->dmx(0);
-    const auto& dmy = grid_->dmx(1);
+    const auto& dy  = grid_->dx (1);   const auto& dmy = grid_->dmx(1);
+    const auto& dz  = grid_->dx (2);   const auto& dmz = grid_->dmx(2);
+    const double nu_h = 0.5 * inv_Re_;
 
-    // dU/dV halos are NOT MPI-exchanged inside MomentumSolver; clamp all
-    // out-of-bound index accesses (i±1, j±1, k±1) to interior range.
-    if (which == COMP_V && dU_prev != nullptr) {
-        const Field<double>& dU = *dU_prev;
-        for (int k = 1; k <= nz; ++k)
-            for (int j = 1; j <= ny; ++j)
-                for (int i = 1; i <= nx; ++i) {
-                    const int im  = std::max(i - 1, 1);
-                    const int ip  = std::min(i + 1, nx);
-                    const int ip2 = std::min(i + 1, nx);   // dU x-face: i+1 clamped
-                    const int jm  = std::max(j - 1, 1);
-                    const double dU_V = 0.25 *
-                        (dU(i,   jm, k) + dU(ip2, jm, k) +
-                         dU(i,   j,  k) + dU(ip2, j,  k));
-                    const double dVdx = (V(ip, j, k) - V(im, j, k))
-                                      / (dmx[ip] + dmx[i]);
-                    dQ(i, j, k) -= 0.5 * dt * dU_V * dVdx;
-                }
-    }
-    else if (which == COMP_W) {
-        if (dU_prev != nullptr) {
-            const Field<double>& dU = *dU_prev;
-            for (int k = 1; k <= nz; ++k)
-                for (int j = 1; j <= ny; ++j)
-                    for (int i = 1; i <= nx; ++i) {
-                        const int im  = std::max(i - 1, 1);
-                        const int ip  = std::min(i + 1, nx);
-                        const int ip2 = std::min(i + 1, nx);
-                        const int km  = std::max(k - 1, 1);
-                        const double dU_W = 0.25 *
-                            (dU(i,   j, km) + dU(ip2, j, km) +
-                             dU(i,   j, k)  + dU(ip2, j, k));
-                        const double dWdx = (W(ip, j, k) - W(im, j, k))
-                                          / (dmx[ip] + dmx[i]);
-                        dQ(i, j, k) -= 0.5 * dt * dU_W * dWdx;
-                    }
+    for (int k = 1; k <= nz; ++k) {
+        const double kvm = (k == 1  && rank_z_ == 0)        ? 0.0 : 1.0;
+        const double kvp = (k == nz && rank_z_ == np3_ - 1) ? 0.0 : 1.0;
+        const int km = k - 1, kp = k + 1;
+
+        for (int j = 1; j <= ny; ++j) {
+            const int jm = j - 1;
+
+            for (int i = 1; i <= nx; ++i) {
+                // dW interpolated to V location (V at y-face j-1/2): weight in y by dy
+                const double dwm5 = (dy[jm]*dW(i,j,k)  + dy[j]*dW(i,jm,k))  / dmy[j] * 0.5;
+                const double dwm6 = (dy[jm]*dW(i,j,kp) + dy[j]*dW(i,jm,kp)) / dmy[j] * 0.5;
+
+                // ∂V/∂z at z-faces k-1/2 and k+1/2
+                const double dvdz5 = (V(i,j,k)  - V(i,j,km)) / dmz[k];
+                const double dvdz6 = (V(i,j,kp) - V(i,j,k))  / dmz[kp];
+
+                // ∂(dW)/∂y at z-faces (dW is on z-face, differentiate in y between j-1, j)
+                const double ddwdy5 = (dW(i,j,k)  - dW(i,jm,k))  / dmy[j];
+                const double ddwdy6 = (dW(i,j,kp) - dW(i,jm,kp)) / dmy[j];
+
+                const double M23dW = 0.25*(dwm5*kvm*dvdz5 + dwm6*kvp*dvdz6)
+                                   - nu_h*(ddwdy6*kvp - ddwdy5*kvm) / dz[k];
+
+                dV(i,j,k) -= dt * M23dW;
+            }
         }
-        if (dV_prev != nullptr) {
-            const Field<double>& dV = *dV_prev;
-            for (int k = 1; k <= nz; ++k)
-                for (int j = 1; j <= ny; ++j)
-                    for (int i = 1; i <= nx; ++i) {
-                        const int jm  = std::max(j - 1, 1);
-                        const int jp  = std::min(j + 1, ny);
-                        const int jp2 = std::min(j + 1, ny);
-                        const int km  = std::max(k - 1, 1);
-                        const double dV_W = 0.25 *
-                            (dV(i, j,   km) + dV(i, jp2, km) +
-                             dV(i, j,   k)  + dV(i, jp2, k));
-                        const double dWdy = (W(i, jp, k) - W(i, jm, k))
-                                          / (dmy[jp] + dmy[j]);
-                        dQ(i, j, k) -= 0.5 * dt * dV_W * dWdy;
-                    }
+    }
+}
+
+// ---------------------------------------------------------------------------
+// cross_BW_U_  (MPM-STD blockLdU_kernel — core_momentum.f90:1702-1797)
+//
+//   dU -= dt · (M12 · dV + M13 · dW)
+//
+//   M12dV = 0.25·(dvm3·∂U/∂y|_3 + dvm4·∂U/∂y|_4)
+//         - nu_h·(∂(dV)/∂x|_4 - ∂(dV)/∂x|_3) / dy_j
+//   M13dW = 0.25·(dwm5·∂U/∂z|_5 + dwm6·∂U/∂z|_6)
+//         - nu_h·(∂(dW)/∂x|_6 - ∂(dW)/∂x|_5) / dz_k
+//
+//   dvm3/dvm4 : dV interpolated to U's location at y-faces j-1/2 / j+1/2
+//   dwm5/dwm6 : dW interpolated to U's location at z-faces k-1/2 / k+1/2
+//
+//   Periodic in y → jum=jup=1 always.  Wall flags (kum/kup) for z only.
+// ---------------------------------------------------------------------------
+void MomentumSolver::cross_BW_U_(Field<double>& dU, const Field<double>& U,
+                                 const Field<double>& dV, const Field<double>& dW, double dt)
+{
+    const int nx = nx_, ny = ny_, nz = nz_;
+    const auto& dx  = grid_->dx (0);   const auto& dmx = grid_->dmx(0);
+    const auto& dy  = grid_->dx (1);   const auto& dmy = grid_->dmx(1);
+    const auto& dz  = grid_->dx (2);   const auto& dmz = grid_->dmx(2);
+    const double nu_h = 0.5 * inv_Re_;
+
+    for (int k = 1; k <= nz; ++k) {
+        const double kum = (k == 1  && rank_z_ == 0)        ? 0.0 : 1.0;
+        const double kup = (k == nz && rank_z_ == np3_ - 1) ? 0.0 : 1.0;
+        const int km = k - 1, kp = k + 1;
+
+        for (int j = 1; j <= ny; ++j) {
+            const double jum = 1.0;   // periodic y → no wall
+            const double jup = 1.0;
+            const int jm = j - 1, jp = j + 1;
+
+            for (int i = 1; i <= nx; ++i) {
+                const int im = i - 1;
+
+                // dV interpolated to U location (U at x-face i-1/2): weight in x by dx
+                const double dvm3 = (dx[im]*dV(i,j, k) + dx[i]*dV(im,j, k)) / dmx[i] * 0.5;
+                const double dvm4 = (dx[im]*dV(i,jp,k) + dx[i]*dV(im,jp,k)) / dmx[i] * 0.5;
+
+                // ∂U/∂y at y-faces (U at cell-center in y, but x-face in x)
+                const double dudy3 = (U(i,j, k) - U(i,jm,k)) / dmy[j];
+                const double dudy4 = (U(i,jp,k) - U(i,j, k)) / dmy[jp];
+
+                // ∂(dV)/∂x at y-faces (dV is on y-face, differentiate in x between i-1, i)
+                const double dvmdx3 = (dV(i,j, k) - dV(im,j, k)) / dmx[i];
+                const double dvmdx4 = (dV(i,jp,k) - dV(im,jp,k)) / dmx[i];
+
+                // dW interpolated to U location: weight in x by dx
+                const double dwm5 = (dx[im]*dW(i,j,k)  + dx[i]*dW(im,j,k))  / dmx[i] * 0.5;
+                const double dwm6 = (dx[im]*dW(i,j,kp) + dx[i]*dW(im,j,kp)) / dmx[i] * 0.5;
+
+                // ∂U/∂z at z-faces
+                const double dudz5 = (U(i,j,k)  - U(i,j,km)) / dmz[k];
+                const double dudz6 = (U(i,j,kp) - U(i,j,k))  / dmz[kp];
+
+                // ∂(dW)/∂x at z-faces
+                const double dwmdx5 = (dW(i,j,k)  - dW(im,j,k))  / dmx[i];
+                const double dwmdx6 = (dW(i,j,kp) - dW(im,j,kp)) / dmx[i];
+
+                const double M12dV = 0.25*(dvm3*jum*dudy3 + dvm4*jup*dudy4)
+                                   - nu_h*(dvmdx4*jup - dvmdx3*jum) / dy[j];
+                const double M13dW = 0.25*(dwm5*kum*dudz5 + dwm6*kup*dudz6)
+                                   - nu_h*(dwmdx6*kup - dwmdx5*kum) / dz[k];
+
+                dU(i,j,k) -= dt * (M12dV + M13dW);
+            }
         }
     }
 }
@@ -611,33 +678,44 @@ void MomentumSolver::advance(Field<double>& U, Field<double>& V, Field<double>& 
     fdma_y_->set_eps_constant(dt);
     fdma_z_->set_eps_constant(dt);
 
-    // Sequential Gauss-Seidel with Beam-Warming cross-coupling (MPM-STD /
-    // PaScaL_TCS style).  All matrices are built from OLD (u^n, v^n, w^n);
-    // already-solved increments enter the NEXT component's RHS via
-    // add_cross_BW_ (the N'^n off-diagonal block).  Increments are applied
-    // atomically at the end to preserve time consistency.
+    // MPM-STD core_momentum + blockLdU pattern (submodule.f90:195-232):
+    //   1) Independently solve each component's ADI (Jacobi base)
+    //   2) Halo-exchange dU, dV, dW so cross-coupling reads valid neighbors
+    //   3) Cross-couple V eq with dW          → halo-exchange dV
+    //   4) Cross-couple U eq with dV (fresh) and dW
+    //   5) Apply all increments atomically
+    // W eq has no cross-BW (chain head, like MPM-STD which omits blockLdW).
 
-    // --- U -------------------------------------------------------------
+    // --- (1) Independent ADI for each component --------------------
     compute_rhs_(COMP_U, dU_, U, V, W, P, dt, mean_dPdx);
     adi_sweep_x_(COMP_U, dU_, dt, U, V, W);
     adi_sweep_y_(COMP_U, dU_, dt, U, V, W);
     adi_sweep_z_(COMP_U, dU_, dt, U, V, W);
 
-    // --- V  (cross-term disabled; dU halo is stale at rank boundaries) -
     compute_rhs_(COMP_V, dV_, U, V, W, P, dt, mean_dPdx);
-    // add_cross_BW_(COMP_V, dV_, dt, U, V, W, &dU_, nullptr);   // DISABLED
     adi_sweep_x_(COMP_V, dV_, dt, U, V, W);
     adi_sweep_y_(COMP_V, dV_, dt, U, V, W);
     adi_sweep_z_(COMP_V, dV_, dt, U, V, W);
 
-    // --- W  (cross-terms disabled) -------------------------------------
     compute_rhs_(COMP_W, dW_, U, V, W, P, dt, mean_dPdx);
-    // add_cross_BW_(COMP_W, dW_, dt, U, V, W, &dU_, &dV_);      // DISABLED
     adi_sweep_x_(COMP_W, dW_, dt, U, V, W);
     adi_sweep_y_(COMP_W, dW_, dt, U, V, W);
     adi_sweep_z_(COMP_W, dW_, dt, U, V, W);
 
-    // --- Apply all increments atomically -------------------------------
+    // --- (2) Refresh halos of all increment fields -----------------
+    // (MPM-STD: cuda_subdomain_ghostcell_update at end of cuda_momentum_solvedU)
+    halo_->exchange(dU_);
+    halo_->exchange(dV_);
+    halo_->exchange(dW_);
+
+    // --- (3) Cross-couple V using dW; refresh dV halo --------------
+    cross_BW_V_(dV_, V, dW_, dt);
+    halo_->exchange(dV_);
+
+    // --- (4) Cross-couple U using dV (fresh) and dW ----------------
+    cross_BW_U_(dU_, U, dV_, dW_, dt);
+
+    // --- (5) Apply all increments atomically -----------------------
     for (int k = 1; k <= nz; ++k)
         for (int j = 1; j <= ny; ++j)
             for (int i = 1; i <= nx; ++i) {

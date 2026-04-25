@@ -31,7 +31,7 @@ uniform3 = 0
 # === group: mesh_stretch ===
 gamma1 = 0.0
 gamma2 = 0.0
-gamma3 = 1.3
+gamma3 = 2.5
 
 # === group: aspect_ratio ===
 H       = 2.0
@@ -64,7 +64,7 @@ target_dPdx          = 0.0
 # Random perturbation amplitude added to the laminar parabolic U profile,
 # expressed as a fraction of Umax = 1.5·Ub.
 #   0.0 = pure Poiseuille,  0.05 = 5% noise, etc.
-pert_amp = 0.4
+pert_amp = 0.5
 
 # === group: output (v2 convention) ===
 # nmonitor    : monitor print interval (steps)

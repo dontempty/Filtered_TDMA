@@ -154,7 +154,7 @@ int main(int argc, char** argv)
         channel::HaloExchanger    halo(topo, sub);
         channel::BoundaryCondition bc(topo, sub);
 
-        channel::MomentumSolver  momentum(cfg, topo, sub, grid);
+        channel::MomentumSolver  momentum(cfg, topo, sub, grid, halo);
         channel::PressureSolver  pressure(cfg, topo, sub, grid, halo);
         channel::ChannelForcing  forcing(cfg, topo, sub, grid);
         channel::Statistics      stats(topo, sub, grid);
