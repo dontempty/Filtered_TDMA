@@ -605,6 +605,8 @@ void MomentumSolver::advance(Field<double>& U, Field<double>& V, Field<double>& 
 
     ++step_count_;
 
+    const double t_adv0 = MPI_Wtime();
+
     fdma_x_->set_eps_constant(dt);
     fdma_y_->set_eps_constant(dt);
     fdma_z_->set_eps_constant(dt);
@@ -643,6 +645,8 @@ void MomentumSolver::advance(Field<double>& U, Field<double>& V, Field<double>& 
                 V(i,j,k) += dV_(i,j,k);
                 W(i,j,k) += dW_(i,j,k);
             }
+
+    if (step_count_ > 20000) momentum_time_ += MPI_Wtime() - t_adv0;
 }
 
 } // namespace channel

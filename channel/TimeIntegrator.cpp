@@ -325,13 +325,17 @@ void TimeIntegrator::run(Field<double>& U, Field<double>& V, Field<double>& W,
     if (cfg_.ContinueFileout)
         restart_.write(cfg_.dir_cont_fileout, U, V, W, P, state);
 
-    // ---- TDMA timing report (accumulated from step 20001 onward) ----
+    // ---- Momentum / TDMA timing report (accumulated from step 20001 onward) ----
     {
-        double local_t  = momentum_.tdma_time();
-        double global_t = 0.0;
-        MPI_Reduce(&local_t, &global_t, 1, MPI_DOUBLE, MPI_MAX, 0, topo_.cart());
-        if (root)
-            std::printf("[TDMA time (step>20000)] %.6e s  (max over ranks)\n", global_t);
+        double loc[2] = { momentum_.momentum_time(), momentum_.tdma_time() };
+        double glo[2] = { 0.0, 0.0 };
+        MPI_Reduce(loc, glo, 2, MPI_DOUBLE, MPI_MAX, 0, topo_.cart());
+        if (root) {
+            const double frac = (glo[0] > 0.0) ? 100.0 * glo[1] / glo[0] : 0.0;
+            std::printf("[Momentum time (step>20000)] %.6e s  (max over ranks)\n", glo[0]);
+            std::printf("[TDMA     time (step>20000)] %.6e s  (max over ranks, %.2f%% of momentum)\n",
+                        glo[1], frac);
+        }
     }
 
     if (root) {

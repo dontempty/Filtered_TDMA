@@ -87,10 +87,12 @@ private:
     int nx_ = 0, ny_ = 0, nz_ = 0;
 
     long   step_count_ = 0;     // incremented each advance() call
-    double tdma_time_  = 0.0;   // accumulated wall-time of TDMA solves (step > 20000)
+    double tdma_time_     = 0.0;  // accumulated wall-time of TDMA solves   (step > 20000)
+    double momentum_time_ = 0.0;  // accumulated wall-time of full advance() (step > 20000)
 
 public:
-    double tdma_time() const { return tdma_time_; }
+    double tdma_time()     const { return tdma_time_; }
+    double momentum_time() const { return momentum_time_; }
 };
 
 } // namespace channel
