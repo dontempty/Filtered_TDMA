@@ -46,8 +46,17 @@ void laminar_init(channel::Field<double>& U, channel::Field<double>& V,
 
     int my_rank = 0;
     MPI_Comm_rank(comm, &my_rank);
-    std::mt19937 rng(12345 + 7919 * my_rank);
+    // Non-deterministic seed (matches MPM-STD's default Fortran random_seed()).
+    // Mixing random_device entropy with the rank ensures both per-run and
+    // per-rank distinguishability.
+    std::random_device rd;
+    const std::uint64_t seed = static_cast<std::uint64_t>(rd())
+                              ^ (static_cast<std::uint64_t>(my_rank) * 0x9E3779B97F4A7C15ULL);
+    std::mt19937 rng(seed);
     std::uniform_real_distribution<double> rnd(-0.5, 0.5);   // matches MPM-STD: uniform[0,1]-0.5
+    if (my_rank == 0)
+        std::printf("[laminar_init] non-deterministic seed (rank0=%llu)\n",
+                    (unsigned long long)seed);
 
     P.fill(0.0);
 

@@ -52,16 +52,29 @@ private:
     void adi_sweep_z_(Component which, Field<double>& dQ, double dt,
                       const Field<double>& U, const Field<double>& V, const Field<double>& W);
 
-    // Beam-Warming cross-component coupling (MPM-STD blockLdU / blockLdV).
-    // Adds the off-diagonal block N'^n contribution to dQ AFTER all three
-    // components have been independently solved.
-    //   V eq:   dV -= dt · M23 · dW          (cross from W in z)
-    //   U eq:   dU -= dt · (M12·dV + M13·dW) (cross from V in y, W in z)
-    //   W eq:   no cross (Gauss-Seidel chain head)
+    // Beam-Warming cross-component coupling — UPPER triangle (post-ADI).
+    // Mirrors MPM-STD blockLdU / blockLdV (core_momentum.f90:535-566).
+    //   V eq:   dV -= dt · M23 · dW          (W → V in z)
+    //   U eq:   dU -= dt · (M12·dV + M13·dW) (V → U in y, W → U in z)
     void cross_BW_V_(Field<double>& dV, const Field<double>& V,
                      const Field<double>& dW, double dt);
     void cross_BW_U_(Field<double>& dU, const Field<double>& U,
                      const Field<double>& dV, const Field<double>& dW, double dt);
+
+    // Beam-Warming cross-component coupling — LOWER triangle (pre-ADI Gauss-Seidel).
+    // Mirrors the "M21ddU" / "M31ddU" / "M32ddV" sections embedded inside
+    // MPM-STD's solvedV/solvedW Amatrix kernels (core_momentum.f90:1222-1229
+    // and 1536-1552).  Subtracts dt·M_ji·dQ_j from the RHS of equation i,
+    // using freshly-computed increments dQ_j (j < i in the GS chain U→V→W).
+    //   V eq:  dV_rhs -= dt · M21 · dU                        (U → V in x)
+    //   W eq:  dW_rhs -= dt · M31 · dU                        (U → W in x)
+    //   W eq:  dW_rhs -= dt · M32 · dV                        (V → W in y)
+    void cross_BW_V_M21_(Field<double>& dV_rhs, const Field<double>& V,
+                         const Field<double>& dU, double dt);
+    void cross_BW_W_M31_(Field<double>& dW_rhs, const Field<double>& W,
+                         const Field<double>& dU, double dt);
+    void cross_BW_W_M32_(Field<double>& dW_rhs, const Field<double>& W,
+                         const Field<double>& dV, double dt);
 
     const Config*        cfg_  = nullptr;
     const Subdomain*     sub_  = nullptr;

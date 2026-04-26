@@ -50,10 +50,10 @@ Timestepmax = 30000
 # === group: sim_continue ===
 ContinueFilein = 0
 ContinueFileout  = 1
-dir_cont_filein = ./restart_in/
-dir_cont_fileout = ./restart_out/
-dir_instantfield = ./instant/
-dir_statistics   = ./statistics/
+dir_cont_filein = ./restart_in/p/
+dir_cont_fileout = ./restart_out/p/
+dir_instantfield = ./instant/p/
+dir_statistics   = ./statistics/p/
 
 # === group: channel_forcing ===
 forcing_mode         = MASS_FLOW

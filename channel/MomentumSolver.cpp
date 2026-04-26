@@ -117,6 +117,15 @@ void MomentumSolver::compute_rhs_(Component which,
     const double sy = (which == COMP_V) ? 1.0 : 0.0;
     const double sz = (which == COMP_W) ? 1.0 : 0.0;
 
+    // Stress-tensor 2μ form for OWN-direction viscous coefficient
+    // (MPM-STD core_momentum.f90: M11MI/CI/PI×2, M22MJ/CJ/PJ×2, M33MK/CK/PK×2).
+    // Cross-direction stays at 1·μ.  For incompressible flow the explicit RHS
+    // (simple Laplacian) is unchanged, but the implicit M_diag damping in the
+    // own direction doubles, matching the reference Beam-Warming conditioning.
+    const double vfx = 1.0 + sx;   // 2 if own (x for U), else 1
+    const double vfy = 1.0 + sy;   // 2 if own (y for V), else 1
+    const double vfz = 1.0 + sz;   // 2 if own (z for W), else 1
+
     for (int k = 1; k <= nz; ++k)
         for (int j = 1; j <= ny; ++j)
             for (int i = 1; i <= nx; ++i) {
@@ -148,15 +157,18 @@ void MomentumSolver::compute_rhs_(Component which,
                     ux1 = 0.5*(U(i-1,j,k) + U(i,j,k));
                     ux2 = 0.5*(U(i,j,k)   + U(i+1,j,k));
                 } else if (which == COMP_V) {
-                    ux1 = 0.5*(U(i,j-1,k)   + U(i,j,k));      // y-interp
+                    // y-interp (uniform y → simple 0.5 avg ≡ inverse-distance)
+                    ux1 = 0.5*(U(i,j-1,k)   + U(i,j,k));
                     ux2 = 0.5*(U(i+1,j-1,k) + U(i+1,j,k));
                 } else {
-                    ux1 = 0.5*(U(i,j,k-1)   + U(i,j,k));      // z-interp
-                    ux2 = 0.5*(U(i+1,j,k-1) + U(i+1,j,k));
+                    // z-interp to W's z-face: STRETCHED z requires inverse-distance
+                    // weighting (MPM-STD line 1399-1400, dx3 weights).
+                    ux1 = (dz[k-1]*U(i,  j,k) + dz[k]*U(i,  j,k-1)) / dmz[k] * 0.5;
+                    ux2 = (dz[k-1]*U(i+1,j,k) + dz[k]*U(i+1,j,k-1)) / dmz[k] * 0.5;
                 }
-                double mAMI = -nu_h/(cvx*spxm) + 0.25*(-ux1/spxm + sx*0.5*dqdx1);
-                double mAPI = -nu_h/(cvx*spxp)  + 0.25*( ux2/spxp + sx*0.5*dqdx2);
-                double mACI =  nu_h/cvx*(1.0/spxm + 1.0/spxp)
+                double mAMI = -vfx*nu_h/(cvx*spxm) + 0.25*(-ux1/spxm + sx*0.5*dqdx1);
+                double mAPI = -vfx*nu_h/(cvx*spxp)  + 0.25*( ux2/spxp + sx*0.5*dqdx2);
+                double mACI =  vfx*nu_h/cvx*(1.0/spxm + 1.0/spxp)
                              + 0.25*(sx*(0.5*dqdx2 + 0.5*dqdx1) - ux2/spxp + ux1/spxm);
 
                 // ==============================================================
@@ -177,15 +189,17 @@ void MomentumSolver::compute_rhs_(Component which,
                     vy1 = 0.5*(V(i,j-1,k) + V(i,j,k));
                     vy2 = 0.5*(V(i,j,k)   + V(i,j+1,k));
                 } else if (which == COMP_U) {
-                    vy1 = 0.5*(V(i-1,j,k)   + V(i,j,k));      // x-interp
+                    // x-interp (uniform x)
+                    vy1 = 0.5*(V(i-1,j,k)   + V(i,j,k));
                     vy2 = 0.5*(V(i-1,j+1,k) + V(i,j+1,k));
                 } else {
-                    vy1 = 0.5*(V(i,j,k-1)   + V(i,j,k));      // z-interp
-                    vy2 = 0.5*(V(i,j+1,k-1) + V(i,j+1,k));
+                    // z-interp to W's z-face (MPM-STD line 1404-1405)
+                    vy1 = (dz[k-1]*V(i,j,  k) + dz[k]*V(i,j,  k-1)) / dmz[k] * 0.5;
+                    vy2 = (dz[k-1]*V(i,j+1,k) + dz[k]*V(i,j+1,k-1)) / dmz[k] * 0.5;
                 }
-                double mAMJ = -nu_h/(cvy*spym) + 0.25*(-vy1/spym + sy*0.5*dqdy1);
-                double mAPJ = -nu_h/(cvy*spyp)  + 0.25*( vy2/spyp + sy*0.5*dqdy2);
-                double mACJ =  nu_h/cvy*(1.0/spym + 1.0/spyp)
+                double mAMJ = -vfy*nu_h/(cvy*spym) + 0.25*(-vy1/spym + sy*0.5*dqdy1);
+                double mAPJ = -vfy*nu_h/(cvy*spyp)  + 0.25*( vy2/spyp + sy*0.5*dqdy2);
+                double mACJ =  vfy*nu_h/cvy*(1.0/spym + 1.0/spyp)
                              + 0.25*(sy*(0.5*dqdy2 + 0.5*dqdy1) - vy2/spyp + vy1/spym);
 
                 // ==============================================================
@@ -212,21 +226,60 @@ void MomentumSolver::compute_rhs_(Component which,
                     wz1 = 0.5*(W(i,j-1,k)   + W(i,j,k));      // y-interp
                     wz2 = 0.5*(W(i,j-1,k+1) + W(i,j,k+1));
                 }
-                double mAMK = -nu_h/(cvz*spzm) + 0.25*(-wz1/spzm + sz*0.5*dqdz1);
-                double mAPK = -nu_h/(cvz*spzp)  + 0.25*( wz2/spzp + sz*0.5*dqdz2);
-                double mACK =  nu_h/cvz*(1.0/spzm + 1.0/spzp)
+                double mAMK = -vfz*nu_h/(cvz*spzm) + 0.25*(-wz1/spzm + sz*0.5*dqdz1);
+                double mAPK = -vfz*nu_h/(cvz*spzp)  + 0.25*( wz2/spzp + sz*0.5*dqdz2);
+                double mACK =  vfz*nu_h/cvz*(1.0/spzm + 1.0/spzp)
                              + 0.25*(sz*(0.5*dqdz2 + 0.5*dqdz1) - wz2/spzp + wz1/spzm);
 
                 // ==============================================================
-                // Explicit viscous (½)·ν∇²q.  The factor ½ matches PaScaL_TCS
-                // line 341 (invRhocCmu_half · ...).  After subtracting imp_res
-                // = M_all·u^n = -½·A·u + N(u^n)  (quadratic N), the net RHS
-                // becomes dt·(A·u − N(u) + force − ∇p), consistent with full
-                // Crank–Nicolson + Beam–Warming.
+                // Explicit viscous: ½·∇·(2μS) — full stress-tensor divergence
+                // (MPM-STD core_momentum.f90:870 form).  In own direction the
+                // 2μ stress contributes factor 2 (handled via vfx/vfy/vfz),
+                // and cross directions add the stress-tensor cross-derivative
+                // terms (viscous_u12, u13 for U eq; v21, v23 for V; w31, w32
+                // for W).  For incompressible flow these reduce to ½ν·∇²q in
+                // continuum but discretely are needed to stay consistent with
+                // the factor-2 own-direction M_diag — without them the implicit
+                // RHS picks up a spurious ½ν·∂²q/∂(own)² and blows up.
                 // ==============================================================
                 double diff_x = nu_h * ((qxp - q)/spxp - (q - qxm)/spxm) / cvx;
                 double diff_y = nu_h * ((qyp - q)/spyp - (q - qym)/spym) / cvy;
                 double diff_z = nu_h * ((qzp - q)/spzp - (q - qzm)/spzm) / cvz;
+
+                // Stress-tensor cross-derivative components — ∂(μ·∂q_other/∂?)/∂?
+                // at the solving variable's location.  Used in BOTH cross_visc
+                // (RHS, MPM-STD line 1170 viscous_v21/v23, etc.)  AND imp_res
+                // (M·u^n viscous part, MPM-STD line 1178 M21Un visc / 1181 M23Wn).
+                double cv_a = 0.0, cv_b = 0.0;   // two cross-stress components
+                if (which == COMP_U) {
+                    // viscous_u12 = ∂(∂V/∂x)/∂y at U location (x-face, y-cell)
+                    const double dvdx_lo = (V(i,j,  k) - V(i-1,j,  k)) / dmx[i];
+                    const double dvdx_hi = (V(i,j+1,k) - V(i-1,j+1,k)) / dmx[i];
+                    cv_a = (dvdx_hi - dvdx_lo) / dy[j];                            // u12
+                    // viscous_u13 = ∂(∂W/∂x)/∂z at U location
+                    const double dwdx_lo = (W(i,j,k  ) - W(i-1,j,k  )) / dmx[i];
+                    const double dwdx_hi = (W(i,j,k+1) - W(i-1,j,k+1)) / dmx[i];
+                    cv_b = (dwdx_hi - dwdx_lo) / dz[k];                            // u13
+                } else if (which == COMP_V) {
+                    // viscous_v21 = ∂(∂U/∂y)/∂x at V location (x-cell, y-face)
+                    const double dudy_lo = (U(i  ,j,k) - U(i  ,j-1,k)) / dmy[j];
+                    const double dudy_hi = (U(i+1,j,k) - U(i+1,j-1,k)) / dmy[j];
+                    cv_a = (dudy_hi - dudy_lo) / dx[i];                            // v21
+                    // viscous_v23 = ∂(∂W/∂y)/∂z at V location
+                    const double dwdy_lo = (W(i,j,k  ) - W(i,j-1,k  )) / dmy[j];
+                    const double dwdy_hi = (W(i,j,k+1) - W(i,j-1,k+1)) / dmy[j];
+                    cv_b = (dwdy_hi - dwdy_lo) / dz[k];                            // v23
+                } else { // COMP_W
+                    // viscous_w31 = ∂(∂U/∂z)/∂x at W location
+                    const double dudz_lo = (U(i  ,j,k) - U(i  ,j,k-1)) / dmz[k];
+                    const double dudz_hi = (U(i+1,j,k) - U(i+1,j,k-1)) / dmz[k];
+                    cv_a = (dudz_hi - dudz_lo) / dx[i];                            // w31
+                    // viscous_w32 = ∂(∂V/∂z)/∂y at W location
+                    const double dvdz_lo = (V(i,j,  k) - V(i,j,  k-1)) / dmz[k];
+                    const double dvdz_hi = (V(i,j+1,k) - V(i,j+1,k-1)) / dmz[k];
+                    cv_b = (dvdz_hi - dvdz_lo) / dy[j];                            // w32
+                }
+                const double cross_visc = nu_h * (cv_a + cv_b);
 
                 // ==============================================================
                 // Pressure gradient
@@ -258,19 +311,23 @@ void MomentumSolver::compute_rhs_(Component which,
                                + mAPJ * qyp + mAMJ * qym
                                + mAPK * qzp + mAMK * qzm;
 
-                // Cross-block contributions (CN factor 0.5, face-avg factor 0.5 → 0.25)
+                // Cross-block M·u^n contributions — both convection (CN factor
+                // 0.5 × face-avg 0.5 = 0.25) AND viscous cross-stress (-nu_h·v),
+                // matching MPM-STD M12Vn/M13Wn (line 877-883), M21Un/M23Wn
+                // (line 1178-1182), M31Un/M32Vn (line 1485-1489).
                 if (which == COMP_U) {
-                    imp_res += 0.25 * (vy1*dqdy1 + vy2*dqdy2);   // 0.5·N_y cross
-                    imp_res += 0.25 * (wz1*dqdz1 + wz2*dqdz2);   // 0.5·N_z cross
+                    imp_res += 0.25 * (vy1*dqdy1 + vy2*dqdy2) - nu_h*cv_a;   // M12Vn
+                    imp_res += 0.25 * (wz1*dqdz1 + wz2*dqdz2) - nu_h*cv_b;   // M13Wn
                 } else if (which == COMP_V) {
-                    imp_res += 0.25 * (ux1*dqdx1 + ux2*dqdx2);   // 0.5·N_x cross
-                    imp_res += 0.25 * (wz1*dqdz1 + wz2*dqdz2);   // 0.5·N_z cross
+                    imp_res += 0.25 * (ux1*dqdx1 + ux2*dqdx2) - nu_h*cv_a;   // M21Un
+                    imp_res += 0.25 * (wz1*dqdz1 + wz2*dqdz2) - nu_h*cv_b;   // M23Wn
                 } else { // COMP_W
-                    imp_res += 0.25 * (ux1*dqdx1 + ux2*dqdx2);   // 0.5·N_x cross
-                    imp_res += 0.25 * (vy1*dqdy1 + vy2*dqdy2);   // 0.5·N_y cross
+                    imp_res += 0.25 * (ux1*dqdx1 + ux2*dqdx2) - nu_h*cv_a;   // M31Un
+                    imp_res += 0.25 * (vy1*dqdy1 + vy2*dqdy2) - nu_h*cv_b;   // M32Vn
                 }
 
-                dQ(i,j,k) = dt * (diff_x + diff_y + diff_z - press + force - imp_res);
+                dQ(i,j,k) = dt * (vfx*diff_x + vfy*diff_y + vfz*diff_z + cross_visc
+                                   - press + force - imp_res);
             }
 }
 
@@ -288,6 +345,7 @@ void MomentumSolver::adi_sweep_x_(Component which, Field<double>& dQ, double dt,
     const double nu_h = 0.5 * inv_Re_;
     const int ns = ny * nz;
     const double sx = (which == COMP_U) ? 1.0 : 0.0;   // BW self-derivative gate
+    const double vfx = 1.0 + sx;                        // 2 if own (x for U), else 1
 
     for (int k = 1; k <= nz; ++k)
         for (int j = 1; j <= ny; ++j) {
@@ -319,13 +377,17 @@ void MomentumSolver::adi_sweep_x_(Component which, Field<double>& dQ, double dt,
                     ux1 = 0.5*(U(i,j-1,k)   + U(i,j,k));
                     ux2 = 0.5*(U(i+1,j-1,k) + U(i+1,j,k));
                 } else {
-                    ux1 = 0.5*(U(i,j,k-1)   + U(i,j,k));
-                    ux2 = 0.5*(U(i+1,j,k-1) + U(i+1,j,k));
+                    // z-interp to W's z-face: STRETCHED z requires inverse-distance
+                    // weighting (MPM-STD line 1399-1400, dx3 weights).
+                    const auto& dz_  = grid_->dx (2);
+                    const auto& dmz_ = grid_->dmx(2);
+                    ux1 = (dz_[k-1]*U(i,  j,k) + dz_[k]*U(i,  j,k-1)) / dmz_[k] * 0.5;
+                    ux2 = (dz_[k-1]*U(i+1,j,k) + dz_[k]*U(i+1,j,k-1)) / dmz_[k] * 0.5;
                 }
 
-                double mAMI = -nu_h/(cvx*spxm) + 0.25*(-ux1/spxm + sx*0.5*dqdx1);
-                double mAPI = -nu_h/(cvx*spxp)  + 0.25*( ux2/spxp + sx*0.5*dqdx2);
-                double mACI =  nu_h/cvx*(1.0/spxm + 1.0/spxp)
+                double mAMI = -vfx*nu_h/(cvx*spxm) + 0.25*(-ux1/spxm + sx*0.5*dqdx1);
+                double mAPI = -vfx*nu_h/(cvx*spxp)  + 0.25*( ux2/spxp + sx*0.5*dqdx2);
+                double mACI =  vfx*nu_h/cvx*(1.0/spxm + 1.0/spxp)
                              + 0.25*(sx*(0.5*dqdx2 + 0.5*dqdx1) - ux2/spxp + ux1/spxm);
 
                 Ax_[row*ns + s] = mAMI * dt;
@@ -367,6 +429,7 @@ void MomentumSolver::adi_sweep_y_(Component which, Field<double>& dQ, double dt,
     const double nu_h = 0.5 * inv_Re_;
     const int ns = nx * nz;
     const double sy = (which == COMP_V) ? 1.0 : 0.0;   // BW self-derivative gate
+    const double vfy = 1.0 + sy;                        // 2 if own (y for V), else 1
 
     for (int k = 1; k <= nz; ++k)
         for (int i = 1; i <= nx; ++i) {
@@ -397,13 +460,17 @@ void MomentumSolver::adi_sweep_y_(Component which, Field<double>& dQ, double dt,
                     vy1 = 0.5*(V(i-1,j,k)   + V(i,j,k));
                     vy2 = 0.5*(V(i-1,j+1,k) + V(i,j+1,k));
                 } else {
-                    vy1 = 0.5*(V(i,j,k-1)   + V(i,j,k));
-                    vy2 = 0.5*(V(i,j+1,k-1) + V(i,j+1,k));
+                    // z-interp to W's z-face: STRETCHED z requires inverse-distance
+                    // weighting (MPM-STD line 1404-1405).
+                    const auto& dz_  = grid_->dx (2);
+                    const auto& dmz_ = grid_->dmx(2);
+                    vy1 = (dz_[k-1]*V(i,j,  k) + dz_[k]*V(i,j,  k-1)) / dmz_[k] * 0.5;
+                    vy2 = (dz_[k-1]*V(i,j+1,k) + dz_[k]*V(i,j+1,k-1)) / dmz_[k] * 0.5;
                 }
 
-                double mAMJ = -nu_h/(cvy*spym) + 0.25*(-vy1/spym + sy*0.5*dqdy1);
-                double mAPJ = -nu_h/(cvy*spyp)  + 0.25*( vy2/spyp + sy*0.5*dqdy2);
-                double mACJ =  nu_h/cvy*(1.0/spym + 1.0/spyp)
+                double mAMJ = -vfy*nu_h/(cvy*spym) + 0.25*(-vy1/spym + sy*0.5*dqdy1);
+                double mAPJ = -vfy*nu_h/(cvy*spyp)  + 0.25*( vy2/spyp + sy*0.5*dqdy2);
+                double mACJ =  vfy*nu_h/cvy*(1.0/spym + 1.0/spyp)
                              + 0.25*(sy*(0.5*dqdy2 + 0.5*dqdy1) - vy2/spyp + vy1/spym);
 
                 Ay_[row*ns + s] = mAMJ * dt;
@@ -446,6 +513,7 @@ void MomentumSolver::adi_sweep_z_(Component which, Field<double>& dQ, double dt,
     const double nu_h = 0.5 * inv_Re_;
     const int ns = nx * ny;
     const double sz = (which == COMP_W) ? 1.0 : 0.0;   // BW self-derivative gate
+    const double vfz = 1.0 + sz;                        // 2 if own (z for W), else 1
 
     for (int j = 1; j <= ny; ++j)
         for (int i = 1; i <= nx; ++i) {
@@ -482,9 +550,9 @@ void MomentumSolver::adi_sweep_z_(Component which, Field<double>& dQ, double dt,
                     wz2 = 0.5*(W(i,j-1,k+1) + W(i,j,k+1));
                 }
 
-                double mAMK = -nu_h/(cvz*spzm) + 0.25*(-wz1/spzm + sz*0.5*dqdz1);
-                double mAPK = -nu_h/(cvz*spzp)  + 0.25*( wz2/spzp + sz*0.5*dqdz2);
-                double mACK =  nu_h/cvz*(1.0/spzm + 1.0/spzp)
+                double mAMK = -vfz*nu_h/(cvz*spzm) + 0.25*(-wz1/spzm + sz*0.5*dqdz1);
+                double mAPK = -vfz*nu_h/(cvz*spzp)  + 0.25*( wz2/spzp + sz*0.5*dqdz2);
+                double mACK =  vfz*nu_h/cvz*(1.0/spzm + 1.0/spzp)
                              + 0.25*(sz*(0.5*dqdz2 + 0.5*dqdz1) - wz2/spzp + wz1/spzm);
 
                 Az_[row*ns + s] = mAMK * dt;
@@ -664,6 +732,150 @@ void MomentumSolver::cross_BW_U_(Field<double>& dU, const Field<double>& U,
 }
 
 // ---------------------------------------------------------------------------
+// cross_BW_V_M21_  (MPM-STD core_momentum.f90:1222-1229, "5: M21ddU")
+//
+//   dV_rhs -= dt · M21 · dU
+//
+//   M21·dU = 0.25·(ddu1·dvdx1 + ddu2·dvdx2)
+//          - nu_h·(ddudy2 - ddudy1) / dx[i]
+//
+//   ddu1/ddu2 : dU interpolated to V's location at x-faces i, i+1
+//               (V at y-face j-1/2; weight in y by dy[jm], dy[j])
+//   dvdx1/dvdx2: ∂V/∂x at x-faces i, i+1 (V at x-cell-center)
+//   ddudy1/ddudy2: ∂(dU)/∂y at x-faces i, i+1
+// ---------------------------------------------------------------------------
+void MomentumSolver::cross_BW_V_M21_(Field<double>& dV_rhs, const Field<double>& V,
+                                     const Field<double>& dU, double dt)
+{
+    const int nx = nx_, ny = ny_, nz = nz_;
+    const auto& dx  = grid_->dx (0);   const auto& dmx = grid_->dmx(0);
+    const auto& dy  = grid_->dx (1);   const auto& dmy = grid_->dmx(1);
+    const double nu_h = 0.5 * inv_Re_;
+
+    for (int k = 1; k <= nz; ++k) {
+        for (int j = 1; j <= ny; ++j) {
+            const int jm = j - 1;
+            for (int i = 1; i <= nx; ++i) {
+                const int ip = i + 1;
+
+                // dU at V's y-face position (V at y-face j-1/2): weight in y by dy
+                const double ddu1 = (dy[jm]*dU(i, j,k) + dy[j]*dU(i, jm,k)) / dmy[j] * 0.5;
+                const double ddu2 = (dy[jm]*dU(ip,j,k) + dy[j]*dU(ip,jm,k)) / dmy[j] * 0.5;
+
+                // ∂V/∂x at x-faces i, i+1 (V at x-cell-center)
+                const double dvdx1 = (V(i, j,k) - V(i-1,j,k)) / dmx[i];
+                const double dvdx2 = (V(ip,j,k) - V(i,  j,k)) / dmx[ip];
+
+                // ∂(dU)/∂y at x-faces i, i+1
+                const double ddudy1 = (dU(i, j,k) - dU(i, jm,k)) / dmy[j];
+                const double ddudy2 = (dU(ip,j,k) - dU(ip,jm,k)) / dmy[j];
+
+                const double M21dU = 0.25*(ddu1*dvdx1 + ddu2*dvdx2)
+                                   - nu_h*(ddudy2 - ddudy1) / dx[i];
+
+                dV_rhs(i,j,k) -= dt * M21dU;
+            }
+        }
+    }
+}
+
+// ---------------------------------------------------------------------------
+// cross_BW_W_M31_  (MPM-STD core_momentum.f90:1536-1543, "5-1 : M31ddU")
+//
+//   dW_rhs -= dt · M31 · dU
+//
+//   M31·dU = 0.25·(ddu1·dwdx1 + ddu2·dwdx2)
+//          - nu_h·(ddudz2 - ddudz1) / dx[i]
+//
+//   ddu1/ddu2 : dU interpolated to W's location at x-faces i, i+1
+//               (W at z-face k-1/2; weight in z by dz[km], dz[k])
+//   dwdx1/dwdx2: ∂W/∂x at x-faces i, i+1 (W at x-cell-center)
+//   ddudz1/ddudz2: ∂(dU)/∂z at x-faces i, i+1
+// ---------------------------------------------------------------------------
+void MomentumSolver::cross_BW_W_M31_(Field<double>& dW_rhs, const Field<double>& W,
+                                     const Field<double>& dU, double dt)
+{
+    const int nx = nx_, ny = ny_, nz = nz_;
+    const auto& dx  = grid_->dx (0);   const auto& dmx = grid_->dmx(0);
+    const auto& dz  = grid_->dx (2);   const auto& dmz = grid_->dmx(2);
+    const double nu_h = 0.5 * inv_Re_;
+
+    for (int k = 1; k <= nz; ++k) {
+        const int km = k - 1;
+        for (int j = 1; j <= ny; ++j) {
+            for (int i = 1; i <= nx; ++i) {
+                const int ip = i + 1;
+
+                // dU at W's z-face position (W at z-face k-1/2): weight in z by dz
+                const double ddu1 = (dz[km]*dU(i, j,k) + dz[k]*dU(i, j,km)) / dmz[k] * 0.5;
+                const double ddu2 = (dz[km]*dU(ip,j,k) + dz[k]*dU(ip,j,km)) / dmz[k] * 0.5;
+
+                // ∂W/∂x at x-faces i, i+1
+                const double dwdx1 = (W(i, j,k) - W(i-1,j,k)) / dmx[i];
+                const double dwdx2 = (W(ip,j,k) - W(i,  j,k)) / dmx[ip];
+
+                // ∂(dU)/∂z at x-faces i, i+1
+                const double ddudz1 = (dU(i, j,k) - dU(i, j,km)) / dmz[k];
+                const double ddudz2 = (dU(ip,j,k) - dU(ip,j,km)) / dmz[k];
+
+                const double M31dU = 0.25*(ddu1*dwdx1 + ddu2*dwdx2)
+                                   - nu_h*(ddudz2 - ddudz1) / dx[i];
+
+                dW_rhs(i,j,k) -= dt * M31dU;
+            }
+        }
+    }
+}
+
+// ---------------------------------------------------------------------------
+// cross_BW_W_M32_  (MPM-STD core_momentum.f90:1545-1552, "5-2 : M32ddV")
+//
+//   dW_rhs -= dt · M32 · dV
+//
+//   M32·dV = 0.25·(ddv3·dwdy3 + ddv4·dwdy4)
+//          - nu_h·(ddvdz4 - ddvdz3) / dy[j]
+//
+//   ddv3/ddv4 : dV interpolated to W's location at y-faces j, j+1
+//               (W at z-face k-1/2; weight in z by dz[km], dz[k])
+//   dwdy3/dwdy4: ∂W/∂y at y-faces j, j+1 (W at y-cell-center)
+//   ddvdz3/ddvdz4: ∂(dV)/∂z at y-faces j, j+1
+// ---------------------------------------------------------------------------
+void MomentumSolver::cross_BW_W_M32_(Field<double>& dW_rhs, const Field<double>& W,
+                                     const Field<double>& dV, double dt)
+{
+    const int nx = nx_, ny = ny_, nz = nz_;
+    const auto& dy  = grid_->dx (1);   const auto& dmy = grid_->dmx(1);
+    const auto& dz  = grid_->dx (2);   const auto& dmz = grid_->dmx(2);
+    const double nu_h = 0.5 * inv_Re_;
+
+    for (int k = 1; k <= nz; ++k) {
+        const int km = k - 1;
+        for (int j = 1; j <= ny; ++j) {
+            const int jp = j + 1;
+            for (int i = 1; i <= nx; ++i) {
+
+                // dV at W's z-face position: weight in z by dz
+                const double ddv3 = (dz[km]*dV(i,j, k) + dz[k]*dV(i,j, km)) / dmz[k] * 0.5;
+                const double ddv4 = (dz[km]*dV(i,jp,k) + dz[k]*dV(i,jp,km)) / dmz[k] * 0.5;
+
+                // ∂W/∂y at y-faces j, j+1
+                const double dwdy3 = (W(i,j, k) - W(i,j-1,k)) / dmy[j];
+                const double dwdy4 = (W(i,jp,k) - W(i,j,  k)) / dmy[jp];
+
+                // ∂(dV)/∂z at y-faces j, j+1
+                const double ddvdz3 = (dV(i,j, k) - dV(i,j, km)) / dmz[k];
+                const double ddvdz4 = (dV(i,jp,k) - dV(i,jp,km)) / dmz[k];
+
+                const double M32dV = 0.25*(ddv3*dwdy3 + ddv4*dwdy4)
+                                   - nu_h*(ddvdz4 - ddvdz3) / dy[j];
+
+                dW_rhs(i,j,k) -= dt * M32dV;
+            }
+        }
+    }
+}
+
+// ---------------------------------------------------------------------------
 void MomentumSolver::advance(Field<double>& U, Field<double>& V, Field<double>& W,
                              const Field<double>& P,
                              double dt, double mean_dPdx)
@@ -678,44 +890,56 @@ void MomentumSolver::advance(Field<double>& U, Field<double>& V, Field<double>& 
     fdma_y_->set_eps_constant(dt);
     fdma_z_->set_eps_constant(dt);
 
-    // MPM-STD core_momentum + blockLdU pattern (submodule.f90:195-232):
-    //   1) Independently solve each component's ADI (Jacobi base)
-    //   2) Halo-exchange dU, dV, dW so cross-coupling reads valid neighbors
-    //   3) Cross-couple V eq with dW          → halo-exchange dV
-    //   4) Cross-couple U eq with dV (fresh) and dW
-    //   5) Apply all increments atomically
-    // W eq has no cross-BW (chain head, like MPM-STD which omits blockLdW).
+    // Literal MPM-STD port (core_momentum.f90 + submodule.f90:195-232).
+    // Block Gauss-Seidel sweep of the 3×3 momentum Jacobian:
+    //
+    //   (1) solve dU                                — diag M11; ADI z→x→y
+    //   (2) halo dU; solve dV with M21·dU baked in  — lower-tri (U→V); ADI z→x→y
+    //   (3) halo dV; solve dW with M31·dU + M32·dV  — lower-tri (U,V→W); ADI z→x→y
+    //   (4) halo dU,dV,dW
+    //   (5) dV -= dt·M23·dW  (upper-tri, blockLdV); halo dV
+    //   (6) dU -= dt·(M12·dV + M13·dW) (upper-tri, blockLdU)
+    //   (7) atomic apply
+    //
+    // ADI sweep order matches MPM-STD's TDMA1=K(z), TDMA2=I(x), TDMA3=J(y)
+    // (cuda_momentum_solvedU lines 484, 495, 506).
 
-    // --- (1) Independent ADI for each component --------------------
+    // --- (1) Solve dU (diag M11 only) ---------------------------------
     compute_rhs_(COMP_U, dU_, U, V, W, P, dt, mean_dPdx);
+    adi_sweep_z_(COMP_U, dU_, dt, U, V, W);
     adi_sweep_x_(COMP_U, dU_, dt, U, V, W);
     adi_sweep_y_(COMP_U, dU_, dt, U, V, W);
-    adi_sweep_z_(COMP_U, dU_, dt, U, V, W);
+    halo_->exchange(dU_);
 
+    // --- (2) Solve dV with M21·dU pre-correction (lower-tri U→V) -----
     compute_rhs_(COMP_V, dV_, U, V, W, P, dt, mean_dPdx);
+    cross_BW_V_M21_(dV_, V, dU_, dt);
+    adi_sweep_z_(COMP_V, dV_, dt, U, V, W);
     adi_sweep_x_(COMP_V, dV_, dt, U, V, W);
     adi_sweep_y_(COMP_V, dV_, dt, U, V, W);
-    adi_sweep_z_(COMP_V, dV_, dt, U, V, W);
+    halo_->exchange(dV_);
 
+    // --- (3) Solve dW with M31·dU + M32·dV pre-correction (U,V→W) ---
     compute_rhs_(COMP_W, dW_, U, V, W, P, dt, mean_dPdx);
+    cross_BW_W_M31_(dW_, W, dU_, dt);
+    cross_BW_W_M32_(dW_, W, dV_, dt);
+    adi_sweep_z_(COMP_W, dW_, dt, U, V, W);
     adi_sweep_x_(COMP_W, dW_, dt, U, V, W);
     adi_sweep_y_(COMP_W, dW_, dt, U, V, W);
-    adi_sweep_z_(COMP_W, dW_, dt, U, V, W);
 
-    // --- (2) Refresh halos of all increment fields -----------------
-    // (MPM-STD: cuda_subdomain_ghostcell_update at end of cuda_momentum_solvedU)
+    // --- (4) Refresh halos of all increment fields ------------------
     halo_->exchange(dU_);
     halo_->exchange(dV_);
     halo_->exchange(dW_);
 
-    // --- (3) Cross-couple V using dW; refresh dV halo --------------
+    // --- (5) Upper-triangular: dV -= dt·M23·dW; refresh dV halo -----
     cross_BW_V_(dV_, V, dW_, dt);
     halo_->exchange(dV_);
 
-    // --- (4) Cross-couple U using dV (fresh) and dW ----------------
+    // --- (6) Upper-triangular: dU -= dt·(M12·dV + M13·dW) -----------
     cross_BW_U_(dU_, U, dV_, dW_, dt);
 
-    // --- (5) Apply all increments atomically -----------------------
+    // --- (7) Apply all increments atomically -----------------------
     for (int k = 1; k <= nz; ++k)
         for (int j = 1; j <= ny; ++j)
             for (int i = 1; i <= nx; ++i) {
