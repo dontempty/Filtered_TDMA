@@ -562,12 +562,16 @@ void MomentumSolver::adi_sweep_z_(Component which, Field<double>& dQ, double dt,
             }
         }
 
-    // Wall BCs for the z-sweep:
-    //   W (z-face):  W(k=1) is the bottom wall face (=0); W(k=nz+1) is the top
-    //                wall face (=0). Pin first row at bottom; zero ap at top row.
-    //   U,V (cell):  antisymmetric ghost U(k=0) = -U(k=1), U(k=nz+1) = -U(k=nz).
-    //                Fold the am·U(0) = -am·U(1) into ac (ac -= am), then am = 0
-    //                at bottom. Same for ap at top.
+    // Wall BCs for the z-sweep — MPM-STD-style flag drop (kum/kup=0):
+    //   W (z-face):  W(k=1) bottom wall face=0, W(k=nz+1) top wall face=0.
+    //                Pin first row at bottom (Az=0, Bz=1, Cz=0, Dz=0).
+    //                Zero ap at top row (so C·δW(nz+1)=C·0 dropped).
+    //   U,V (cell):  zero-ghost convention (BoundaryCondition: U(0)=V(0)=0).
+    //                Combined with the matrix coefficient AMK at k=1 being
+    //                effectively gated to 0 (MPM-STD kum=0 multiplier), we
+    //                just SET Az=0 with NO fold into B.  This matches MPM-STD
+    //                line 931-933 `AMK_d = (M11MK·kum·dt)·iuc` with kum=0.
+    //                Same for Cz at top row.
     if (rank_z_ == 0) {
         if (which == COMP_W) {
             for (int s = 0; s < ns; ++s) {
@@ -575,10 +579,10 @@ void MomentumSolver::adi_sweep_z_(Component which, Field<double>& dQ, double dt,
                 Bz_[0*ns+s] = 1.0;  Dz_[0*ns+s] = 0.0;
             }
         } else {
-            for (int s = 0; s < ns; ++s) {
-                Bz_[0*ns+s] -= Az_[0*ns+s];
-                Az_[0*ns+s]  = 0.0;
-            }
+            // U/V: drop wall-ghost coupling (no fold). δU(0)=0 implicitly via
+            // Az=0; the diagonal Bz keeps its full discrete-Laplacian value.
+            for (int s = 0; s < ns; ++s)
+                Az_[0*ns+s] = 0.0;
         }
     }
     if (rank_z_ == np3_-1) {
@@ -586,10 +590,8 @@ void MomentumSolver::adi_sweep_z_(Component which, Field<double>& dQ, double dt,
             for (int s = 0; s < ns; ++s)
                 Cz_[(nz-1)*ns+s] = 0.0;
         } else {
-            for (int s = 0; s < ns; ++s) {
-                Bz_[(nz-1)*ns+s] -= Cz_[(nz-1)*ns+s];
-                Cz_[(nz-1)*ns+s]  = 0.0;
-            }
+            for (int s = 0; s < ns; ++s)
+                Cz_[(nz-1)*ns+s] = 0.0;
         }
     }
 
