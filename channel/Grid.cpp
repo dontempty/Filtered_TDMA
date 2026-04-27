@@ -57,25 +57,30 @@ void Grid::build_axis(int axis,
     std::vector<double> xc_g(static_cast<std::size_t>(n_global) + 2);
     for (int i = 1; i <= n_global; ++i)
         xc_g[i] = 0.5 * (xf[i - 1] + xf[i]);
-    // Halo cell centers: mirror or extrapolate
+    // Halo cell centers — MIRROR convention (matches v2 grid.cpp:
+    //   dzf[0] = dz[0], dzf[Nz] = dz[Nz-1]).  This gives dmx[1] = dx[1] and
+    //   pairs with the antisymmetric ghost BC for U/V to produce a correct
+    //   3·ν/dz² wall-row coefficient in the implicit ADI.
     if (periodic) {
         xc_g[0]            = xc_g[n_global] - L_axis;
         xc_g[n_global + 1] = xc_g[1]        + L_axis;
     } else {
-        xc_g[0]            = xf[0]        - (xc_g[1]        - xf[0]);
-        xc_g[n_global + 1] = xf[n_global] + (xf[n_global]   - xc_g[n_global]);
+        // Mirror across wall: ghost center reflected through the wall face.
+        xc_g[0]            = xf[0]          - (xc_g[1]        - xf[0]);
+        xc_g[n_global + 1] = xf[n_global]   + (xf[n_global]   - xc_g[n_global]);
     }
 
-    // dx_g[i] = xf[i] - xf[i-1]   for i=1..n_global; ghosts = neighbor copy
+    // dx_g[i] = xf[i] - xf[i-1]   for i=1..n_global; mirror: ghost = first cell width
     std::vector<double> dx_g(static_cast<std::size_t>(n_global) + 2);
     for (int i = 1; i <= n_global; ++i) dx_g[i] = xf[i] - xf[i - 1];
-    dx_g[0]            = dx_g[periodic ? n_global : 1];
-    dx_g[n_global + 1] = dx_g[periodic ? 1        : n_global];
+    dx_g[0]            = periodic ? dx_g[n_global] : dx_g[1];
+    dx_g[n_global + 1] = periodic ? dx_g[1]        : dx_g[n_global];
 
     // dmx_g[i] = xc[i] - xc[i-1]  for i=1..n_global+1
+    //   With mirror ghost: dmx_g[1] = dx[1] (full cell width, NOT dx[1]/2).
     std::vector<double> dmx_g(static_cast<std::size_t>(n_global) + 2);
     for (int i = 1; i <= n_global + 1; ++i) dmx_g[i] = xc_g[i] - xc_g[i - 1];
-    dmx_g[0] = dmx_g[periodic ? n_global : 1];
+    dmx_g[0] = periodic ? dmx_g[n_global] : dmx_g[1];
 
     // Slice local: indices ista..iend become 1..n; ghost from neighbor cells
     int n_local = iend - ista + 1;

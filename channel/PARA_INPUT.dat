@@ -31,7 +31,7 @@ uniform3 = 0
 # === group: mesh_stretch ===
 gamma1 = 0.0
 gamma2 = 0.0
-gamma3 = 2.5
+gamma3 = 1.5
 
 # === group: aspect_ratio ===
 H       = 2.0

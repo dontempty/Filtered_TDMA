@@ -23,30 +23,25 @@ void BoundaryCondition::apply(Field<double>& U,
     const int ny = sub_.ny();
     const int nz = sub_.nz();
 
-    // Wall BC — MPM-STD-style "zero ghost" (UBCzbt = UBCzup = 0):
-    //   * U, V (cell-centered in z): set ghost cells to 0 (NOT antisymmetric).
-    //     Combined with the wall-flag drop in adi_sweep_z_ (Az=0 / Cz=0 with
-    //     NO fold), this matches MPM-STD's `kum=kup=0` treatment exactly.
+    // Wall BC — v2 style:
+    //   * U, V (cell-centered in z): antisymmetric ghost (ghost = -interior).
+    //     Pairs with mirror grid (dmz[1] = dz[1]) and a diagonal fold in the
+    //     z ADI to give the correct 3·ν/dz² wall-row coefficient.
     //   * W (face-centered in z): wall faces (k=1, k=nz+1) = 0.
-    //
-    // Why not antisymmetric: antisymm gives a slightly stiffer wall-shear
-    // discretization (extra +nu/dz²·U(1) in M·U^n at k=1) compared to
-    // MPM-STD's flag-drop, which over-damps wall-layer fluctuations and
-    // pushes the flow back to laminar Poiseuille at sub-critical Re.
     if (at_low_wall_) {
         for (int j = 0; j <= ny + 1; ++j)
             for (int i = 0; i <= nx + 1; ++i) {
-                U(i, j, 0) = 0.0;      // zero ghost (MPM-STD convention)
-                V(i, j, 0) = 0.0;
-                W(i, j, 1) = 0.0;      // bottom wall face
+                U(i, j, 0) = -U(i, j, 1);   // antisymmetric ghost
+                V(i, j, 0) = -V(i, j, 1);
+                W(i, j, 1) =  0.0;          // bottom wall face
             }
     }
     if (at_high_wall_) {
         for (int j = 0; j <= ny + 1; ++j)
             for (int i = 0; i <= nx + 1; ++i) {
-                U(i, j, nz + 1) = 0.0;
-                V(i, j, nz + 1) = 0.0;
-                W(i, j, nz + 1) = 0.0; // top wall face
+                U(i, j, nz + 1) = -U(i, j, nz);
+                V(i, j, nz + 1) = -V(i, j, nz);
+                W(i, j, nz + 1) =  0.0;     // top wall face
             }
     }
 }

@@ -14,6 +14,7 @@
 
 #include <vector>
 #include <cstddef>
+#include <cstdio>
 #include <algorithm>
 #include <cassert>
 
@@ -64,6 +65,11 @@ public:
 
 private:
     std::size_t idx(int i, int j, int k) const {
+        if (!(i >= 0 && i < nxt_) || !(j >= 0 && j < nyt_) || !(k >= 0 && k < nzt_)) {
+            std::fprintf(stderr, "[Field::idx OOB] i=%d j=%d k=%d  bounds (nxt=%d nyt=%d nzt=%d)\n",
+                         i, j, k, nxt_, nyt_, nzt_);
+            std::fflush(stderr);
+        }
         assert(i >= 0 && i < nxt_);
         assert(j >= 0 && j < nyt_);
         assert(k >= 0 && k < nzt_);

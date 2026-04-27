@@ -1,9 +1,20 @@
 // channel/MomentumSolver.hpp
 //
-// Beam-Warming + 3-stage ADI velocity update (PaScaL_TCS style).
-// Both diffusion and linearized convection are implicit in the TDMA matrix.
-// Each ADI sweep uses FilteredTdmaSolver across the relevant sub-communicator,
-// supporting full 3D domain decomposition (np1 × np2 × np3).
+// Projection-method momentum solver — v2 style:
+//   1. Explicit conservative advection N(u,v,w)  (divergence form on staggered grid)
+//   2. AB2 update:  u_tilde = u + dt*(1.5*N^n - 0.5*N^{n-1})    (Euler on first step)
+//   3. Body force:  u_tilde += -dt*mean_dPdx                     (U component only)
+//   4. CN diffusion ADI:
+//        rhs = u_tilde + (nu*dt/2) * lap(u_tilde)
+//        (I - nu*dt/2*∂²/∂z²)(I - nu*dt/2*∂²/∂y²)(I - nu*dt/2*∂²/∂x²) u* = rhs
+//      Wall BC in z: U/V antisymmetric ghost (fold into diagonal),
+//                    W zero ghost (off-diagonal zeroed at wall row).
+//   5. (Pressure projection done by PressureSolver afterwards.)
+//
+// Reference: /shared/home/wel1come1234/workspace/TDMA/Filtered_TDMAv2/channel/
+//            (advection.cpp / diffusion.cpp / projection.cpp)
+//
+// Original Beam-Warming version preserved as MomentumSolver_BW.{hpp,cpp}.bak.
 
 #ifndef CHANNEL_MOMENTUM_SOLVER_HPP
 #define CHANNEL_MOMENTUM_SOLVER_HPP
@@ -30,6 +41,8 @@ public:
                    const Grid& grid,
                    const HaloExchanger& halo);
 
+    // P is unused here (Chorin-style: pressure handled fully in PressureSolver).
+    // Signature kept for compatibility with the existing TimeIntegrator call.
     void advance(Field<double>& U, Field<double>& V, Field<double>& W,
                  const Field<double>& P,
                  double dt, double mean_dPdx);
@@ -37,44 +50,32 @@ public:
 private:
     enum Component { COMP_U, COMP_V, COMP_W };
 
-    void compute_rhs_(Component which,
-                      Field<double>& dQ,
-                      const Field<double>& U,
-                      const Field<double>& V,
-                      const Field<double>& W,
-                      const Field<double>& P,
-                      double dt, double mean_dPdx);
+    // Conservative-form advection on staggered grid (v2 advection.cpp port).
+    // Convention here: U at x-face i-1/2, V at y-face j-1/2, W at z-face k-1/2.
+    void compute_advection_(const Field<double>& U,
+                            const Field<double>& V,
+                            const Field<double>& W,
+                            Field<double>& Nu,
+                            Field<double>& Nv,
+                            Field<double>& Nw) const;
 
-    void adi_sweep_x_(Component which, Field<double>& dQ, double dt,
-                      const Field<double>& U, const Field<double>& V, const Field<double>& W);
-    void adi_sweep_y_(Component which, Field<double>& dQ, double dt,
-                      const Field<double>& U, const Field<double>& V, const Field<double>& W);
-    void adi_sweep_z_(Component which, Field<double>& dQ, double dt,
-                      const Field<double>& U, const Field<double>& V, const Field<double>& W);
+    // u_tilde = u + dt*(1.5*N_new - 0.5*N_old)   (or u + dt*N_new on first step)
+    void apply_AB2_(Field<double>& U, Field<double>& V, Field<double>& W,
+                    const Field<double>& Nu_new, const Field<double>& Nv_new,
+                    const Field<double>& Nw_new,
+                    const Field<double>& Nu_old, const Field<double>& Nv_old,
+                    const Field<double>& Nw_old,
+                    double dt, bool first) const;
 
-    // Beam-Warming cross-component coupling — UPPER triangle (post-ADI).
-    // Mirrors MPM-STD blockLdU / blockLdV (core_momentum.f90:535-566).
-    //   V eq:   dV -= dt · M23 · dW          (W → V in z)
-    //   U eq:   dU -= dt · (M12·dV + M13·dW) (V → U in y, W → U in z)
-    void cross_BW_V_(Field<double>& dV, const Field<double>& V,
-                     const Field<double>& dW, double dt);
-    void cross_BW_U_(Field<double>& dU, const Field<double>& U,
-                     const Field<double>& dV, const Field<double>& dW, double dt);
+    // rhs = q + (nu*dt/2) * lap(q)   (component-aware: U/V/W staggering only
+    // affects which dz / dmz is used in the z-direction).
+    void add_explicit_lap_(Component which, const Field<double>& q,
+                           Field<double>& rhs, double nu_dt_half) const;
 
-    // Beam-Warming cross-component coupling — LOWER triangle (pre-ADI Gauss-Seidel).
-    // Mirrors the "M21ddU" / "M31ddU" / "M32ddV" sections embedded inside
-    // MPM-STD's solvedV/solvedW Amatrix kernels (core_momentum.f90:1222-1229
-    // and 1536-1552).  Subtracts dt·M_ji·dQ_j from the RHS of equation i,
-    // using freshly-computed increments dQ_j (j < i in the GS chain U→V→W).
-    //   V eq:  dV_rhs -= dt · M21 · dU                        (U → V in x)
-    //   W eq:  dW_rhs -= dt · M31 · dU                        (U → W in x)
-    //   W eq:  dW_rhs -= dt · M32 · dV                        (V → W in y)
-    void cross_BW_V_M21_(Field<double>& dV_rhs, const Field<double>& V,
-                         const Field<double>& dU, double dt);
-    void cross_BW_W_M31_(Field<double>& dW_rhs, const Field<double>& W,
-                         const Field<double>& dU, double dt);
-    void cross_BW_W_M32_(Field<double>& dW_rhs, const Field<double>& W,
-                         const Field<double>& dV, double dt);
+    // Solve (I - nu*dt/2 * ∂²/∂x²) q_out = q_in via FilteredTdmaSolver.
+    void adi_x_(Component which, Field<double>& q, double nu_dt_half);
+    void adi_y_(Component which, Field<double>& q, double nu_dt_half);
+    void adi_z_(Component which, Field<double>& q, double nu_dt_half);
 
     const Config*        cfg_  = nullptr;
     const Subdomain*     sub_  = nullptr;
@@ -83,29 +84,30 @@ private:
 
     double inv_Re_ = 0.0;
 
-    int np3_ = 1;   // needed to check z-BC boundary rank
+    int np3_ = 1;
     int rank_z_ = 0;
 
-    // Scratch velocity increment fields
-    Field<double> dU_, dV_, dW_;
+    // AB2 history (advection N at previous and current step).
+    Field<double> Nu_old_, Nv_old_, Nw_old_;
+    Field<double> Nu_new_, Nv_new_, Nw_new_;
+    bool first_step_ = true;
 
-    // Tridiagonal solver per axis (shared across U/V/W components).
-    // Backend (FILTERED or PASCAL) selected via cfg.tdma_backend.
+    // Scratch RHS buffer (re-used across U/V/W).
+    Field<double> rhs_;
+
+    // Tridiagonal solver per axis.
     std::unique_ptr<TdmaSolver> fdma_x_, fdma_y_, fdma_z_;
 
-    // Pre-allocated coefficient arrays (avoid per-step allocation)
-    // x-sweep: [nx_loc × (ny_loc*nz_loc)]
+    // Pre-allocated TDMA coefficient/RHS arrays.
     std::vector<double> Ax_, Bx_, Cx_, Dx_;
-    // y-sweep: [ny_loc × (nx_loc*nz_loc)]
     std::vector<double> Ay_, By_, Cy_, Dy_;
-    // z-sweep: [nz_loc × (nx_loc*ny_loc)]
     std::vector<double> Az_, Bz_, Cz_, Dz_;
 
     int nx_ = 0, ny_ = 0, nz_ = 0;
 
-    long   step_count_ = 0;     // incremented each advance() call
-    double tdma_time_     = 0.0;  // accumulated wall-time of TDMA solves   (step > 20000)
-    double momentum_time_ = 0.0;  // accumulated wall-time of full advance() (step > 20000)
+    long   step_count_    = 0;
+    double tdma_time_     = 0.0;
+    double momentum_time_ = 0.0;
 
 public:
     double tdma_time()     const { return tdma_time_; }
