@@ -73,7 +73,10 @@ private:
                            Field<double>& rhs, double nu_dt_half) const;
 
     // Solve (I - nu*dt/2 * ∂²/∂x²) q_out = q_in via FilteredTdmaSolver.
-    void adi_x_(Component which, Field<double>& q, double nu_dt_half);
+    // adi_x_ optionally unpacks the final TDMA result into `dst` instead of q,
+    // letting the caller skip a full-field copy when q is a scratch buffer.
+    void adi_x_(Component which, Field<double>& q, double nu_dt_half,
+                Field<double>* dst = nullptr);
     void adi_y_(Component which, Field<double>& q, double nu_dt_half);
     void adi_z_(Component which, Field<double>& q, double nu_dt_half);
 

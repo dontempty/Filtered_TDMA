@@ -1,18 +1,19 @@
-#!/bin/bash
-#SBATCH -J ch_filtered_tdma
-#SBATCH -p batch
-#SBATCH -w cpu02
-#SBATCH --nodes=1
+#!/bin/sh
+#SBATCH -J KISTI_TDMA
+#SBATCH -p cpu
+#SBATCH -N 1 # number of node
+#SBATCH -n 32 # total process
 #SBATCH --ntasks-per-node=32
 #SBATCH -o log/%x_%j.out
 #SBATCH -e log/%x_%j.err
-#SBATCH --time=24:00:00
+#SBATCH --time=48:00:00
+#SBATCH --comment etc
 
 # ============================================================
 #  Batch script for Filtered_TDMA channel solver
 #
 #  Usage (submit):
-#    cd /shared/home/wel1come1234/workspace/Filtered_TDMA
+#    cd /scratch/x3319a05/Filtered_TDMA
 #    mkdir -p log          # must exist before sbatch
 #    sbatch channel.sh [PARA_INPUT.dat]
 #
@@ -41,7 +42,12 @@ fi
 
 # --- Load modules -----------------------------------------------
 module purge
-module load nvhpc/23.7
+module load gcc/15.2.0
+module load mpi/openmpi-4.1.8
+module load fftw3/3.3.10
+
+make clean
+make all
 
 # --- Parse NP from PARA_INPUT.dat (np1 * np2 * np3) -------------
 _get_val() {
@@ -88,7 +94,7 @@ mkdir -p "${SCRIPT_DIR}/log"
 cd "${SCRIPT_DIR}/channel" || exit 1
 
 echo "[$(date '+%Y-%m-%d %H:%M:%S')] Starting  mpirun -np ${NP}"
-mpirun -np ${NP} "${SCRIPT_DIR}/build/bin/channel.out" "${INPUT}"
+mpirun --bind-to none -np ${NP} "${SCRIPT_DIR}/build/bin/channel.out" "${INPUT}"
 EXIT_CODE=$?
 echo "[$(date '+%Y-%m-%d %H:%M:%S')] Finished  (exit=${EXIT_CODE})"
 

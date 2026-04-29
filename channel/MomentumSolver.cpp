@@ -399,8 +399,10 @@ void MomentumSolver::adi_y_(Component which, Field<double>& q, double nu_dt_half
 // ---------------------------------------------------------------------------
 //  ADI x-sweep: (I - nu_dt_half * d²/dx²) q = q_in  (uniform x, periodic)
 // ---------------------------------------------------------------------------
-void MomentumSolver::adi_x_(Component which, Field<double>& q, double nu_dt_half)
+void MomentumSolver::adi_x_(Component which, Field<double>& q, double nu_dt_half,
+                            Field<double>* dst)
 {
+    Field<double>& out = dst ? *dst : q;
     const int nx = nx_, ny = ny_, nz = nz_;
     const auto& dx  = grid_->dx (0); const auto& dmx = grid_->dmx(0);
     const int ns = ny * nz;
@@ -442,7 +444,7 @@ void MomentumSolver::adi_x_(Component which, Field<double>& q, double nu_dt_half
     for (int k = 1; k <= nz; ++k)
         for (int j = 1; j <= ny; ++j)
             for (int i = 1; i <= nx; ++i)
-                q(i,j,k) = Dx_[(i-1)*ns + (j-1)*nz + (k-1)];
+                out(i,j,k) = Dx_[(i-1)*ns + (j-1)*nz + (k-1)];
 }
 
 // ---------------------------------------------------------------------------
@@ -460,6 +462,12 @@ void MomentumSolver::advance(Field<double>& U, Field<double>& V, Field<double>& 
 
     ++step_count_;
     const double t_adv0 = MPI_Wtime();
+
+    // Refresh FilteredTDMA truncation threshold to reflect the current dt
+    // (eps_ = dt / (N*N) inside the library — see filtered_tdma.hpp).
+    fdma_x_->set_eps_constant(dt);
+    fdma_y_->set_eps_constant(dt);
+    fdma_z_->set_eps_constant(dt);
 
     // === Step 1a: advection N at u^n (needs current ghosts; assumed already set) ===
     compute_advection_(U, V, W, Nu_new_, Nv_new_, Nw_new_);
@@ -504,12 +512,8 @@ void MomentumSolver::advance(Field<double>& U, Field<double>& V, Field<double>& 
         // (I - nu*dt/2 * d²/dz²)(I - .. d²/dy²)(I - .. d²/dx²) q = rhs
         adi_z_(c, rhs_, nu_dt_h);
         adi_y_(c, rhs_, nu_dt_h);
-        adi_x_(c, rhs_, nu_dt_h);
-        // Copy back to q
-        for (int k = 1; k <= nz; ++k)
-            for (int j = 1; j <= ny; ++j)
-                for (int i = 1; i <= nx; ++i)
-                    q(i,j,k) = rhs_(i,j,k);
+        // Final x-sweep unpacks straight into q — saves a full-field copy.
+        adi_x_(c, rhs_, nu_dt_h, &q);
     };
 
     diffuse(COMP_U, U);
@@ -517,13 +521,11 @@ void MomentumSolver::advance(Field<double>& U, Field<double>& V, Field<double>& 
     diffuse(COMP_W, W);
 
     // === Rotate AB2 history ===
-    for (int k = 1; k <= nz; ++k)
-        for (int j = 1; j <= ny; ++j)
-            for (int i = 1; i <= nx; ++i) {
-                Nu_old_(i,j,k) = Nu_new_(i,j,k);
-                Nv_old_(i,j,k) = Nv_new_(i,j,k);
-                Nw_old_(i,j,k) = Nw_new_(i,j,k);
-            }
+    // Swap buffers instead of copying: next step's compute_advection_ overwrites
+    // *_new_ entirely, so the old contents (now in *_new_) are irrelevant.
+    Nu_old_.swap(Nu_new_);
+    Nv_old_.swap(Nv_new_);
+    Nw_old_.swap(Nw_new_);
     first_step_ = false;
 
     if (step_count_ > 20000) momentum_time_ += MPI_Wtime() - t_adv0;

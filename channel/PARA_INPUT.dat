@@ -50,10 +50,10 @@ Timestepmax = 30000
 # === group: sim_continue ===
 ContinueFilein = 0
 ContinueFileout  = 1
-dir_cont_filein = ./restart_in/p/
-dir_cont_fileout = ./restart_out/p/
-dir_instantfield = ./instant/p/
-dir_statistics   = ./statistics/p/
+dir_cont_filein = ./restart_in/f/
+dir_cont_fileout = ./restart_out/f/
+dir_instantfield = ./instant/f/
+dir_statistics   = ./statistics/f/
 
 # === group: channel_forcing ===
 forcing_mode         = MASS_FLOW
@@ -84,4 +84,4 @@ out_field   = 1
 
 # === group: tdma ===
 # momentum ADI TDMA backend: "filtered" (Filtered_TDMA) or "pascal" (PaScaL_TDMA)
-tdma_backend = pascal
+tdma_backend = filtered
