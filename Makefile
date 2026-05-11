@@ -8,11 +8,12 @@ BUILDDIR := build
 #  Libraries:
 #    Filtered_TDMA/  → build/lib/libfiltered_tdma.a
 #    PaScaL_TDMA/    → build/lib/libpascal_tdma.a
-#  Solver:
+#  Solvers (pick one with `make channel` or `make heat`):
 #    channel/        → build/bin/channel.out
+#    Heat/           → build/bin/heat.out
 # ============================================================
 
-.PHONY: all FilteredTDMA PaScaL channel tests clean rm
+.PHONY: all FilteredTDMA PaScaL channel heat tests clean rm
 
 # Output directories produced by a run (stats/, instant/, restart_out/).
 # Paths match the defaults in channel/PARA_INPUT.dat.
@@ -33,6 +34,10 @@ channel: FilteredTDMA PaScaL
 	mkdir -p $(BUILDDIR)/obj $(BUILDDIR)/bin
 	$(MAKE) -C channel all BUILDDIR=../$(BUILDDIR)
 
+heat: FilteredTDMA PaScaL
+	mkdir -p $(BUILDDIR)/obj $(BUILDDIR)/bin
+	$(MAKE) -C Heat all BUILDDIR=../$(BUILDDIR)
+
 tests: channel
 	mkdir -p $(BUILDDIR)/obj $(BUILDDIR)/bin
 	$(MAKE) -C channel/tests all BUILDDIR=../../$(BUILDDIR)
@@ -41,6 +46,7 @@ clean:
 	-$(MAKE) -C Filtered_TDMA  clean BUILDDIR=../$(BUILDDIR)
 	-$(MAKE) -C PaScaL_TDMA    clean BUILDDIR=../$(BUILDDIR)
 	-$(MAKE) -C channel        clean BUILDDIR=../$(BUILDDIR)
+	-$(MAKE) -C Heat           clean BUILDDIR=../$(BUILDDIR)
 	-$(MAKE) -C channel/tests  clean BUILDDIR=../../$(BUILDDIR)
 	rm -rf $(BUILDDIR)
 

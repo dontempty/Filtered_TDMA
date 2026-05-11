@@ -287,7 +287,6 @@ void FilteredTDMA::solve_filtered_v2_profile(double* __restrict A,
         double r = 1.0 / (1.0 - p.A1[i] * p.C0[i]);
         p.D0[i] =  r * (p.D0[i] - p.C0[i] * p.D1[i]);
         p.A0[i] =  r * p.A0[i];
-        p.C0[i] =  0.0;
     }
     t1 = MPI_Wtime(); time_list[2] = t1 - t0;
 
