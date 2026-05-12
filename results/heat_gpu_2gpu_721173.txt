@@ -1,0 +1,62 @@
+
+=== backend=pascal  2gpu  (NP=2)  N=64 ===
+[1778547407.764012] [gpu04:123623:0]     ucp_context.c:1354 UCX  WARN  transport 'gdr_copy' is not available, please use one or more of: cma, cuda, cuda_copy, cuda_ipc, dc, dc_mlx5, dc_x, ib, mm, posix, rc, rc_mlx5, rc_v, rc_verbs, rc_x, self, shm, sm, sysv, tcp, ud, ud_mlx5, ud_v, ud_verbs, ud_x, xpmem
+[1778547407.820877] [gpu04:123626:0]     ucp_context.c:1354 UCX  WARN  transport 'gdr_copy' is not available, please use one or more of: cma, cuda, cuda_copy, cuda_ipc, dc, dc_mlx5, dc_x, ib, mm, posix, rc, rc_mlx5, rc_v, rc_verbs, rc_x, self, shm, sm, sysv, tcp, ud, ud_mlx5, ud_v, ud_verbs, ud_x, xpmem
+[1778547408.031404] [gpu04:123626:0]     ucp_context.c:1354 UCX  WARN  transport 'gdr_copy' is not available, please use one or more of: cma, cuda, cuda_copy, cuda_ipc, dc, dc_mlx5, dc_x, ib, mm, posix, rc, rc_mlx5, rc_v, rc_verbs, rc_x, self, shm, sm, sysv, tcp, ud, ud_mlx5, ud_v, ud_verbs, ud_x, xpmem
+[1778547408.031446] [gpu04:123623:0]     ucp_context.c:1354 UCX  WARN  transport 'gdr_copy' is not available, please use one or more of: cma, cuda, cuda_copy, cuda_ipc, dc, dc_mlx5, dc_x, ib, mm, posix, rc, rc_mlx5, rc_v, rc_verbs, rc_x, self, shm, sm, sysv, tcp, ud, ud_mlx5, ud_v, ud_verbs, ud_x, xpmem
+[1778547408.216490] [gpu04:123623:0]     ucp_context.c:1354 UCX  WARN  transport 'gdr_copy' is not available, please use one or more of: cma, cuda, cuda_copy, cuda_ipc, dc, dc_mlx5, dc_x, ib, mm, posix, rc, rc_mlx5, rc_v, rc_verbs, rc_x, self, shm, sm, sysv, tcp, ud, ud_mlx5, ud_v, ud_verbs, ud_x, xpmem
+[1778547408.216607] [gpu04:123626:0]     ucp_context.c:1354 UCX  WARN  transport 'gdr_copy' is not available, please use one or more of: cma, cuda, cuda_copy, cuda_ipc, dc, dc_mlx5, dc_x, ib, mm, posix, rc, rc_mlx5, rc_v, rc_verbs, rc_x, self, shm, sm, sysv, tcp, ud, ud_mlx5, ud_v, ud_verbs, ud_x, xpmem
+[1778547408.405387] [gpu04:123623:0]     ucp_context.c:1354 UCX  WARN  transport 'gdr_copy' is not available, please use one or more of: cma, cuda, cuda_copy, cuda_ipc, dc, dc_mlx5, dc_x, ib, mm, posix, rc, rc_mlx5, rc_v, rc_verbs, rc_x, self, shm, sm, sysv, tcp, ud, ud_mlx5, ud_v, ud_verbs, ud_x, xpmem
+[1778547408.405433] [gpu04:123626:0]     ucp_context.c:1354 UCX  WARN  transport 'gdr_copy' is not available, please use one or more of: cma, cuda, cuda_copy, cuda_ipc, dc, dc_mlx5, dc_x, ib, mm, posix, rc, rc_mlx5, rc_v, rc_verbs, rc_x, self, shm, sm, sysv, tcp, ud, ud_mlx5, ud_v, ud_verbs, ud_x, xpmem
+[Tmax] = 0.00195312 | [max_iter] = 2
+[nx] = 32 | [ny] = 64 | [nz] = 64
+[rho] = 0.25
+[backend] = pascal
+Global L2 error = 4.21191e-05
+[time] pascal 2gpu N=64  3s
+
+=== backend=pascal  2gpu  (NP=2)  N=128 ===
+[1778547410.998838] [gpu04:123695:0]     ucp_context.c:1354 UCX  WARN  transport 'gdr_copy' is not available, please use one or more of: cma, cuda, cuda_copy, cuda_ipc, dc, dc_mlx5, dc_x, ib, mm, posix, rc, rc_mlx5, rc_v, rc_verbs, rc_x, self, shm, sm, sysv, tcp, ud, ud_mlx5, ud_v, ud_verbs, ud_x, xpmem
+[1778547410.998881] [gpu04:123696:0]     ucp_context.c:1354 UCX  WARN  transport 'gdr_copy' is not available, please use one or more of: cma, cuda, cuda_copy, cuda_ipc, dc, dc_mlx5, dc_x, ib, mm, posix, rc, rc_mlx5, rc_v, rc_verbs, rc_x, self, shm, sm, sysv, tcp, ud, ud_mlx5, ud_v, ud_verbs, ud_x, xpmem
+[1778547411.214977] [gpu04:123695:0]     ucp_context.c:1354 UCX  WARN  transport 'gdr_copy' is not available, please use one or more of: cma, cuda, cuda_copy, cuda_ipc, dc, dc_mlx5, dc_x, ib, mm, posix, rc, rc_mlx5, rc_v, rc_verbs, rc_x, self, shm, sm, sysv, tcp, ud, ud_mlx5, ud_v, ud_verbs, ud_x, xpmem
+[1778547411.215105] [gpu04:123696:0]     ucp_context.c:1354 UCX  WARN  transport 'gdr_copy' is not available, please use one or more of: cma, cuda, cuda_copy, cuda_ipc, dc, dc_mlx5, dc_x, ib, mm, posix, rc, rc_mlx5, rc_v, rc_verbs, rc_x, self, shm, sm, sysv, tcp, ud, ud_mlx5, ud_v, ud_verbs, ud_x, xpmem
+[1778547411.374205] [gpu04:123695:0]     ucp_context.c:1354 UCX  WARN  transport 'gdr_copy' is not available, please use one or more of: cma, cuda, cuda_copy, cuda_ipc, dc, dc_mlx5, dc_x, ib, mm, posix, rc, rc_mlx5, rc_v, rc_verbs, rc_x, self, shm, sm, sysv, tcp, ud, ud_mlx5, ud_v, ud_verbs, ud_x, xpmem
+[1778547411.374259] [gpu04:123696:0]     ucp_context.c:1354 UCX  WARN  transport 'gdr_copy' is not available, please use one or more of: cma, cuda, cuda_copy, cuda_ipc, dc, dc_mlx5, dc_x, ib, mm, posix, rc, rc_mlx5, rc_v, rc_verbs, rc_x, self, shm, sm, sysv, tcp, ud, ud_mlx5, ud_v, ud_verbs, ud_x, xpmem
+[1778547411.542433] [gpu04:123696:0]     ucp_context.c:1354 UCX  WARN  transport 'gdr_copy' is not available, please use one or more of: cma, cuda, cuda_copy, cuda_ipc, dc, dc_mlx5, dc_x, ib, mm, posix, rc, rc_mlx5, rc_v, rc_verbs, rc_x, self, shm, sm, sysv, tcp, ud, ud_mlx5, ud_v, ud_verbs, ud_x, xpmem
+[1778547411.542489] [gpu04:123695:0]     ucp_context.c:1354 UCX  WARN  transport 'gdr_copy' is not available, please use one or more of: cma, cuda, cuda_copy, cuda_ipc, dc, dc_mlx5, dc_x, ib, mm, posix, rc, rc_mlx5, rc_v, rc_verbs, rc_x, self, shm, sm, sysv, tcp, ud, ud_mlx5, ud_v, ud_verbs, ud_x, xpmem
+[Tmax] = 0.00195312 | [max_iter] = 8
+[nx] = 64 | [ny] = 128 | [nz] = 128
+[rho] = 0.25
+[backend] = pascal
+Global L2 error = 1.03721e-05
+[time] pascal 2gpu N=128  22s
+
+=== backend=pascal  2gpu  (NP=2)  N=256 ===
+[1778547432.828621] [gpu04:124700:0]     ucp_context.c:1354 UCX  WARN  transport 'gdr_copy' is not available, please use one or more of: cma, cuda, cuda_copy, cuda_ipc, dc, dc_mlx5, dc_x, ib, mm, posix, rc, rc_mlx5, rc_v, rc_verbs, rc_x, self, shm, sm, sysv, tcp, ud, ud_mlx5, ud_v, ud_verbs, ud_x, xpmem
+[1778547432.841627] [gpu04:124699:0]     ucp_context.c:1354 UCX  WARN  transport 'gdr_copy' is not available, please use one or more of: cma, cuda, cuda_copy, cuda_ipc, dc, dc_mlx5, dc_x, ib, mm, posix, rc, rc_mlx5, rc_v, rc_verbs, rc_x, self, shm, sm, sysv, tcp, ud, ud_mlx5, ud_v, ud_verbs, ud_x, xpmem
+[1778547433.056414] [gpu04:124699:0]     ucp_context.c:1354 UCX  WARN  transport 'gdr_copy' is not available, please use one or more of: cma, cuda, cuda_copy, cuda_ipc, dc, dc_mlx5, dc_x, ib, mm, posix, rc, rc_mlx5, rc_v, rc_verbs, rc_x, self, shm, sm, sysv, tcp, ud, ud_mlx5, ud_v, ud_verbs, ud_x, xpmem
+[1778547433.068180] [gpu04:124700:0]     ucp_context.c:1354 UCX  WARN  transport 'gdr_copy' is not available, please use one or more of: cma, cuda, cuda_copy, cuda_ipc, dc, dc_mlx5, dc_x, ib, mm, posix, rc, rc_mlx5, rc_v, rc_verbs, rc_x, self, shm, sm, sysv, tcp, ud, ud_mlx5, ud_v, ud_verbs, ud_x, xpmem
+[1778547433.231483] [gpu04:124699:0]     ucp_context.c:1354 UCX  WARN  transport 'gdr_copy' is not available, please use one or more of: cma, cuda, cuda_copy, cuda_ipc, dc, dc_mlx5, dc_x, ib, mm, posix, rc, rc_mlx5, rc_v, rc_verbs, rc_x, self, shm, sm, sysv, tcp, ud, ud_mlx5, ud_v, ud_verbs, ud_x, xpmem
+[1778547433.232195] [gpu04:124700:0]     ucp_context.c:1354 UCX  WARN  transport 'gdr_copy' is not available, please use one or more of: cma, cuda, cuda_copy, cuda_ipc, dc, dc_mlx5, dc_x, ib, mm, posix, rc, rc_mlx5, rc_v, rc_verbs, rc_x, self, shm, sm, sysv, tcp, ud, ud_mlx5, ud_v, ud_verbs, ud_x, xpmem
+[1778547433.398263] [gpu04:124700:0]     ucp_context.c:1354 UCX  WARN  transport 'gdr_copy' is not available, please use one or more of: cma, cuda, cuda_copy, cuda_ipc, dc, dc_mlx5, dc_x, ib, mm, posix, rc, rc_mlx5, rc_v, rc_verbs, rc_x, self, shm, sm, sysv, tcp, ud, ud_mlx5, ud_v, ud_verbs, ud_x, xpmem
+[1778547433.398305] [gpu04:124699:0]     ucp_context.c:1354 UCX  WARN  transport 'gdr_copy' is not available, please use one or more of: cma, cuda, cuda_copy, cuda_ipc, dc, dc_mlx5, dc_x, ib, mm, posix, rc, rc_mlx5, rc_v, rc_verbs, rc_x, self, shm, sm, sysv, tcp, ud, ud_mlx5, ud_v, ud_verbs, ud_x, xpmem
+[Tmax] = 0.00195312 | [max_iter] = 32
+[nx] = 128 | [ny] = 256 | [nz] = 256
+[rho] = 0.25
+[backend] = pascal
+Global L2 error = 2.58574e-06
+[time] pascal 2gpu N=256  332s
+
+=== backend=pascal  2gpu  (NP=2)  N=512 ===
+[1778547765.354020] [gpu04:130765:0]     ucp_context.c:1354 UCX  WARN  transport 'gdr_copy' is not available, please use one or more of: cma, cuda, cuda_copy, cuda_ipc, dc, dc_mlx5, dc_x, ib, mm, posix, rc, rc_mlx5, rc_v, rc_verbs, rc_x, self, shm, sm, sysv, tcp, ud, ud_mlx5, ud_v, ud_verbs, ud_x, xpmem
+[1778547765.363285] [gpu04:130764:0]     ucp_context.c:1354 UCX  WARN  transport 'gdr_copy' is not available, please use one or more of: cma, cuda, cuda_copy, cuda_ipc, dc, dc_mlx5, dc_x, ib, mm, posix, rc, rc_mlx5, rc_v, rc_verbs, rc_x, self, shm, sm, sysv, tcp, ud, ud_mlx5, ud_v, ud_verbs, ud_x, xpmem
+[1778547765.580694] [gpu04:130764:0]     ucp_context.c:1354 UCX  WARN  transport 'gdr_copy' is not available, please use one or more of: cma, cuda, cuda_copy, cuda_ipc, dc, dc_mlx5, dc_x, ib, mm, posix, rc, rc_mlx5, rc_v, rc_verbs, rc_x, self, shm, sm, sysv, tcp, ud, ud_mlx5, ud_v, ud_verbs, ud_x, xpmem
+[1778547765.592570] [gpu04:130765:0]     ucp_context.c:1354 UCX  WARN  transport 'gdr_copy' is not available, please use one or more of: cma, cuda, cuda_copy, cuda_ipc, dc, dc_mlx5, dc_x, ib, mm, posix, rc, rc_mlx5, rc_v, rc_verbs, rc_x, self, shm, sm, sysv, tcp, ud, ud_mlx5, ud_v, ud_verbs, ud_x, xpmem
+[1778547765.748145] [gpu04:130765:0]     ucp_context.c:1354 UCX  WARN  transport 'gdr_copy' is not available, please use one or more of: cma, cuda, cuda_copy, cuda_ipc, dc, dc_mlx5, dc_x, ib, mm, posix, rc, rc_mlx5, rc_v, rc_verbs, rc_x, self, shm, sm, sysv, tcp, ud, ud_mlx5, ud_v, ud_verbs, ud_x, xpmem
+[1778547765.748194] [gpu04:130764:0]     ucp_context.c:1354 UCX  WARN  transport 'gdr_copy' is not available, please use one or more of: cma, cuda, cuda_copy, cuda_ipc, dc, dc_mlx5, dc_x, ib, mm, posix, rc, rc_mlx5, rc_v, rc_verbs, rc_x, self, shm, sm, sysv, tcp, ud, ud_mlx5, ud_v, ud_verbs, ud_x, xpmem
+[1778547765.915319] [gpu04:130764:0]     ucp_context.c:1354 UCX  WARN  transport 'gdr_copy' is not available, please use one or more of: cma, cuda, cuda_copy, cuda_ipc, dc, dc_mlx5, dc_x, ib, mm, posix, rc, rc_mlx5, rc_v, rc_verbs, rc_x, self, shm, sm, sysv, tcp, ud, ud_mlx5, ud_v, ud_verbs, ud_x, xpmem
+[1778547765.915358] [gpu04:130765:0]     ucp_context.c:1354 UCX  WARN  transport 'gdr_copy' is not available, please use one or more of: cma, cuda, cuda_copy, cuda_ipc, dc, dc_mlx5, dc_x, ib, mm, posix, rc, rc_mlx5, rc_v, rc_verbs, rc_x, self, shm, sm, sysv, tcp, ud, ud_mlx5, ud_v, ud_verbs, ud_x, xpmem
+[Tmax] = 0.00195312 | [max_iter] = 128
+[nx] = 256 | [ny] = 512 | [nz] = 512
+[rho] = 0.25
+[backend] = pascal

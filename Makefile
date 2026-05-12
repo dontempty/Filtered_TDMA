@@ -13,7 +13,7 @@ BUILDDIR := build
 #    Heat/           → build/bin/heat.out
 # ============================================================
 
-.PHONY: all FilteredTDMA PaScaL channel heat tests clean rm
+.PHONY: all FilteredTDMA PaScaL channel heat heat_gpu tests clean rm
 
 # Output directories produced by a run (stats/, instant/, restart_out/).
 # Paths match the defaults in channel/PARA_INPUT.dat.
@@ -22,7 +22,7 @@ OUTDIRS := $(RUNDIR)/statistics $(RUNDIR)/instant $(RUNDIR)/restart_out $(RUNDIR
 
 all: FilteredTDMA PaScaL channel
 
-FilteredTDMA:
+FilteredTDMA: PaScaL
 	mkdir -p $(BUILDDIR)/obj/ftdma $(BUILDDIR)/lib $(BUILDDIR)/include
 	$(MAKE) -C Filtered_TDMA all BUILDDIR=../$(BUILDDIR)
 
@@ -38,6 +38,11 @@ heat: FilteredTDMA PaScaL
 	mkdir -p $(BUILDDIR)/obj $(BUILDDIR)/bin
 	$(MAKE) -C Heat all BUILDDIR=../$(BUILDDIR)
 
+# GPU heat example: requires USE_CUDA=1 CUDA_ARCH=<sm_*> on the command line.
+heat_gpu: FilteredTDMA PaScaL
+	mkdir -p $(BUILDDIR)/obj $(BUILDDIR)/bin
+	$(MAKE) -C Heat_gpu all BUILDDIR=../$(BUILDDIR)
+
 tests: channel
 	mkdir -p $(BUILDDIR)/obj $(BUILDDIR)/bin
 	$(MAKE) -C channel/tests all BUILDDIR=../../$(BUILDDIR)
@@ -47,6 +52,7 @@ clean:
 	-$(MAKE) -C PaScaL_TDMA    clean BUILDDIR=../$(BUILDDIR)
 	-$(MAKE) -C channel        clean BUILDDIR=../$(BUILDDIR)
 	-$(MAKE) -C Heat           clean BUILDDIR=../$(BUILDDIR)
+	-$(MAKE) -C Heat_gpu       clean BUILDDIR=../$(BUILDDIR) 2>/dev/null
 	-$(MAKE) -C channel/tests  clean BUILDDIR=../../$(BUILDDIR)
 	rm -rf $(BUILDDIR)
 
