@@ -1,28 +1,29 @@
 #!/bin/bash
 #SBATCH -J ftdma_gpu_conv
-#SBATCH -p amd_a100nv_8
+#SBATCH -p cas_v100nv_8
 #SBATCH -N 1
-#SBATCH --gres=gpu:8
-#SBATCH --ntasks-per-node=8
+#SBATCH --gres=gpu:4
+#SBATCH --ntasks-per-node=4
 #SBATCH -o log/%x_%j.out
 #SBATCH -e log/%x_%j.err
-#SBATCH --time=02:00:00
+#SBATCH --time=01:00:00
 #SBATCH --comment etc
 
 # ============================================================
-#  Filtered_TDMA GPU convergence (rho=0.25, dt=dx^2, T_final fixed)
-#  Two backends (pascal, filtered) × 4 decompositions × 4 grid sizes
-#  = 32 runs in one job.
-#
-#  Submit from /scratch/x3319a05/Filtered_TDMA :
-#      sbatch Heat_gpu/run_convergence_a100.sh
+#  Filtered_TDMA GPU convergence (NP=1,2,4 only — NP=8 has 2-day queue wait).
+#  Two backends (pascal, filtered) × 3 decompositions × 4 grid sizes
+#  = 24 runs in one job.
 # ============================================================
 
 set -e
 
-# --- KISTI Neuron environment ---------------------------------------------
 module purge
 module load nvhpc/25.11_cuda12
+export OMPI_MCA_opal_warn_on_missing_libcuda=0
+export OMPI_MCA_pml=ucx
+export OMPI_MCA_osc=ucx
+export OMPI_MCA_coll=^hcoll
+export UCX_TLS=cuda_copy,cuda_ipc,sm,self
 export UCX_MEMTYPE_CACHE=n
 export CUDA_LIBDIR="${NVHPC_ROOT}/cuda/lib64"
 
@@ -43,8 +44,8 @@ echo " cwd     : $PROJ"
 echo "=============================================="
 
 # --- Build ----------------------------------------------------------------
-echo "[build] USE_CUDA=1 CUDA_ARCH=80 make heat_gpu"
-USE_CUDA=1 CUDA_ARCH=80 make heat_gpu
+echo "[build] USE_CUDA=1 CUDA_ARCH=70 make heat_gpu (V100)"
+USE_CUDA=1 CUDA_ARCH=70 make heat_gpu
 
 EXE="${PROJ}/build/bin/heat_gpu.out"
 RUN_DIR="${PROJ}/Heat_gpu/inputs"
@@ -61,10 +62,10 @@ echo " LOG  : ${RESULT}"
 echo "================================================================"
 : > "${RESULT}"
 
-for BACKEND in pascal filtered; do
-    for LABEL in 1gpu 2gpu 4gpu 8gpu; do
+for BACKEND in pascal filtered filtered_v2; do
+    for LABEL in 1gpu 2gpu 4gpu; do
         case "${LABEL}" in
-            1gpu) NP=1 ;;  2gpu) NP=2 ;;  4gpu) NP=4 ;;  8gpu) NP=8 ;;
+            1gpu) NP=1 ;;  2gpu) NP=2 ;;  4gpu) NP=4 ;;
         esac
 
         for N in 64 128 256 512; do

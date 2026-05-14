@@ -20,4 +20,4 @@ dt   = 0.001
 option = order
 
 !==================== TDMA backend ====================
-tdma_backend = filtered
+tdma_backend = filtered_v2

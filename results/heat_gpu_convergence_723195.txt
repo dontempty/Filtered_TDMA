@@ -1,0 +1,324 @@
+
+=== backend=pascal  1gpu  (NP=1)  N=64 ===
+[Tmax] = 0.00195312 | [max_iter] = 2
+[nx] = 64 | [ny] = 64 | [nz] = 64
+[rho] = 0.25
+[backend] = pascal
+ [Timing] CSV saved to results/timing_65_111_pascal.csv
+Global L2 error = 4.21191e-05
+[time] pascal 1gpu N=64  this run 4s
+
+=== backend=pascal  1gpu  (NP=1)  N=128 ===
+[Tmax] = 0.00195312 | [max_iter] = 8
+[nx] = 128 | [ny] = 128 | [nz] = 128
+[rho] = 0.25
+[backend] = pascal
+ [Timing] CSV saved to results/timing_129_111_pascal.csv
+Global L2 error = 1.03721e-05
+[time] pascal 1gpu N=128  this run 4s
+
+=== backend=pascal  1gpu  (NP=1)  N=256 ===
+[Tmax] = 0.00195312 | [max_iter] = 32
+[nx] = 256 | [ny] = 256 | [nz] = 256
+[rho] = 0.25
+[backend] = pascal
+ [Timing] CSV saved to results/timing_257_111_pascal.csv
+Global L2 error = 2.58574e-06
+[time] pascal 1gpu N=256  this run 5s
+
+=== backend=pascal  1gpu  (NP=1)  N=512 ===
+[Tmax] = 0.00195312 | [max_iter] = 128
+[nx] = 512 | [ny] = 512 | [nz] = 512
+[rho] = 0.25
+[backend] = pascal
+ [Timing] CSV saved to results/timing_513_111_pascal.csv
+Global L2 error = 6.46409e-07
+[time] pascal 1gpu N=512  this run 10s
+
+=== backend=pascal  2gpu  (NP=2)  N=64 ===
+[Tmax] = 0.00195312 | [max_iter] = 2
+[nx] = 32 | [ny] = 64 | [nz] = 64
+[rho] = 0.25
+[backend] = pascal
+ [Timing] CSV saved to results/timing_65_211_pascal.csv
+Global L2 error = 4.21191e-05
+[time] pascal 2gpu N=64  this run 5s
+
+=== backend=pascal  2gpu  (NP=2)  N=128 ===
+[Tmax] = 0.00195312 | [max_iter] = 8
+[nx] = 64 | [ny] = 128 | [nz] = 128
+[rho] = 0.25
+[backend] = pascal
+ [Timing] CSV saved to results/timing_129_211_pascal.csv
+Global L2 error = 1.03721e-05
+[time] pascal 2gpu N=128  this run 5s
+
+=== backend=pascal  2gpu  (NP=2)  N=256 ===
+[Tmax] = 0.00195312 | [max_iter] = 32
+[nx] = 128 | [ny] = 256 | [nz] = 256
+[rho] = 0.25
+[backend] = pascal
+ [Timing] CSV saved to results/timing_257_211_pascal.csv
+Global L2 error = 2.58574e-06
+[time] pascal 2gpu N=256  this run 5s
+
+=== backend=pascal  2gpu  (NP=2)  N=512 ===
+[Tmax] = 0.00195312 | [max_iter] = 128
+[nx] = 256 | [ny] = 512 | [nz] = 512
+[rho] = 0.25
+[backend] = pascal
+ [Timing] CSV saved to results/timing_513_211_pascal.csv
+Global L2 error = 6.46409e-07
+[time] pascal 2gpu N=512  this run 8s
+
+=== backend=pascal  4gpu  (NP=4)  N=64 ===
+[Tmax] = 0.00195312 | [max_iter] = 2
+[nx] = 32 | [ny] = 32 | [nz] = 64
+[rho] = 0.25
+[backend] = pascal
+ [Timing] CSV saved to results/timing_65_221_pascal.csv
+Global L2 error = 4.21191e-05
+[time] pascal 4gpu N=64  this run 7s
+
+=== backend=pascal  4gpu  (NP=4)  N=128 ===
+[Tmax] = 0.00195312 | [max_iter] = 8
+[nx] = 64 | [ny] = 64 | [nz] = 128
+[rho] = 0.25
+[backend] = pascal
+ [Timing] CSV saved to results/timing_129_221_pascal.csv
+Global L2 error = 1.03721e-05
+[time] pascal 4gpu N=128  this run 6s
+
+=== backend=pascal  4gpu  (NP=4)  N=256 ===
+[Tmax] = 0.00195312 | [max_iter] = 32
+[nx] = 128 | [ny] = 128 | [nz] = 256
+[rho] = 0.25
+[backend] = pascal
+ [Timing] CSV saved to results/timing_257_221_pascal.csv
+Global L2 error = 2.58574e-06
+[time] pascal 4gpu N=256  this run 6s
+
+=== backend=pascal  4gpu  (NP=4)  N=512 ===
+[Tmax] = 0.00195312 | [max_iter] = 128
+[nx] = 256 | [ny] = 256 | [nz] = 512
+[rho] = 0.25
+[backend] = pascal
+ [Timing] CSV saved to results/timing_513_221_pascal.csv
+Global L2 error = 6.46409e-07
+[time] pascal 4gpu N=512  this run 9s
+
+=== backend=filtered  1gpu  (NP=1)  N=64 ===
+[Tmax] = 0.00195312 | [max_iter] = 2
+[nx] = 64 | [ny] = 64 | [nz] = 64
+[rho] = 0.25
+[backend] = filtered
+ [Timing] CSV saved to results/timing_65_111_filtered.csv
+Global L2 error = 4.21191e-05
+[time] filtered 1gpu N=64  this run 3s
+
+=== backend=filtered  1gpu  (NP=1)  N=128 ===
+[Tmax] = 0.00195312 | [max_iter] = 8
+[nx] = 128 | [ny] = 128 | [nz] = 128
+[rho] = 0.25
+[backend] = filtered
+ [Timing] CSV saved to results/timing_129_111_filtered.csv
+Global L2 error = 1.03721e-05
+[time] filtered 1gpu N=128  this run 4s
+
+=== backend=filtered  1gpu  (NP=1)  N=256 ===
+[Tmax] = 0.00195312 | [max_iter] = 32
+[nx] = 256 | [ny] = 256 | [nz] = 256
+[rho] = 0.25
+[backend] = filtered
+ [Timing] CSV saved to results/timing_257_111_filtered.csv
+Global L2 error = 2.58574e-06
+[time] filtered 1gpu N=256  this run 5s
+
+=== backend=filtered  1gpu  (NP=1)  N=512 ===
+[Tmax] = 0.00195312 | [max_iter] = 128
+[nx] = 512 | [ny] = 512 | [nz] = 512
+[rho] = 0.25
+[backend] = filtered
+ [Timing] CSV saved to results/timing_513_111_filtered.csv
+Global L2 error = 6.46409e-07
+[time] filtered 1gpu N=512  this run 10s
+
+=== backend=filtered  2gpu  (NP=2)  N=64 ===
+[Tmax] = 0.00195312 | [max_iter] = 2
+[nx] = 32 | [ny] = 64 | [nz] = 64
+[rho] = 0.25
+[backend] = filtered
+ [Timing] CSV saved to results/timing_65_211_filtered.csv
+Global L2 error = 4.21198e-05
+[time] filtered 2gpu N=64  this run 4s
+
+=== backend=filtered  2gpu  (NP=2)  N=128 ===
+[Tmax] = 0.00195312 | [max_iter] = 8
+[nx] = 64 | [ny] = 128 | [nz] = 128
+[rho] = 0.25
+[backend] = filtered
+ [Timing] CSV saved to results/timing_129_211_filtered.csv
+Global L2 error = 1.03724e-05
+[time] filtered 2gpu N=128  this run 5s
+
+=== backend=filtered  2gpu  (NP=2)  N=256 ===
+[Tmax] = 0.00195312 | [max_iter] = 32
+[nx] = 128 | [ny] = 256 | [nz] = 256
+[rho] = 0.25
+[backend] = filtered
+ [Timing] CSV saved to results/timing_257_211_filtered.csv
+Global L2 error = 2.58579e-06
+[time] filtered 2gpu N=256  this run 5s
+
+=== backend=filtered  2gpu  (NP=2)  N=512 ===
+[Tmax] = 0.00195312 | [max_iter] = 128
+[nx] = 256 | [ny] = 512 | [nz] = 512
+[rho] = 0.25
+[backend] = filtered
+ [Timing] CSV saved to results/timing_513_211_filtered.csv
+Global L2 error = 6.46416e-07
+[time] filtered 2gpu N=512  this run 10s
+
+=== backend=filtered  4gpu  (NP=4)  N=64 ===
+[Tmax] = 0.00195312 | [max_iter] = 2
+[nx] = 32 | [ny] = 32 | [nz] = 64
+[rho] = 0.25
+[backend] = filtered
+ [Timing] CSV saved to results/timing_65_221_filtered.csv
+Global L2 error = 4.21205e-05
+[time] filtered 4gpu N=64  this run 5s
+
+=== backend=filtered  4gpu  (NP=4)  N=128 ===
+[Tmax] = 0.00195312 | [max_iter] = 8
+[nx] = 64 | [ny] = 64 | [nz] = 128
+[rho] = 0.25
+[backend] = filtered
+ [Timing] CSV saved to results/timing_129_221_filtered.csv
+Global L2 error = 1.03727e-05
+[time] filtered 4gpu N=128  this run 6s
+
+=== backend=filtered  4gpu  (NP=4)  N=256 ===
+[Tmax] = 0.00195312 | [max_iter] = 32
+[nx] = 128 | [ny] = 128 | [nz] = 256
+[rho] = 0.25
+[backend] = filtered
+ [Timing] CSV saved to results/timing_257_221_filtered.csv
+Global L2 error = 2.58584e-06
+[time] filtered 4gpu N=256  this run 6s
+
+=== backend=filtered  4gpu  (NP=4)  N=512 ===
+[Tmax] = 0.00195312 | [max_iter] = 128
+[nx] = 256 | [ny] = 256 | [nz] = 512
+[rho] = 0.25
+[backend] = filtered
+ [Timing] CSV saved to results/timing_513_221_filtered.csv
+Global L2 error = 6.46423e-07
+[time] filtered 4gpu N=512  this run 8s
+
+=== backend=filtered_v2  1gpu  (NP=1)  N=64 ===
+[Tmax] = 0.00195312 | [max_iter] = 2
+[nx] = 64 | [ny] = 64 | [nz] = 64
+[rho] = 0.25
+[backend] = filtered_v2
+ [Timing] CSV saved to results/timing_65_111_filtered_v2.csv
+Global L2 error = 4.21191e-05
+[time] filtered_v2 1gpu N=64  this run 4s
+
+=== backend=filtered_v2  1gpu  (NP=1)  N=128 ===
+[Tmax] = 0.00195312 | [max_iter] = 8
+[nx] = 128 | [ny] = 128 | [nz] = 128
+[rho] = 0.25
+[backend] = filtered_v2
+ [Timing] CSV saved to results/timing_129_111_filtered_v2.csv
+Global L2 error = 1.03721e-05
+[time] filtered_v2 1gpu N=128  this run 3s
+
+=== backend=filtered_v2  1gpu  (NP=1)  N=256 ===
+[Tmax] = 0.00195312 | [max_iter] = 32
+[nx] = 256 | [ny] = 256 | [nz] = 256
+[rho] = 0.25
+[backend] = filtered_v2
+ [Timing] CSV saved to results/timing_257_111_filtered_v2.csv
+Global L2 error = 2.58574e-06
+[time] filtered_v2 1gpu N=256  this run 5s
+
+=== backend=filtered_v2  1gpu  (NP=1)  N=512 ===
+[Tmax] = 0.00195312 | [max_iter] = 128
+[nx] = 512 | [ny] = 512 | [nz] = 512
+[rho] = 0.25
+[backend] = filtered_v2
+ [Timing] CSV saved to results/timing_513_111_filtered_v2.csv
+Global L2 error = 6.46409e-07
+[time] filtered_v2 1gpu N=512  this run 10s
+
+=== backend=filtered_v2  2gpu  (NP=2)  N=64 ===
+[Tmax] = 0.00195312 | [max_iter] = 2
+[nx] = 32 | [ny] = 64 | [nz] = 64
+[rho] = 0.25
+[backend] = filtered_v2
+ [Timing] CSV saved to results/timing_65_211_filtered_v2.csv
+Global L2 error = 4.21199e-05
+[time] filtered_v2 2gpu N=64  this run 5s
+
+=== backend=filtered_v2  2gpu  (NP=2)  N=128 ===
+[Tmax] = 0.00195312 | [max_iter] = 8
+[nx] = 64 | [ny] = 128 | [nz] = 128
+[rho] = 0.25
+[backend] = filtered_v2
+ [Timing] CSV saved to results/timing_129_211_filtered_v2.csv
+Global L2 error = 1.03722e-05
+[time] filtered_v2 2gpu N=128  this run 4s
+
+=== backend=filtered_v2  2gpu  (NP=2)  N=256 ===
+[Tmax] = 0.00195312 | [max_iter] = 32
+[nx] = 128 | [ny] = 256 | [nz] = 256
+[rho] = 0.25
+[backend] = filtered_v2
+ [Timing] CSV saved to results/timing_257_211_filtered_v2.csv
+Global L2 error = 2.58575e-06
+[time] filtered_v2 2gpu N=256  this run 5s
+
+=== backend=filtered_v2  2gpu  (NP=2)  N=512 ===
+[Tmax] = 0.00195312 | [max_iter] = 128
+[nx] = 256 | [ny] = 512 | [nz] = 512
+[rho] = 0.25
+[backend] = filtered_v2
+ [Timing] CSV saved to results/timing_513_211_filtered_v2.csv
+Global L2 error = 6.46411e-07
+[time] filtered_v2 2gpu N=512  this run 9s
+
+=== backend=filtered_v2  4gpu  (NP=4)  N=64 ===
+[Tmax] = 0.00195312 | [max_iter] = 2
+[nx] = 32 | [ny] = 32 | [nz] = 64
+[rho] = 0.25
+[backend] = filtered_v2
+ [Timing] CSV saved to results/timing_65_221_filtered_v2.csv
+Global L2 error = 4.21208e-05
+[time] filtered_v2 4gpu N=64  this run 6s
+
+=== backend=filtered_v2  4gpu  (NP=4)  N=128 ===
+[Tmax] = 0.00195312 | [max_iter] = 8
+[nx] = 64 | [ny] = 64 | [nz] = 128
+[rho] = 0.25
+[backend] = filtered_v2
+ [Timing] CSV saved to results/timing_129_221_filtered_v2.csv
+Global L2 error = 1.03723e-05
+[time] filtered_v2 4gpu N=128  this run 6s
+
+=== backend=filtered_v2  4gpu  (NP=4)  N=256 ===
+[Tmax] = 0.00195312 | [max_iter] = 32
+[nx] = 128 | [ny] = 128 | [nz] = 256
+[rho] = 0.25
+[backend] = filtered_v2
+ [Timing] CSV saved to results/timing_257_221_filtered_v2.csv
+Global L2 error = 2.58577e-06
+[time] filtered_v2 4gpu N=256  this run 5s
+
+=== backend=filtered_v2  4gpu  (NP=4)  N=512 ===
+[Tmax] = 0.00195312 | [max_iter] = 128
+[nx] = 256 | [ny] = 256 | [nz] = 512
+[rho] = 0.25
+[backend] = filtered_v2
+ [Timing] CSV saved to results/timing_513_221_filtered_v2.csv
+Global L2 error = 6.46413e-07
+[time] filtered_v2 4gpu N=512  this run 7s

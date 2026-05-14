@@ -16,6 +16,9 @@ channel/restart_out/
 log/
 *.err
 
+# results
+# results/
+
 # Editor / IDE
 .vscode/
 .idea/

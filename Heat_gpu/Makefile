@@ -18,8 +18,9 @@ OBJS        := $(CPP_OBJS) $(CU_OBJS)
 LDFLAGS := -L$(LDIR)
 # pascal_tdma static archive contains CUDA objects, so we need the CUDA runtime.
 CUDA_LIBDIR ?= $(if $(CUDA_HOME),$(CUDA_HOME)/lib64,/usr/local/cuda/lib64)
+CUDA_INCDIR ?= $(CUDA_LIBDIR:/lib64=/include)
 LIBS    := -lfiltered_tdma -lpascal_tdma -L$(CUDA_LIBDIR) $(CUDA_LDFLAGS) -lstdc++
-CXXFLAGS += -I$(IDIR)
+CXXFLAGS += -I$(IDIR) -I$(CUDA_INCDIR)
 
 all: $(BINDIR)/$(EXE)
 

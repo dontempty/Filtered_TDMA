@@ -20,9 +20,12 @@
 
 class TdmaBackendGPU {
 public:
-    enum class Kind { FILTERED, PASCAL };
+    enum class Kind { FILTERED, FILTERED_V2, PASCAL };
 
-    /// Case-insensitive — also accepts "pascal_tdma" / "filtered_tdma".
+    /// Case-insensitive. Accepted strings:
+    ///   "pascal" | "pascal_tdma"                  → PASCAL
+    ///   "filtered" | "filtered_tdma" | "filtered_v1" → FILTERED   (solve_filtered_v1)
+    ///   "filtered_v2"                              → FILTERED_V2 (solve_filtered_v2)
     static Kind parse(const std::string& s);
 
     /// `n_sys`, `n_row` are the dimensions of one direction's system.

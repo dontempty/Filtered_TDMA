@@ -2,7 +2,6 @@
 #define FILTERED_TDMA_CUDA_HPP
 
 #include <mpi.h>
-#include <vector>
 
 /// CUDA / GPU version of FilteredTDMA.
 ///
@@ -68,10 +67,12 @@ private:
     int          n_sys_, n_row_, nprocs_;
     int          left_rank_, right_rank_;
 
-    MPI_Datatype row0_type_ = MPI_DATATYPE_NULL;   // subarray type for row j=0
-    MPI_Datatype rowN_type_ = MPI_DATATYPE_NULL;   // subarray type for row j=n_row-1
-
-    // Device receive / send buffers for neighbor boundary data
+    // Device receive / send buffers for neighbor boundary data.
+    // d_*_lastrow_send_ are dedicated contiguous staging buffers for the
+    // CUDA-aware MPI fast path (pack kernel → cudaStreamSynchronize →
+    // MPI on plain MPI_DOUBLE). Mirrors PaScaL_TDMA's d_sendbuf_/d_recvbuf_.
+    double* d_C_lastrow_send_ = nullptr;
+    double* d_D_lastrow_send_ = nullptr;
     double* d_C_left_recv_   = nullptr;
     double* d_D_left_recv_   = nullptr;
     double* d_D_right_send_  = nullptr;
@@ -80,15 +81,8 @@ private:
     // Per-row spectral radius estimates (device)
     double* d_A_rho_ = nullptr;
     double* d_C_rho_ = nullptr;
-
-    // Host mirror of A_rho/C_rho (filled by cal_J via cudaMemcpy) — small,
-    // (n_row+1) doubles, kept here to avoid per-call host alloc.
-    std::vector<double> h_A_rho_;
-    std::vector<double> h_C_rho_;
-
-    // Device scratch for {max|D0|, max|DN|} reductions (2 doubles, one float
-    // for v1 — mirrored back to host inside cal_J_v1).
-    double* d_maxD_ = nullptr;     // [2]
+    // Device scratch for cal_J kernel result (single int).
+    int*    d_J_     = nullptr;
 
     double eps_;
 };

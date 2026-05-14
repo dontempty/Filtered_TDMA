@@ -1,6 +1,8 @@
 #include <mpi.h>
+#include <cuda_runtime.h>
 #include <iostream>
 #include <cmath>
+#include <cstdlib>
 #include <vector>
 
 #include "global.hpp"
@@ -15,6 +17,19 @@ int main(int argc, char** argv) {
     MPI_Init(&argc, &argv);
     MPI_Comm_size(MPI_COMM_WORLD, &nprocs);
     MPI_Comm_rank(MPI_COMM_WORLD, &myrank);
+
+    // Pin each MPI rank to its own GPU.
+    {
+        int nDevices = 0;
+        if (cudaGetDeviceCount(&nDevices) != cudaSuccess || nDevices <= 0) {
+            MPI_Abort(MPI_COMM_WORLD, 1);
+        }
+        int local_rank = myrank;
+        if (const char* s = std::getenv("OMPI_COMM_WORLD_LOCAL_RANK")) local_rank = std::atoi(s);
+        else if (const char* s = std::getenv("PMI_LOCAL_RANK"))       local_rank = std::atoi(s);
+        else if (const char* s = std::getenv("SLURM_LOCALID"))        local_rank = std::atoi(s);
+        cudaSetDevice(local_rank % nDevices);
+    }
 
     // 1) Load parameters
     GlobalParams params;

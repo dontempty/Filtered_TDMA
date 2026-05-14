@@ -8,7 +8,8 @@ TdmaBackendGPU::Kind TdmaBackendGPU::parse(const std::string& s) {
     t.reserve(s.size());
     for (char c : s) t.push_back(static_cast<char>(std::tolower(c)));
     if (t == "pascal" || t == "pascal_tdma") return Kind::PASCAL;
-    return Kind::FILTERED;
+    if (t == "filtered_v2")                  return Kind::FILTERED_V2;
+    return Kind::FILTERED;  // "filtered", "filtered_v1", "filtered_tdma"
 }
 
 TdmaBackendGPU::TdmaBackendGPU(Kind kind, int n_sys, int n_row,
@@ -17,19 +18,23 @@ TdmaBackendGPU::TdmaBackendGPU(Kind kind, int n_sys, int n_row,
                                double eps_constant)
     : kind_(kind), n_sys_(n_sys), n_row_(n_row)
 {
-    if (kind_ == Kind::FILTERED) {
+    if (kind_ == Kind::PASCAL) {
+        // 16×16 block matches PaScaL_TDMA_F defaults (256 threads per block).
+        pasc_ = std::make_unique<PaScaLTDMAManyCUDA>(n_sys, myrank, nprocs, comm,
+                                                    16, 16);
+    } else {
         filt_ = std::make_unique<FilteredTDMACUDA>(n_sys, n_row,
                                                    myrank, nprocs, comm,
                                                    left_rank, right_rank,
                                                    eps_constant);
-    } else {
-        pasc_ = std::make_unique<PaScaLTDMAManyCUDA>(n_sys, myrank, nprocs, comm);
     }
 }
 
 void TdmaBackendGPU::solve(double* d_A, double* d_B, double* d_C, double* d_D) {
     if (kind_ == Kind::FILTERED) {
         filt_->solve_filtered_v1(d_A, d_B, d_C, d_D);
+    } else if (kind_ == Kind::FILTERED_V2) {
+        filt_->solve_filtered_v2(d_A, d_B, d_C, d_D);
     } else {
         pasc_->solve(d_A, d_B, d_C, d_D, n_sys_, n_row_);
     }
@@ -38,9 +43,9 @@ void TdmaBackendGPU::solve(double* d_A, double* d_B, double* d_C, double* d_D) {
 void TdmaBackendGPU::set_rho_device(const double* d_A,
                                     const double* d_B,
                                     const double* d_C) {
-    if (kind_ == Kind::FILTERED) filt_->set_rho_device(d_A, d_B, d_C);
+    if (kind_ != Kind::PASCAL) filt_->set_rho_device(d_A, d_B, d_C);
 }
 
 void TdmaBackendGPU::set_eps_constant(double eps_constant) {
-    if (kind_ == Kind::FILTERED) filt_->set_eps_constant(eps_constant);
+    if (kind_ != Kind::PASCAL) filt_->set_eps_constant(eps_constant);
 }

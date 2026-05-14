@@ -1,0 +1,496 @@
+
+=== backend=pascal  1gpu  (NP=1)  N=64 ===
+[Tmax] = 0.00195312 | [max_iter] = 2
+[nx] = 64 | [ny] = 64 | [nz] = 64
+[rho] = 0.25
+[backend] = pascal
+ [Timing] CSV saved to results/timing_65_111_pascal.csv
+Global L2 error = 4.21191e-05
+[time] pascal 1gpu N=64  this run 4s
+
+=== backend=pascal  1gpu  (NP=1)  N=128 ===
+[Tmax] = 0.00195312 | [max_iter] = 8
+[nx] = 128 | [ny] = 128 | [nz] = 128
+[rho] = 0.25
+[backend] = pascal
+ [Timing] CSV saved to results/timing_129_111_pascal.csv
+Global L2 error = 1.03721e-05
+[time] pascal 1gpu N=128  this run 4s
+
+=== backend=pascal  1gpu  (NP=1)  N=256 ===
+[Tmax] = 0.00195312 | [max_iter] = 32
+[nx] = 256 | [ny] = 256 | [nz] = 256
+[rho] = 0.25
+[backend] = pascal
+ [Timing] CSV saved to results/timing_257_111_pascal.csv
+Global L2 error = 2.58574e-06
+[time] pascal 1gpu N=256  this run 4s
+
+=== backend=pascal  1gpu  (NP=1)  N=512 ===
+[Tmax] = 0.00195312 | [max_iter] = 128
+[nx] = 512 | [ny] = 512 | [nz] = 512
+[rho] = 0.25
+[backend] = pascal
+ [Timing] CSV saved to results/timing_513_111_pascal.csv
+Global L2 error = 6.46409e-07
+[time] pascal 1gpu N=512  this run 11s
+
+=== backend=pascal  2gpu  (NP=2)  N=64 ===
+[Tmax] = 0.00195312 | [max_iter] = 2
+[nx] = 32 | [ny] = 64 | [nz] = 64
+[rho] = 0.25
+[backend] = pascal
+ [Timing] CSV saved to results/timing_65_211_pascal.csv
+Global L2 error = 4.21191e-05
+[time] pascal 2gpu N=64  this run 4s
+
+=== backend=pascal  2gpu  (NP=2)  N=128 ===
+[Tmax] = 0.00195312 | [max_iter] = 8
+[nx] = 64 | [ny] = 128 | [nz] = 128
+[rho] = 0.25
+[backend] = pascal
+ [Timing] CSV saved to results/timing_129_211_pascal.csv
+Global L2 error = 1.03721e-05
+[time] pascal 2gpu N=128  this run 4s
+
+=== backend=pascal  2gpu  (NP=2)  N=256 ===
+[Tmax] = 0.00195312 | [max_iter] = 32
+[nx] = 128 | [ny] = 256 | [nz] = 256
+[rho] = 0.25
+[backend] = pascal
+ [Timing] CSV saved to results/timing_257_211_pascal.csv
+Global L2 error = 2.58574e-06
+[time] pascal 2gpu N=256  this run 5s
+
+=== backend=pascal  2gpu  (NP=2)  N=512 ===
+[Tmax] = 0.00195312 | [max_iter] = 128
+[nx] = 256 | [ny] = 512 | [nz] = 512
+[rho] = 0.25
+[backend] = pascal
+ [Timing] CSV saved to results/timing_513_211_pascal.csv
+Global L2 error = 6.46409e-07
+[time] pascal 2gpu N=512  this run 8s
+
+=== backend=pascal  4gpu  (NP=4)  N=64 ===
+[Tmax] = 0.00195312 | [max_iter] = 2
+[nx] = 32 | [ny] = 32 | [nz] = 64
+[rho] = 0.25
+[backend] = pascal
+ [Timing] CSV saved to results/timing_65_221_pascal.csv
+Global L2 error = 4.21191e-05
+[time] pascal 4gpu N=64  this run 6s
+
+=== backend=pascal  4gpu  (NP=4)  N=128 ===
+[Tmax] = 0.00195312 | [max_iter] = 8
+[nx] = 64 | [ny] = 64 | [nz] = 128
+[rho] = 0.25
+[backend] = pascal
+ [Timing] CSV saved to results/timing_129_221_pascal.csv
+Global L2 error = 1.03721e-05
+[time] pascal 4gpu N=128  this run 5s
+
+=== backend=pascal  4gpu  (NP=4)  N=256 ===
+[Tmax] = 0.00195312 | [max_iter] = 32
+[nx] = 128 | [ny] = 128 | [nz] = 256
+[rho] = 0.25
+[backend] = pascal
+ [Timing] CSV saved to results/timing_257_221_pascal.csv
+Global L2 error = 2.58574e-06
+[time] pascal 4gpu N=256  this run 6s
+
+=== backend=pascal  4gpu  (NP=4)  N=512 ===
+[Tmax] = 0.00195312 | [max_iter] = 128
+[nx] = 256 | [ny] = 256 | [nz] = 512
+[rho] = 0.25
+[backend] = pascal
+ [Timing] CSV saved to results/timing_513_221_pascal.csv
+Global L2 error = 6.46409e-07
+[time] pascal 4gpu N=512  this run 9s
+
+=== backend=filtered  1gpu  (NP=1)  N=64 ===
+[Tmax] = 0.00195312 | [max_iter] = 2
+[nx] = 64 | [ny] = 64 | [nz] = 64
+[rho] = 0.25
+[backend] = filtered
+ [Timing] CSV saved to results/timing_65_111_filtered.csv
+Global L2 error = 4.21191e-05
+[time] filtered 1gpu N=64  this run 4s
+
+=== backend=filtered  1gpu  (NP=1)  N=128 ===
+[Tmax] = 0.00195312 | [max_iter] = 8
+[nx] = 128 | [ny] = 128 | [nz] = 128
+[rho] = 0.25
+[backend] = filtered
+ [Timing] CSV saved to results/timing_129_111_filtered.csv
+Global L2 error = 1.03721e-05
+[time] filtered 1gpu N=128  this run 3s
+
+=== backend=filtered  1gpu  (NP=1)  N=256 ===
+[Tmax] = 0.00195312 | [max_iter] = 32
+[nx] = 256 | [ny] = 256 | [nz] = 256
+[rho] = 0.25
+[backend] = filtered
+ [Timing] CSV saved to results/timing_257_111_filtered.csv
+Global L2 error = 2.58574e-06
+[time] filtered 1gpu N=256  this run 4s
+
+=== backend=filtered  1gpu  (NP=1)  N=512 ===
+[Tmax] = 0.00195312 | [max_iter] = 128
+[nx] = 512 | [ny] = 512 | [nz] = 512
+[rho] = 0.25
+[backend] = filtered
+ [Timing] CSV saved to results/timing_513_111_filtered.csv
+Global L2 error = 6.46409e-07
+[time] filtered 1gpu N=512  this run 11s
+
+=== backend=filtered  2gpu  (NP=2)  N=64 ===
+[Tmax] = 0.00195312 | [max_iter] = 2
+[nx] = 32 | [ny] = 64 | [nz] = 64
+[rho] = 0.25
+[backend] = filtered
+[gpu36:1825307:0:1825307] Caught signal 4 (Illegal instruction: illegal operand)
+[gpu36:1825306:0:1825306] Caught signal 4 (Illegal instruction: illegal operand)
+==== backtrace (tid:1825307) ====
+ 0 0x0000000000054db0 __GI___sigaction()  :0
+ 1 0x000000000041791f FilteredTDMACUDA::solve_filtered_v1()  /scratch/x3319a05/Filtered_TDMA/Filtered_TDMA/filtered_tdma_cuda.cu:302
+ 2 0x0000000000411d8d SolveTheta::profile()  /scratch/x3319a05/Filtered_TDMA/Heat_gpu/solve_theta.cu:621
+ 3 0x00000000004083b1 main()  /scratch/x3319a05/Filtered_TDMA/Heat_gpu/main.cpp:68
+ 4 0x000000000003feb0 __libc_start_call_main()  ???:0
+ 5 0x000000000003ff60 __libc_start_main_alias_2()  :0
+ 6 0x00000000004047e5 _start()  ???:0
+=================================
+==== backtrace (tid:1825306) ====
+ 0 0x0000000000054db0 __GI___sigaction()  :0
+ 1 0x000000000041791f FilteredTDMACUDA::solve_filtered_v1()  /scratch/x3319a05/Filtered_TDMA/Filtered_TDMA/filtered_tdma_cuda.cu:302
+ 2 0x0000000000411d8d SolveTheta::profile()  /scratch/x3319a05/Filtered_TDMA/Heat_gpu/solve_theta.cu:621
+ 3 0x00000000004083b1 main()  /scratch/x3319a05/Filtered_TDMA/Heat_gpu/main.cpp:68
+ 4 0x000000000003feb0 __libc_start_call_main()  ???:0
+ 5 0x000000000003ff60 __libc_start_main_alias_2()  :0
+ 6 0x00000000004047e5 _start()  ???:0
+=================================
+--------------------------------------------------------------------------
+Primary job  terminated normally, but 1 process returned
+a non-zero exit code. Per user-direction, the job has been aborted.
+--------------------------------------------------------------------------
+--------------------------------------------------------------------------
+mpirun noticed that process rank 1 with PID 1825307 on node gpu36 exited on signal 4 (Illegal instruction).
+--------------------------------------------------------------------------
+[time] filtered 2gpu N=64  this run 7s
+
+=== backend=filtered  2gpu  (NP=2)  N=128 ===
+[Tmax] = 0.00195312 | [max_iter] = 8
+[nx] = 64 | [ny] = 128 | [nz] = 128
+[rho] = 0.25
+[backend] = filtered
+[gpu36:1825396:0:1825396] Caught signal 4 (Illegal instruction: illegal operand)
+[gpu36:1825395:0:1825395] Caught signal 4 (Illegal instruction: illegal operand)
+==== backtrace (tid:1825395) ====
+ 0 0x0000000000054db0 __GI___sigaction()  :0
+ 1 0x000000000041791f FilteredTDMACUDA::solve_filtered_v1()  /scratch/x3319a05/Filtered_TDMA/Filtered_TDMA/filtered_tdma_cuda.cu:302
+ 2 0x0000000000411d8d SolveTheta::profile()  /scratch/x3319a05/Filtered_TDMA/Heat_gpu/solve_theta.cu:621
+ 3 0x00000000004083b1 main()  /scratch/x3319a05/Filtered_TDMA/Heat_gpu/main.cpp:68
+ 4 0x000000000003feb0 __libc_start_call_main()  ???:0
+ 5 0x000000000003ff60 __libc_start_main_alias_2()  :0
+ 6 0x00000000004047e5 _start()  ???:0
+=================================
+==== backtrace (tid:1825396) ====
+ 0 0x0000000000054db0 __GI___sigaction()  :0
+ 1 0x000000000041791f FilteredTDMACUDA::solve_filtered_v1()  /scratch/x3319a05/Filtered_TDMA/Filtered_TDMA/filtered_tdma_cuda.cu:302
+ 2 0x0000000000411d8d SolveTheta::profile()  /scratch/x3319a05/Filtered_TDMA/Heat_gpu/solve_theta.cu:621
+ 3 0x00000000004083b1 main()  /scratch/x3319a05/Filtered_TDMA/Heat_gpu/main.cpp:68
+ 4 0x000000000003feb0 __libc_start_call_main()  ???:0
+ 5 0x000000000003ff60 __libc_start_main_alias_2()  :0
+ 6 0x00000000004047e5 _start()  ???:0
+=================================
+--------------------------------------------------------------------------
+Primary job  terminated normally, but 1 process returned
+a non-zero exit code. Per user-direction, the job has been aborted.
+--------------------------------------------------------------------------
+--------------------------------------------------------------------------
+mpirun noticed that process rank 1 with PID 1825396 on node gpu36 exited on signal 4 (Illegal instruction).
+--------------------------------------------------------------------------
+[time] filtered 2gpu N=128  this run 6s
+
+=== backend=filtered  2gpu  (NP=2)  N=256 ===
+[Tmax] = 0.00195312 | [max_iter] = 32
+[nx] = 128 | [ny] = 256 | [nz] = 256
+[rho] = 0.25
+[backend] = filtered
+[gpu36:1825487:0:1825487] Caught signal 4 (Illegal instruction: illegal operand)
+[gpu36:1825486:0:1825486] Caught signal 4 (Illegal instruction: illegal operand)
+==== backtrace (tid:1825486) ====
+ 0 0x0000000000054db0 __GI___sigaction()  :0
+ 1 0x000000000041791f FilteredTDMACUDA::solve_filtered_v1()  /scratch/x3319a05/Filtered_TDMA/Filtered_TDMA/filtered_tdma_cuda.cu:302
+ 2 0x0000000000411d8d SolveTheta::profile()  /scratch/x3319a05/Filtered_TDMA/Heat_gpu/solve_theta.cu:621
+ 3 0x00000000004083b1 main()  /scratch/x3319a05/Filtered_TDMA/Heat_gpu/main.cpp:68
+ 4 0x000000000003feb0 __libc_start_call_main()  ???:0
+ 5 0x000000000003ff60 __libc_start_main_alias_2()  :0
+ 6 0x00000000004047e5 _start()  ???:0
+=================================
+==== backtrace (tid:1825487) ====
+ 0 0x0000000000054db0 __GI___sigaction()  :0
+ 1 0x000000000041791f FilteredTDMACUDA::solve_filtered_v1()  /scratch/x3319a05/Filtered_TDMA/Filtered_TDMA/filtered_tdma_cuda.cu:302
+ 2 0x0000000000411d8d SolveTheta::profile()  /scratch/x3319a05/Filtered_TDMA/Heat_gpu/solve_theta.cu:621
+ 3 0x00000000004083b1 main()  /scratch/x3319a05/Filtered_TDMA/Heat_gpu/main.cpp:68
+ 4 0x000000000003feb0 __libc_start_call_main()  ???:0
+ 5 0x000000000003ff60 __libc_start_main_alias_2()  :0
+ 6 0x00000000004047e5 _start()  ???:0
+=================================
+--------------------------------------------------------------------------
+Primary job  terminated normally, but 1 process returned
+a non-zero exit code. Per user-direction, the job has been aborted.
+--------------------------------------------------------------------------
+--------------------------------------------------------------------------
+mpirun noticed that process rank 1 with PID 1825487 on node gpu36 exited on signal 4 (Illegal instruction).
+--------------------------------------------------------------------------
+[time] filtered 2gpu N=256  this run 7s
+
+=== backend=filtered  2gpu  (NP=2)  N=512 ===
+[Tmax] = 0.00195312 | [max_iter] = 128
+[nx] = 256 | [ny] = 512 | [nz] = 512
+[rho] = 0.25
+[backend] = filtered
+[gpu36:1825576:0:1825576] Caught signal 4 (Illegal instruction: illegal operand)
+[gpu36:1825575:0:1825575] Caught signal 4 (Illegal instruction: illegal operand)
+==== backtrace (tid:1825575) ====
+ 0 0x0000000000054db0 __GI___sigaction()  :0
+ 1 0x000000000041791f FilteredTDMACUDA::solve_filtered_v1()  /scratch/x3319a05/Filtered_TDMA/Filtered_TDMA/filtered_tdma_cuda.cu:302
+ 2 0x0000000000411d8d SolveTheta::profile()  /scratch/x3319a05/Filtered_TDMA/Heat_gpu/solve_theta.cu:621
+ 3 0x00000000004083b1 main()  /scratch/x3319a05/Filtered_TDMA/Heat_gpu/main.cpp:68
+ 4 0x000000000003feb0 __libc_start_call_main()  ???:0
+ 5 0x000000000003ff60 __libc_start_main_alias_2()  :0
+ 6 0x00000000004047e5 _start()  ???:0
+=================================
+==== backtrace (tid:1825576) ====
+ 0 0x0000000000054db0 __GI___sigaction()  :0
+ 1 0x000000000041791f FilteredTDMACUDA::solve_filtered_v1()  /scratch/x3319a05/Filtered_TDMA/Filtered_TDMA/filtered_tdma_cuda.cu:302
+ 2 0x0000000000411d8d SolveTheta::profile()  /scratch/x3319a05/Filtered_TDMA/Heat_gpu/solve_theta.cu:621
+ 3 0x00000000004083b1 main()  /scratch/x3319a05/Filtered_TDMA/Heat_gpu/main.cpp:68
+ 4 0x000000000003feb0 __libc_start_call_main()  ???:0
+ 5 0x000000000003ff60 __libc_start_main_alias_2()  :0
+ 6 0x00000000004047e5 _start()  ???:0
+=================================
+--------------------------------------------------------------------------
+Primary job  terminated normally, but 1 process returned
+a non-zero exit code. Per user-direction, the job has been aborted.
+--------------------------------------------------------------------------
+--------------------------------------------------------------------------
+mpirun noticed that process rank 0 with PID 1825575 on node gpu36 exited on signal 4 (Illegal instruction).
+--------------------------------------------------------------------------
+[time] filtered 2gpu N=512  this run 12s
+
+=== backend=filtered  4gpu  (NP=4)  N=64 ===
+[Tmax] = 0.00195312 | [max_iter] = 2
+[nx] = 32 | [ny] = 32 | [nz] = 64
+[rho] = 0.25
+[backend] = filtered
+[gpu36:1825677:0:1825677] Caught signal 4 (Illegal instruction: illegal operand)
+[gpu36:1825676:0:1825676] Caught signal 4 (Illegal instruction: illegal operand)
+[gpu36:1825675:0:1825675] Caught signal 4 (Illegal instruction: illegal operand)
+[gpu36:1825674:0:1825674] Caught signal 4 (Illegal instruction: illegal operand)
+==== backtrace (tid:1825676) ====
+ 0 0x0000000000054db0 __GI___sigaction()  :0
+ 1 0x000000000041791f FilteredTDMACUDA::solve_filtered_v1()  /scratch/x3319a05/Filtered_TDMA/Filtered_TDMA/filtered_tdma_cuda.cu:302
+ 2 0x00000000004117bd SolveTheta::profile()  /scratch/x3319a05/Filtered_TDMA/Heat_gpu/solve_theta.cu:604
+ 3 0x00000000004083b1 main()  /scratch/x3319a05/Filtered_TDMA/Heat_gpu/main.cpp:68
+ 4 0x000000000003feb0 __libc_start_call_main()  ???:0
+ 5 0x000000000003ff60 __libc_start_main_alias_2()  :0
+ 6 0x00000000004047e5 _start()  ???:0
+=================================
+==== backtrace (tid:1825675) ====
+ 0 0x0000000000054db0 __GI___sigaction()  :0
+ 1 0x000000000041791f FilteredTDMACUDA::solve_filtered_v1()  /scratch/x3319a05/Filtered_TDMA/Filtered_TDMA/filtered_tdma_cuda.cu:302
+ 2 0x00000000004117bd SolveTheta::profile()  /scratch/x3319a05/Filtered_TDMA/Heat_gpu/solve_theta.cu:604
+ 3 0x00000000004083b1 main()  /scratch/x3319a05/Filtered_TDMA/Heat_gpu/main.cpp:68
+ 4 0x000000000003feb0 __libc_start_call_main()  ???:0
+ 5 0x000000000003ff60 __libc_start_main_alias_2()  :0
+ 6 0x00000000004047e5 _start()  ???:0
+=================================
+==== backtrace (tid:1825677) ====
+ 0 0x0000000000054db0 __GI___sigaction()  :0
+ 1 0x000000000041791f FilteredTDMACUDA::solve_filtered_v1()  /scratch/x3319a05/Filtered_TDMA/Filtered_TDMA/filtered_tdma_cuda.cu:302
+ 2 0x00000000004117bd SolveTheta::profile()  /scratch/x3319a05/Filtered_TDMA/Heat_gpu/solve_theta.cu:604
+ 3 0x00000000004083b1 main()  /scratch/x3319a05/Filtered_TDMA/Heat_gpu/main.cpp:68
+ 4 0x000000000003feb0 __libc_start_call_main()  ???:0
+ 5 0x000000000003ff60 __libc_start_main_alias_2()  :0
+ 6 0x00000000004047e5 _start()  ???:0
+=================================
+==== backtrace (tid:1825674) ====
+ 0 0x0000000000054db0 __GI___sigaction()  :0
+ 1 0x000000000041791f FilteredTDMACUDA::solve_filtered_v1()  /scratch/x3319a05/Filtered_TDMA/Filtered_TDMA/filtered_tdma_cuda.cu:302
+ 2 0x00000000004117bd SolveTheta::profile()  /scratch/x3319a05/Filtered_TDMA/Heat_gpu/solve_theta.cu:604
+ 3 0x00000000004083b1 main()  /scratch/x3319a05/Filtered_TDMA/Heat_gpu/main.cpp:68
+ 4 0x000000000003feb0 __libc_start_call_main()  ???:0
+ 5 0x000000000003ff60 __libc_start_main_alias_2()  :0
+ 6 0x00000000004047e5 _start()  ???:0
+=================================
+--------------------------------------------------------------------------
+Primary job  terminated normally, but 1 process returned
+a non-zero exit code. Per user-direction, the job has been aborted.
+--------------------------------------------------------------------------
+--------------------------------------------------------------------------
+mpirun noticed that process rank 2 with PID 1825676 on node gpu36 exited on signal 4 (Illegal instruction).
+--------------------------------------------------------------------------
+[time] filtered 4gpu N=64  this run 7s
+
+=== backend=filtered  4gpu  (NP=4)  N=128 ===
+[Tmax] = 0.00195312 | [max_iter] = 8
+[nx] = 64 | [ny] = 64 | [nz] = 128
+[rho] = 0.25
+[backend] = filtered
+[gpu36:1825807:0:1825807] Caught signal 4 (Illegal instruction: illegal operand)
+[gpu36:1825806:0:1825806] Caught signal 4 (Illegal instruction: illegal operand)
+[gpu36:1825809:0:1825809] Caught signal 4 (Illegal instruction: illegal operand)
+[gpu36:1825808:0:1825808] Caught signal 4 (Illegal instruction: illegal operand)
+==== backtrace (tid:1825809) ====
+ 0 0x0000000000054db0 __GI___sigaction()  :0
+ 1 0x000000000041791f FilteredTDMACUDA::solve_filtered_v1()  /scratch/x3319a05/Filtered_TDMA/Filtered_TDMA/filtered_tdma_cuda.cu:302
+ 2 0x00000000004117bd SolveTheta::profile()  /scratch/x3319a05/Filtered_TDMA/Heat_gpu/solve_theta.cu:604
+ 3 0x00000000004083b1 main()  /scratch/x3319a05/Filtered_TDMA/Heat_gpu/main.cpp:68
+ 4 0x000000000003feb0 __libc_start_call_main()  ???:0
+ 5 0x000000000003ff60 __libc_start_main_alias_2()  :0
+ 6 0x00000000004047e5 _start()  ???:0
+=================================
+==== backtrace (tid:1825806) ====
+ 0 0x0000000000054db0 __GI___sigaction()  :0
+ 1 0x000000000041791f FilteredTDMACUDA::solve_filtered_v1()  /scratch/x3319a05/Filtered_TDMA/Filtered_TDMA/filtered_tdma_cuda.cu:302
+ 2 0x00000000004117bd SolveTheta::profile()  /scratch/x3319a05/Filtered_TDMA/Heat_gpu/solve_theta.cu:604
+ 3 0x00000000004083b1 main()  /scratch/x3319a05/Filtered_TDMA/Heat_gpu/main.cpp:68
+ 4 0x000000000003feb0 __libc_start_call_main()  ???:0
+ 5 0x000000000003ff60 __libc_start_main_alias_2()  :0
+ 6 0x00000000004047e5 _start()  ???:0
+=================================
+==== backtrace (tid:1825808) ====
+ 0 0x0000000000054db0 __GI___sigaction()  :0
+ 1 0x000000000041791f FilteredTDMACUDA::solve_filtered_v1()  /scratch/x3319a05/Filtered_TDMA/Filtered_TDMA/filtered_tdma_cuda.cu:302
+ 2 0x00000000004117bd SolveTheta::profile()  /scratch/x3319a05/Filtered_TDMA/Heat_gpu/solve_theta.cu:604
+ 3 0x00000000004083b1 main()  /scratch/x3319a05/Filtered_TDMA/Heat_gpu/main.cpp:68
+ 4 0x000000000003feb0 __libc_start_call_main()  ???:0
+ 5 0x000000000003ff60 __libc_start_main_alias_2()  :0
+ 6 0x00000000004047e5 _start()  ???:0
+=================================
+==== backtrace (tid:1825807) ====
+ 0 0x0000000000054db0 __GI___sigaction()  :0
+ 1 0x000000000041791f FilteredTDMACUDA::solve_filtered_v1()  /scratch/x3319a05/Filtered_TDMA/Filtered_TDMA/filtered_tdma_cuda.cu:302
+ 2 0x00000000004117bd SolveTheta::profile()  /scratch/x3319a05/Filtered_TDMA/Heat_gpu/solve_theta.cu:604
+ 3 0x00000000004083b1 main()  /scratch/x3319a05/Filtered_TDMA/Heat_gpu/main.cpp:68
+ 4 0x000000000003feb0 __libc_start_call_main()  ???:0
+ 5 0x000000000003ff60 __libc_start_main_alias_2()  :0
+ 6 0x00000000004047e5 _start()  ???:0
+=================================
+--------------------------------------------------------------------------
+Primary job  terminated normally, but 1 process returned
+a non-zero exit code. Per user-direction, the job has been aborted.
+--------------------------------------------------------------------------
+--------------------------------------------------------------------------
+mpirun noticed that process rank 0 with PID 1825806 on node gpu36 exited on signal 4 (Illegal instruction).
+--------------------------------------------------------------------------
+[time] filtered 4gpu N=128  this run 7s
+
+=== backend=filtered  4gpu  (NP=4)  N=256 ===
+[Tmax] = 0.00195312 | [max_iter] = 32
+[nx] = 128 | [ny] = 128 | [nz] = 256
+[rho] = 0.25
+[backend] = filtered
+[gpu36:1825947:0:1825947] Caught signal 4 (Illegal instruction: illegal operand)
+[gpu36:1825948:0:1825948] Caught signal 4 (Illegal instruction: illegal operand)
+[gpu36:1825950:0:1825950] Caught signal 4 (Illegal instruction: illegal operand)
+[gpu36:1825949:0:1825949] Caught signal 4 (Illegal instruction: illegal operand)
+==== backtrace (tid:1825948) ====
+ 0 0x0000000000054db0 __GI___sigaction()  :0
+ 1 0x000000000041791f FilteredTDMACUDA::solve_filtered_v1()  /scratch/x3319a05/Filtered_TDMA/Filtered_TDMA/filtered_tdma_cuda.cu:302
+ 2 0x00000000004117bd SolveTheta::profile()  /scratch/x3319a05/Filtered_TDMA/Heat_gpu/solve_theta.cu:604
+==== backtrace (tid:1825947) ====
+ 3 0x00000000004083b1 main()  /scratch/x3319a05/Filtered_TDMA/Heat_gpu/main.cpp:68
+ 4 0x000000000003feb0 __libc_start_call_main()  ???:0
+ 5 0x000000000003ff60 __libc_start_main_alias_2()  :0
+ 6 0x00000000004047e5 _start()  ???:0
+=================================
+ 0 0x0000000000054db0 __GI___sigaction()  :0
+ 1 0x000000000041791f FilteredTDMACUDA::solve_filtered_v1()  /scratch/x3319a05/Filtered_TDMA/Filtered_TDMA/filtered_tdma_cuda.cu:302
+ 2 0x00000000004117bd SolveTheta::profile()  /scratch/x3319a05/Filtered_TDMA/Heat_gpu/solve_theta.cu:604
+ 3 0x00000000004083b1 main()  /scratch/x3319a05/Filtered_TDMA/Heat_gpu/main.cpp:68
+ 4 0x000000000003feb0 __libc_start_call_main()  ???:0
+ 5 0x000000000003ff60 __libc_start_main_alias_2()  :0
+ 6 0x00000000004047e5 _start()  ???:0
+=================================
+==== backtrace (tid:1825949) ====
+ 0 0x0000000000054db0 __GI___sigaction()  :0
+ 1 0x000000000041791f FilteredTDMACUDA::solve_filtered_v1()  /scratch/x3319a05/Filtered_TDMA/Filtered_TDMA/filtered_tdma_cuda.cu:302
+ 2 0x00000000004117bd SolveTheta::profile()  /scratch/x3319a05/Filtered_TDMA/Heat_gpu/solve_theta.cu:604
+ 3 0x00000000004083b1 main()  /scratch/x3319a05/Filtered_TDMA/Heat_gpu/main.cpp:68
+ 4 0x000000000003feb0 __libc_start_call_main()  ???:0
+ 5 0x000000000003ff60 __libc_start_main_alias_2()  :0
+ 6 0x00000000004047e5 _start()  ???:0
+=================================
+==== backtrace (tid:1825950) ====
+ 0 0x0000000000054db0 __GI___sigaction()  :0
+ 1 0x000000000041791f FilteredTDMACUDA::solve_filtered_v1()  /scratch/x3319a05/Filtered_TDMA/Filtered_TDMA/filtered_tdma_cuda.cu:302
+ 2 0x00000000004117bd SolveTheta::profile()  /scratch/x3319a05/Filtered_TDMA/Heat_gpu/solve_theta.cu:604
+ 3 0x00000000004083b1 main()  /scratch/x3319a05/Filtered_TDMA/Heat_gpu/main.cpp:68
+ 4 0x000000000003feb0 __libc_start_call_main()  ???:0
+ 5 0x000000000003ff60 __libc_start_main_alias_2()  :0
+ 6 0x00000000004047e5 _start()  ???:0
+=================================
+--------------------------------------------------------------------------
+Primary job  terminated normally, but 1 process returned
+a non-zero exit code. Per user-direction, the job has been aborted.
+--------------------------------------------------------------------------
+--------------------------------------------------------------------------
+mpirun noticed that process rank 0 with PID 1825947 on node gpu36 exited on signal 4 (Illegal instruction).
+--------------------------------------------------------------------------
+[time] filtered 4gpu N=256  this run 8s
+
+=== backend=filtered  4gpu  (NP=4)  N=512 ===
+[Tmax] = 0.00195312 | [max_iter] = 128
+[nx] = 256 | [ny] = 256 | [nz] = 512
+[rho] = 0.25
+[backend] = filtered
+[gpu36:1826544:0:1826544] Caught signal 4 (Illegal instruction: illegal operand)
+[gpu36:1826543:0:1826543] Caught signal 4 (Illegal instruction: illegal operand)
+[gpu36:1826546:0:1826546] Caught signal 4 (Illegal instruction: illegal operand)
+[gpu36:1826545:0:1826545] Caught signal 4 (Illegal instruction: illegal operand)
+==== backtrace (tid:1826546) ====
+ 0 0x0000000000054db0 __GI___sigaction()  :0
+ 1 0x000000000041791f FilteredTDMACUDA::solve_filtered_v1()  /scratch/x3319a05/Filtered_TDMA/Filtered_TDMA/filtered_tdma_cuda.cu:302
+ 2 0x00000000004117bd SolveTheta::profile()  /scratch/x3319a05/Filtered_TDMA/Heat_gpu/solve_theta.cu:604
+ 3 0x00000000004083b1 main()  /scratch/x3319a05/Filtered_TDMA/Heat_gpu/main.cpp:68
+ 4 0x000000000003feb0 __libc_start_call_main()  ???:0
+ 5 0x000000000003ff60 __libc_start_main_alias_2()  :0
+ 6 0x00000000004047e5 _start()  ???:0
+=================================
+==== backtrace (tid:1826543) ====
+ 0 0x0000000000054db0 __GI___sigaction()  :0
+ 1 0x000000000041791f FilteredTDMACUDA::solve_filtered_v1()  /scratch/x3319a05/Filtered_TDMA/Filtered_TDMA/filtered_tdma_cuda.cu:302
+ 2 0x00000000004117bd SolveTheta::profile()  /scratch/x3319a05/Filtered_TDMA/Heat_gpu/solve_theta.cu:604
+ 3 0x00000000004083b1 main()  /scratch/x3319a05/Filtered_TDMA/Heat_gpu/main.cpp:68
+ 4 0x000000000003feb0 __libc_start_call_main()  ???:0
+ 5 0x000000000003ff60 __libc_start_main_alias_2()  :0
+ 6 0x00000000004047e5 _start()  ???:0
+=================================
+==== backtrace (tid:1826544) ====
+ 0 0x0000000000054db0 __GI___sigaction()  :0
+ 1 0x000000000041791f FilteredTDMACUDA::solve_filtered_v1()  /scratch/x3319a05/Filtered_TDMA/Filtered_TDMA/filtered_tdma_cuda.cu:302
+ 2 0x00000000004117bd SolveTheta::profile()  /scratch/x3319a05/Filtered_TDMA/Heat_gpu/solve_theta.cu:604
+ 3 0x00000000004083b1 main()  /scratch/x3319a05/Filtered_TDMA/Heat_gpu/main.cpp:68
+ 4 0x000000000003feb0 __libc_start_call_main()  ???:0
+ 5 0x000000000003ff60 __libc_start_main_alias_2()  :0
+ 6 0x00000000004047e5 _start()  ???:0
+=================================
+==== backtrace (tid:1826545) ====
+ 0 0x0000000000054db0 __GI___sigaction()  :0
+ 1 0x000000000041791f FilteredTDMACUDA::solve_filtered_v1()  /scratch/x3319a05/Filtered_TDMA/Filtered_TDMA/filtered_tdma_cuda.cu:302
+ 2 0x00000000004117bd SolveTheta::profile()  /scratch/x3319a05/Filtered_TDMA/Heat_gpu/solve_theta.cu:604
+ 3 0x00000000004083b1 main()  /scratch/x3319a05/Filtered_TDMA/Heat_gpu/main.cpp:68
+ 4 0x000000000003feb0 __libc_start_call_main()  ???:0
+ 5 0x000000000003ff60 __libc_start_main_alias_2()  :0
+ 6 0x00000000004047e5 _start()  ???:0
+=================================
+--------------------------------------------------------------------------
+Primary job  terminated normally, but 1 process returned
+a non-zero exit code. Per user-direction, the job has been aborted.
+--------------------------------------------------------------------------
+--------------------------------------------------------------------------
+mpirun noticed that process rank 1 with PID 1826544 on node gpu36 exited on signal 4 (Illegal instruction).
+--------------------------------------------------------------------------
+[time] filtered 4gpu N=512  this run 9s

@@ -17,12 +17,14 @@
 #include "tdma_backend_gpu.hpp"
 #include "stencil_coeffs.hpp"
 #include "index.hpp"
+#include "timing_csv.hpp"
 
 #include <cuda_runtime.h>
 #include <cmath>
 #include <cstdio>
 #include <cstdlib>
 #include <iostream>
+#include <string>
 #include <vector>
 
 #define CUDA_CHECK(expr)                                                       \
@@ -325,11 +327,8 @@ __global__ void copy_y_to_rhs(double* __restrict__ d_rhs,
     d_rhs[off_rhs] = d_D[off_y];
 }
 
-// =============================================================================
-//  Build LHS for X-direction sweep.
-//  Layout: d_X[ ((ii * iz) + kk) * iy + jj ] — i becomes the row dimension.
-//  Treated by TDMA as [n_row=ix × n_sys=iz*iy], row-major.
-// =============================================================================
+// Build X-LHS. d_rhs has ii fastest, d_X has jj fastest — stage d_rhs through
+// a shared tile so reads coalesce on ii and writes coalesce on jj.
 __global__ void build_lhs_x_kernel(double* __restrict__ d_A,
                                    double* __restrict__ d_B,
                                    double* __restrict__ d_C,
@@ -339,20 +338,40 @@ __global__ void build_lhs_x_kernel(double* __restrict__ d_A,
                                    const int* __restrict__ x_lb,
                                    const int* __restrict__ x_rb,
                                    int ix, int iy, int iz, double dt) {
-    int ii = blockIdx.x * blockDim.x + threadIdx.x;
-    int jj = blockIdx.y * blockDim.y + threadIdx.y;
-    int kk = blockIdx.z * blockDim.z + threadIdx.z;
-    if (ii >= ix || jj >= iy || kk >= iz) return;
-    int i = ii + 1;
+    constexpr int TILE = 32;
+    __shared__ double tile[TILE][TILE + 1];
 
-    double sa, sb, sc;  d_stencil(dt, dmx[i], x_lb[i], x_rb[i], sa, sb, sc);
+    int ii_b = blockIdx.x * TILE;
+    int jj_b = blockIdx.y * TILE;
+    int kk   = blockIdx.z;
+    if (kk >= iz) return;
 
-    std::size_t off_x   = ((std::size_t)ii * iz + kk) * iy + jj;
-    std::size_t off_rhs = ((std::size_t)kk * iy + jj) * ix + ii;
-    d_A[off_x] = -sa;
-    d_B[off_x] = 1.0 - sb;
-    d_C[off_x] = -sc;
-    d_D[off_x] = d_rhs[off_rhs];
+    int tx = threadIdx.x;
+    int ty = threadIdx.y;
+
+    {
+        int ii_g = ii_b + tx;
+        int jj_g = jj_b + ty;
+        if (ii_g < ix && jj_g < iy) {
+            tile[ty][tx] = d_rhs[((std::size_t)kk * iy + jj_g) * ix + ii_g];
+        }
+    }
+    __syncthreads();
+
+    {
+        int jj_g = jj_b + tx;
+        int ii_g = ii_b + ty;
+        if (ii_g < ix && jj_g < iy) {
+            int i = ii_g + 1;
+            double sa, sb, sc;
+            d_stencil(dt, dmx[i], x_lb[i], x_rb[i], sa, sb, sc);
+            std::size_t off_x = ((std::size_t)ii_g * iz + kk) * iy + jj_g;
+            d_A[off_x] = -sa;
+            d_B[off_x] = 1.0 - sb;
+            d_C[off_x] = -sc;
+            d_D[off_x] = tile[tx][ty];
+        }
+    }
 }
 
 // Final update: theta(i,j,k) = D_x(i,k,j).
@@ -491,40 +510,72 @@ void SolveTheta::profile(std::vector<double>& theta) {
         std::cout << "[backend] = " << params_.tdma_backend << "\n";
     }
 
-    // -------------------------------------------------------------------
-    //  Launch configs
-    // -------------------------------------------------------------------
-    dim3 b3(8, 8, 4);
+    dim3 b3(8, 4, 4);
     dim3 g3 = grid3(ix, iy, iz, b3);
+
+    constexpr int LHS_X_TILE = 32;
+    dim3 b3_lhs_x(LHS_X_TILE, LHS_X_TILE, 1);
+    dim3 g3_lhs_x((ix + LHS_X_TILE - 1) / LHS_X_TILE,
+                  (iy + LHS_X_TILE - 1) / LHS_X_TILE,
+                  iz);
     dim3 b2(16, 16, 1);
     dim3 g_xy = grid2(ix, iy, b2);
     dim3 g_xz = grid2(ix, iz, b2);
     dim3 g_yz = grid2(iy, iz, b2);
 
     // -------------------------------------------------------------------
-    //  Time-step loop
+    //  Time-step loop  (per-step, per-rank, per-event timing → long CSV)
+    //  Events: rhs, solve_z, solve_y, solve_x, etc, comm
+    //  t_step==0 is treated as a warmup — measured but NOT written to CSV.
     // -------------------------------------------------------------------
+    const std::vector<std::string> event_names =
+        {"rhs", "solve_z", "solve_y", "solve_x", "etc", "comm"};
+    const int n_events = (int)event_names.size();
+    timing_csv::timing_init(n_events, max_iter - 1, MPI_COMM_WORLD);
+    std::vector<double> local_times(n_events, 0.0);
+
     for (int t_step = 0; t_step < max_iter; ++t_step) {
-        // Refresh eps and per-row spectral bounds (no-op for PaScaL backend)
+        double t0, t1;
+
+        // --- comm (ghost cell exchange — at start of step) ---
+        MPI_Barrier(MPI_COMM_WORLD);
+        t0 = MPI_Wtime();
+        sub_.ghostcellUpdateDevice(d_theta, cx, cy, cz);
+        CUDA_CHECK(cudaDeviceSynchronize());
+        t1 = MPI_Wtime();
+        local_times[5] = t1 - t0;
+
+        // --- etc: backend refresh (filtered backend needs eps refresh per step) ---
+        MPI_Barrier(MPI_COMM_WORLD);
+        t0 = MPI_Wtime();
         solver_z.set_eps_constant(dt);
         solver_y.set_eps_constant(dt);
         solver_x.set_eps_constant(dt);
+        CUDA_CHECK(cudaDeviceSynchronize());
+        t1 = MPI_Wtime();
+        local_times[4] = t1 - t0;
 
-        // RHS
+        // --- RHS ---
+        MPI_Barrier(MPI_COMM_WORLD);
+        t0 = MPI_Wtime();
         rhs_kernel<<<g3, b3>>>(d_rhs, d_theta,
                                d_dmx, d_dmy, d_dmz,
                                d_x_lb, d_x_rb, d_y_lb, d_y_rb, d_z_lb, d_z_rb,
                                d_x_sub, d_y_sub, d_z_sub,
                                nx_full, ny_full, nz_full, dt);
+        CUDA_CHECK(cudaDeviceSynchronize());
+        t1 = MPI_Wtime();
+        local_times[0] = t1 - t0;
 
+        // --- Z direction (boundary correction + build_LHS + TDMA + copy back) ---
+        MPI_Barrier(MPI_COMM_WORLD);
+        t0 = MPI_Wtime();
         z_boundary_kernel<<<g_xy, b2>>>(d_rhs,
                                         d_th_zL, d_th_zR,
                                         d_z_lb, d_z_rb,
                                         d_dmx, d_dmy, d_dmz,
                                         d_x_lb, d_x_rb, d_y_lb, d_y_rb,
                                         nx_full, ny_full, nz_full, dt);
-
-        // Z sweep
         build_lhs_z_kernel<<<g3, b3>>>(d_A, d_B, d_C, d_D, d_rhs,
                                        d_dmz, d_z_lb, d_z_rb, ix, iy, iz, dt);
         solver_z.set_rho_device(d_A, d_B, d_C);
@@ -534,8 +585,13 @@ void SolveTheta::profile(std::vector<double>& theta) {
             const int grid_lin  = (int)((inner_n + block_lin - 1) / block_lin);
             copy_z_to_rhs<<<grid_lin, block_lin>>>(d_rhs, d_D, inner_n);
         }
+        CUDA_CHECK(cudaDeviceSynchronize());
+        t1 = MPI_Wtime();
+        local_times[1] = t1 - t0;
 
-        // Y boundary correction + sweep
+        // --- Y direction ---
+        MPI_Barrier(MPI_COMM_WORLD);
+        t0 = MPI_Wtime();
         y_boundary_kernel<<<g_xz, b2>>>(d_rhs,
                                         d_th_yL, d_th_yR,
                                         d_y_lb, d_y_rb,
@@ -547,27 +603,60 @@ void SolveTheta::profile(std::vector<double>& theta) {
         solver_y.set_rho_device(d_A, d_B, d_C);
         solver_y.solve(d_A, d_B, d_C, d_D);
         copy_y_to_rhs<<<g3, b3>>>(d_rhs, d_D, ix, iy, iz);
+        CUDA_CHECK(cudaDeviceSynchronize());
+        t1 = MPI_Wtime();
+        local_times[2] = t1 - t0;
 
-        // X boundary correction + sweep
+        // --- X direction ---
+        MPI_Barrier(MPI_COMM_WORLD);
+        t0 = MPI_Wtime();
         x_boundary_kernel<<<g_yz, b2>>>(d_rhs,
                                         d_th_xL, d_th_xR,
                                         d_x_lb, d_x_rb,
                                         d_dmx,
                                         nx_full, ny_full, nz_full, dt);
-        build_lhs_x_kernel<<<g3, b3>>>(d_A, d_B, d_C, d_D, d_rhs,
+        build_lhs_x_kernel<<<g3_lhs_x, b3_lhs_x>>>(d_A, d_B, d_C, d_D, d_rhs,
                                        d_dmx, d_x_lb, d_x_rb, ix, iy, iz, dt);
         solver_x.set_rho_device(d_A, d_B, d_C);
         solver_x.solve(d_A, d_B, d_C, d_D);
-
-        // Update theta from x-solution; theta layout (i,j,k) ← D layout (i,k,j)
         update_theta_kernel<<<g3, b3>>>(d_theta, d_D, ix, iy, iz, nx_full, ny_full);
+        CUDA_CHECK(cudaDeviceSynchronize());
+        t1 = MPI_Wtime();
+        local_times[3] = t1 - t0;
 
-        // Ghost-cell exchange — only does work when a neighbor exists.
-        // CUDA-aware MPI uses the host-side derived datatypes against d_theta.
-        if (cx.nprocs > 1 || cy.nprocs > 1 || cz.nprocs > 1) {
-            CUDA_CHECK(cudaDeviceSynchronize());
-            sub_.ghostcellUpdateDevice(d_theta, cx, cy, cz);
+        // Skip t_step==0 (warmup): record only steps 1..max_iter-1.
+        if (t_step >= 1) {
+            timing_csv::timing_record(t_step, local_times, MPI_COMM_WORLD);
         }
+    }
+
+    // -------------------------------------------------------------------
+    //  Write long-format CSV (rank 0 only).
+    //  Path:  results/timing_<N>_<npx><npy><npz>_<backend>.csv
+    //  Meta:  # grid=NxNxN, np=NP (npx,npy,npz), dt=..., Tmax=..., solver_kind=<backend>
+    // -------------------------------------------------------------------
+    {
+        char meta[256];
+        std::snprintf(meta, sizeof(meta),
+                      "grid=%dx%dx%d, np=%d (%d,%d,%d), dt=%10.3E, Tmax=%d, solver_kind=%s",
+                      params_.nx, params_.ny, params_.nz,
+                      cx.nprocs * cy.nprocs * cz.nprocs,
+                      params_.np_dim[0], params_.np_dim[1], params_.np_dim[2],
+                      dt, max_iter, params_.tdma_backend.c_str());
+
+        char fn[256];
+        const char* env_path = std::getenv("TIMING_CSV");
+        if (env_path && env_path[0] != '\0') {
+            std::snprintf(fn, sizeof(fn), "%s", env_path);
+        } else {
+            std::snprintf(fn, sizeof(fn), "results/timing_%d_%d%d%d_%s.csv",
+                          params_.nx,
+                          params_.np_dim[0], params_.np_dim[1], params_.np_dim[2],
+                          params_.tdma_backend.c_str());
+        }
+
+        timing_csv::timing_save_csv(fn, event_names, meta, MPI_COMM_WORLD);
+        timing_csv::timing_cleanup();
     }
 
     // -------------------------------------------------------------------

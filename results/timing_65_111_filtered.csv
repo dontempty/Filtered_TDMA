@@ -1,0 +1,8 @@
+# grid=65x65x65, np=1 (1,1,1), dt= 9.766E-04, Tmax=2, solver_kind=filtered
+rank,t_step,event,time_sec
+0,1,rhs, 2.461000000E-05
+0,1,solve_z, 1.049910000E-04
+0,1,solve_y, 1.043600000E-04
+0,1,solve_x, 1.030300000E-04
+0,1,etc, 1.467000000E-06
+0,1,comm, 1.827000000E-06

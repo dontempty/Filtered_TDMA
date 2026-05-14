@@ -252,7 +252,69 @@ PaScaL_TCS와의 모듈 대응 + 좌표 규약 + 빌드 패턴은 이 파일의 
 
 ---
 
-## 10. 참고 자료
+## 10. 성능 최적화 로그 — ghost-cell pack/unpack
+
+### 배경
+
+초기 GPU 포팅은 `MPI_Type_create_subarray` 로 만든 **derived datatype**
+을 **device pointer** 에 적용해서 `MPI_Isend/Irecv` 를 호출하는
+방식이었음. HPC-X (OpenMPI) 의 CUDA-aware 경로는 **연속 device 버퍼**
+에 대해서는 UCX `cuda_ipc` / `cuda_copy` 로 빠르게 처리하지만,
+**strided derived type + device pointer** 조합에서는 폴백 (셀 단위
+`cudaMemcpy` 또는 전체 배열 D2H/H2D 스테이징) 으로 빠지면서 연속
+전송 대비 100×–300× 까지 느려짐.
+
+### 변경 사항 (`Heat_gpu/ghostcell_cuda.cu`)
+
+각 면의 slab 을 2D CUDA kernel (`pack_x/y/z`) 로 **연속 device buffer**
+에 packing → 연속 포인터로 `MPI_Isend/Irecv` → 받은 buffer 를 `unpack_x/y/z`
+kernel 로 ghost slot 에 scatter. 12 개의 device buffer (각 면당 send/recv
+1 쌍 × 6 면) 는 time loop 시작에서 `MPISubdomain::allocGhostBufsDevice()`
+가 한 번 할당, 끝에서 해제.
+
+### 측정 결과 (V100 PCIe, 2-GPU NP=2,1,1, backend=pascal)
+
+| N    | Before (DDT, job 721173) | After (pack/unpack, job 721218) | Speedup  |
+|------|-------------------------:|--------------------------------:|---------:|
+|  64  |         3 s              |        2 s                      |  1.5×    |
+| 128  |        22 s              |        2 s                      |   11×    |
+| 256  |       332 s              |        3 s                      | **111×** |
+| 512  |    > 1800 s (안 끝남)    |       36 s                      | **>50×** |
+
+`backend=filtered` 도 동일 ghost-cell 경로를 쓰므로 같은 정도의 가속.
+전체 8-run sweep (2 backends × 4 grid) 이 이전엔 1시간 안에 끝나지
+않았는데 최적화 후 **약 80 초** 안에 완료.
+
+### 시도했지만 도움 안 된 환경 변수
+
+다음 UCX / OpenMPI 옵션은 시도했지만 V100 PCIe 노드에서는 의미 있는
+차이가 없었음 (UCX 가 `gdr_copy is not available` 경고를 띄움 — V100
+PCIe 에는 GPUDirect RDMA 없음; `cuda_copy`/`cuda_ipc` 는 이미 활성화):
+```bash
+export OMPI_MCA_pml=ucx
+export OMPI_MCA_btl=^openib,uct
+export OMPI_MCA_pml_ucx_opal_cuda=1
+export OMPI_MCA_opal_cuda_support=true
+export UCX_TLS=rc,sm,cuda_copy,cuda_ipc,gdr_copy
+export UCX_MEMTYPE_CACHE=n
+export UCX_RNDV_THRESH=8192
+```
+**병목은 transport 가 아니라**, `MPI_Isend/Irecv` 안에서 derived-datatype
++ device-pointer 조합이 OpenMPI 를 느린 fallback 으로 강제하는 것이
+었음. 동일 패턴이 `PaScaL_TDMA_F examples/solve_theta.f90` 의
+`ghostcell_update_cuda` 에서도 사용됨.
+
+### 빌드 캐시 주의
+
+`mpi_subdomain.{hpp,cpp}` 에 device-buffer 멤버를 추가했다면 반드시
+**`make` 전에 `rm build/obj/exgpu_*.o`** — 헤더만 바뀌고 `.cpp`
+의 object 가 stale 한 채로 남으면 struct layout 이 어긋나서 packing
+kernel 이 host pointer 를 dereferencing → `illegal memory access` 로
+실패함. 디버깅 중 PaScaL_TDMA repo 에서 같은 증상으로 한 차례 겪음.
+
+---
+
+## 11. 참고 자료
 
 - PaScaL_TDMA GPU convergence 보고서: [`/scratch/x3319a05/PaScaL_TDMA/run/CONVERGENCE_GPU.md`](../PaScaL_TDMA/run/CONVERGENCE_GPU.md)
 - 원본 PaScaL_TDMA Fortran (`PaScaL_TDMA_F`): NVHPC + cuSPARSE 비교 — `/scratch/x3319a05/PaScaL_TDMA_F`
