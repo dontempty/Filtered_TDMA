@@ -1,6 +1,6 @@
-include ../Makefile.inc
+include ../../Makefile.inc
 
-BUILDDIR ?= ../build
+BUILDDIR ?= ../../build
 
 EXE    := heat_gpu.out
 SRCDIR := .

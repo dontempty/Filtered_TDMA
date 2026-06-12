@@ -29,7 +29,7 @@ export OMPI_MCA_btl=^openib,uct
 
 PROJ="/scratch/x3319a05/Filtered_TDMA"
 EXE="${PROJ}/build/bin/heat_gpu.out"
-RESULTS="${PROJ}/Heat_gpu/results/weak"
+RESULTS="${PROJ}/apps/heat_gpu/results/weak"
 mkdir -p "${RESULTS}" log
 
 [ -x "${EXE}" ] || { echo "[ERROR] missing ${EXE}" >&2; exit 1; }
@@ -42,7 +42,7 @@ echo "============================================================"
 
 for D in 128 512; do
     for NP in 1 2 4 8; do
-        INP="${PROJ}/Heat_gpu/inputs/weak_${D}/PARA_INPUT_${NP}.txt"
+        INP="${PROJ}/apps/heat_gpu/inputs/weak_${D}/PARA_INPUT_${NP}.txt"
         [ -f "${INP}" ] || { echo "[skip] missing ${INP}"; continue; }
         nx_full=$(awk '/^nx /{print $3; exit}' "${INP}")
         npxnpynpz=$(awk '/^npx /{x=$3}/^npy /{y=$3}/^npz /{z=$3;print x""y""z}' "${INP}")

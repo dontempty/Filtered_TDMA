@@ -1,10 +1,10 @@
-include ../../Makefile.inc
+include ../../../Makefile.inc
 
 # ============================================================
 #  Channel — unit tests (built against the channel example)
 # ============================================================
 
-BUILDDIR ?= ../../build
+BUILDDIR ?= ../../../build
 
 OBJDIR  := $(BUILDDIR)/obj
 IDIR    := $(BUILDDIR)/include

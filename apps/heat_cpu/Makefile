@@ -1,4 +1,4 @@
-include ../Makefile.inc
+include ../../Makefile.inc
 
 # ============================================================
 #  Heat Equation Example — Makefile
@@ -6,7 +6,7 @@ include ../Makefile.inc
 #            FilteredTDMA + PaScaL_TDMA libs from ../build/
 # ============================================================
 
-BUILDDIR ?= ../build
+BUILDDIR ?= ../../build
 
 EXE      := heat.out
 SRCDIR   := .

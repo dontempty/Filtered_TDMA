@@ -48,7 +48,7 @@ echo "[build] USE_CUDA=1 CUDA_ARCH=70 make heat_gpu (V100)"
 USE_CUDA=1 CUDA_ARCH=70 make heat_gpu
 
 EXE="${PROJ}/build/bin/heat_gpu.out"
-RUN_DIR="${PROJ}/Heat_gpu/inputs"
+RUN_DIR="${PROJ}/apps/heat_gpu/inputs"
 RESULT="${PROJ}/results/heat_gpu_convergence_${SLURM_JOB_ID:-local}.txt"
 
 [ -x "${EXE}" ] || { echo "[ERROR] missing binary ${EXE}" >&2; exit 1; }

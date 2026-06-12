@@ -17,7 +17,7 @@ module purge
 module load gcc/11.5.0 mpi/openmpi-4.1.8
 
 if [ -n "${SLURM_SUBMIT_DIR}" ]; then cd "${SLURM_SUBMIT_DIR}"; fi
-PROJ="$(realpath ..)"
+PROJ="$(realpath ../..)"
 
 EXE="${PROJ}/build/bin/channel.out"
 [ -x "${EXE}" ] || { echo "[ERROR] missing ${EXE}" >&2; exit 1; }
