@@ -10,7 +10,7 @@ cd "${PROF_DIR}"
 echo "######################################################"
 echo "##  TASK 2 — Per-kernel time breakdown (nsys)        ##"
 echo "######################################################"
-for tag in N512_NP1 N1024_NP2 N1024_NP8; do
+for tag in N512_NP2 N512_NP1 N1024_NP2; do
   rep="nsys_${tag}.nsys-rep"
   if [ ! -f "$rep" ]; then echo "[skip] $rep not found"; continue; fi
   echo ""
@@ -23,7 +23,7 @@ echo ""
 echo "######################################################"
 echo "##  TASK 1 — GPU saturation (ncu DRAM/SM)            ##"
 echo "######################################################"
-for tag in N512_NP1 N1024_NP2 N1024_NP8; do
+for tag in N512_NP2 N512_NP1 N1024_NP2; do
   csv="ncu_${tag}.csv"
   if [ ! -f "$csv" ]; then echo "[skip] $csv not found"; continue; fi
   echo ""

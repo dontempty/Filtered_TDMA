@@ -1,9 +1,9 @@
 #!/bin/bash
 #SBATCH -J ftdma_prof
-#SBATCH -p cas_v100nv_8
+#SBATCH -p cas_v100_2
 #SBATCH -N 1
-#SBATCH --gres=gpu:8
-#SBATCH --ntasks-per-node=8
+#SBATCH --gres=gpu:2
+#SBATCH --ntasks-per-node=2
 #SBATCH -o log/%x_%j.out
 #SBATCH -e log/%x_%j.err
 #SBATCH --time=02:00:00
@@ -49,10 +49,15 @@ echo " gpus : $(nvidia-smi -L 2>/dev/null | wc -l)"
 echo "============================================================"
 
 # ---- Configs: tag, input_path, NP ----
+# Reduced to 2 GPU max (cas_v100_2 partition).
+# Covers three workload-per-rank points to map the saturation curve:
+#   N=512 NP=2  → 67M cells/rank  (under-saturated hypothesis)
+#   N=512 NP=1  → 134M cells/rank (transition)
+#   N=1024 NP=2 → 537M cells/rank (saturated hypothesis)
 declare -a CONFIGS=(
+  "N512_NP2   inputs/strong_512/PARA_INPUT_2.txt   2"
   "N512_NP1   inputs/strong_512/PARA_INPUT_1.txt   1"
   "N1024_NP2  inputs/strong_1024/PARA_INPUT_2.txt  2"
-  "N1024_NP8  inputs/strong_1024/PARA_INPUT_8.txt  8"
 )
 
 # =================================================================
