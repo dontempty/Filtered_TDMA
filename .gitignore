@@ -6,22 +6,29 @@ build/
 *.so
 *.out
 
-# Solver runtime output (created by channel.sh / Makefile rm target)
+# Solver runtime output
 channel/instant/
 channel/statistics/
 channel/restart_in/
 channel/restart_out/
 
+# Profiling artifacts
+Heat_gpu/profile_results/
+*.nsys-rep
+*.sqlite
+*.qdrep
+*.ncu-rep
+
 # SLURM logs
 log/
+channel/log/
+Heat_gpu/log/
 *.err
-
-# results
-# results/
 
 # Editor / IDE
 .vscode/
 .idea/
 *.swp
 *~
+*.bak
 .DS_Store
