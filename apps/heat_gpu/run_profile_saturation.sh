@@ -33,7 +33,7 @@ export OMPI_MCA_btl=^openib,uct
 
 PROJ="/scratch/x3319a05/Filtered_TDMA"
 EXE="${PROJ}/build/bin/heat_gpu.out"
-RESULTS="${PROJ}/Heat_gpu/profile_results"
+RESULTS="${PROJ}/apps/heat_gpu/profile_results"
 mkdir -p "${RESULTS}" log
 NCU=/usr/local/cuda-13.0/bin/ncu
 NSYS=/usr/local/cuda-13.0/bin/nsys
@@ -67,7 +67,7 @@ declare -a CONFIGS=(
 echo ""
 echo "######  TASK 2 — nsys per-kernel breakdown  ######"
 for entry in "${CONFIGS[@]}"; do
-  set -- $entry; TAG=$1; INP=${PROJ}/Heat_gpu/$2; NP=$3
+  set -- $entry; TAG=$1; INP=${PROJ}/apps/heat_gpu/$2; NP=$3
   echo ""
   echo "=== nsys ${TAG} ==="
   REPORT="${RESULTS}/nsys_${TAG}"
@@ -104,7 +104,7 @@ l1tex__t_bytes_pipe_lsu_mem_global_op_st.sum"
 KERNEL_REGEX="tdma_many_kernel|modified_thomas_kernel|rhs_kernel|build_lhs_z_kernel|build_lhs_y_kernel|build_lhs_x_kernel"
 
 for entry in "${CONFIGS[@]}"; do
-  set -- $entry; TAG=$1; INP=${PROJ}/Heat_gpu/$2; NP=$3
+  set -- $entry; TAG=$1; INP=${PROJ}/apps/heat_gpu/$2; NP=$3
   echo ""
   echo "=== ncu ${TAG} ==="
   CSV="${RESULTS}/ncu_${TAG}.csv"

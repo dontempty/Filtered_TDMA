@@ -1,5 +1,5 @@
 #!/bin/bash
-#SBATCH -J ftdma_strong
+#SBATCH -J ftdma_strong_f
 #SBATCH -p cas_v100nv_8
 #SBATCH -N 1
 #SBATCH --gres=gpu:8
@@ -14,7 +14,7 @@
 #  Sizes: N = 512, 1024.  NP = 1, 2, 4, 8 (decomps: 1-1-1, 2-1-1, 2-2-1, 2-2-2).
 #  TDMA backend: pascal (with the (128,1) block-dim optimization).
 #  11 steps per run = 1 warmup (t_step==0) + 10 measured.
-#  CSV → results/strong/timing_<N>_<npxnpynpz>_pascal.csv
+#  CSV → results/strong/timing_<N>_<npxnpynpz>_filtered_v2.csv
 # ============================================================
 set +e   # continue past per-case failures (e.g., OOM on N=1024 NP=1)
 
@@ -28,7 +28,7 @@ export OMPI_MCA_btl=^openib,uct
 
 PROJ="/scratch/x3319a05/Filtered_TDMA"
 EXE="${PROJ}/build/bin/heat_gpu.out"
-RESULTS="${PROJ}/Heat_gpu/results/strong"
+RESULTS="${PROJ}/apps/heat_gpu/results/strong_filtered"
 mkdir -p "${RESULTS}" log
 
 [ -x "${EXE}" ] || { echo "[ERROR] missing ${EXE}" >&2; exit 1; }
@@ -41,10 +41,10 @@ echo "============================================================"
 
 for N in 512 1024; do
     for NP in 1 2 4 8; do
-        INP="${PROJ}/Heat_gpu/inputs/strong_${N}/PARA_INPUT_${NP}.txt"
+        INP="${PROJ}/apps/heat_gpu/inputs/strong_${N}/PARA_INPUT_${NP}.txt"
         [ -f "${INP}" ] || { echo "[skip] missing ${INP}"; continue; }
         npxnpynpz=$(awk '/^npx /{x=$3}/^npy /{y=$3}/^npz /{z=$3;print x""y""z}' "${INP}")
-        export TIMING_CSV="${RESULTS}/timing_${N}_${npxnpynpz}_pascal.csv"
+        export TIMING_CSV="${RESULTS}/timing_${N}_${npxnpynpz}_filtered_v2.csv"
         echo
         echo "=== strong  N=${N}  NP=${NP}  npxnpynpz=${npxnpynpz} ==="
         T0=$(date +%s)

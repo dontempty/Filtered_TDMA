@@ -7,13 +7,13 @@ build/
 *.out
 
 # Solver runtime output
-channel/instant/
-channel/statistics/
-channel/restart_in/
-channel/restart_out/
+apps/channel/instant/
+apps/channel/statistics/
+apps/channel/restart_in/
+apps/channel/restart_out/
 
 # Profiling artifacts
-Heat_gpu/profile_results/
+apps/heat_gpu/profile_results/
 *.nsys-rep
 *.sqlite
 *.qdrep
@@ -21,8 +21,8 @@ Heat_gpu/profile_results/
 
 # SLURM logs
 log/
-channel/log/
-Heat_gpu/log/
+apps/channel/log/
+apps/heat_gpu/log/
 *.err
 
 # Editor / IDE

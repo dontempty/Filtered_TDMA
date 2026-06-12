@@ -1,4 +1,4 @@
-include ../Makefile.inc
+include ../../Makefile.inc
 
 # ============================================================
 #  Channel Flow Solver — Makefile
@@ -7,7 +7,7 @@ include ../Makefile.inc
 #             FilteredTDMA lib from ../build/
 # ============================================================
 
-BUILDDIR ?= ../build
+BUILDDIR ?= ../../build
 
 EXE      := channel.out
 SRCDIR   := .

@@ -6,57 +6,58 @@ BUILDDIR := build
 #  Top-level orchestration
 #
 #  Libraries:
-#    Filtered_TDMA/  → build/lib/libfiltered_tdma.a
-#    PaScaL_TDMA/    → build/lib/libpascal_tdma.a
-#  Solvers (pick one with `make channel` or `make heat`):
-#    channel/        → build/bin/channel.out
-#    Heat/           → build/bin/heat.out
+#    libs/filtered_tdma/  → build/lib/libfiltered_tdma.a
+#    libs/pascal_tdma/    → build/lib/libpascal_tdma.a
+#  Apps (pick one with `make channel`, `make heat`, `make heat_gpu`):
+#    apps/channel/        → build/bin/channel.out
+#    apps/heat_cpu/       → build/bin/heat.out
+#    apps/heat_gpu/       → build/bin/heat_gpu.out
 # ============================================================
 
 .PHONY: all FilteredTDMA PaScaL channel heat heat_gpu tests clean rm
 
 # Output directories produced by a run (stats/, instant/, restart_out/).
-# Paths match the defaults in channel/PARA_INPUT.dat.
-RUNDIR := channel
+# Paths match the defaults in apps/channel/PARA_INPUT.dat.
+RUNDIR := apps/channel
 OUTDIRS := $(RUNDIR)/statistics $(RUNDIR)/instant $(RUNDIR)/restart_out $(RUNDIR)/restart_in
 
 all: FilteredTDMA PaScaL channel
 
 FilteredTDMA: PaScaL
 	mkdir -p $(BUILDDIR)/obj/ftdma $(BUILDDIR)/lib $(BUILDDIR)/include
-	$(MAKE) -C Filtered_TDMA all BUILDDIR=../$(BUILDDIR)
+	$(MAKE) -C libs/filtered_tdma all BUILDDIR=../../$(BUILDDIR)
 
 PaScaL:
 	mkdir -p $(BUILDDIR)/obj/pascal $(BUILDDIR)/lib $(BUILDDIR)/include
-	$(MAKE) -C PaScaL_TDMA all BUILDDIR=../$(BUILDDIR)
+	$(MAKE) -C libs/pascal_tdma all BUILDDIR=../../$(BUILDDIR)
 
 channel: FilteredTDMA PaScaL
 	mkdir -p $(BUILDDIR)/obj $(BUILDDIR)/bin
-	$(MAKE) -C channel all BUILDDIR=../$(BUILDDIR)
+	$(MAKE) -C apps/channel all BUILDDIR=../../$(BUILDDIR)
 
 heat: FilteredTDMA PaScaL
 	mkdir -p $(BUILDDIR)/obj $(BUILDDIR)/bin
-	$(MAKE) -C Heat all BUILDDIR=../$(BUILDDIR)
+	$(MAKE) -C apps/heat_cpu all BUILDDIR=../../$(BUILDDIR)
 
 # GPU heat example: requires USE_CUDA=1 CUDA_ARCH=<sm_*> on the command line.
 heat_gpu: FilteredTDMA PaScaL
 	mkdir -p $(BUILDDIR)/obj $(BUILDDIR)/bin
-	$(MAKE) -C Heat_gpu all BUILDDIR=../$(BUILDDIR)
+	$(MAKE) -C apps/heat_gpu all BUILDDIR=../../$(BUILDDIR)
 
 tests: channel
 	mkdir -p $(BUILDDIR)/obj $(BUILDDIR)/bin
-	$(MAKE) -C channel/tests all BUILDDIR=../../$(BUILDDIR)
+	$(MAKE) -C apps/channel/tests all BUILDDIR=../../../$(BUILDDIR)
 
 clean:
-	-$(MAKE) -C Filtered_TDMA  clean BUILDDIR=../$(BUILDDIR)
-	-$(MAKE) -C PaScaL_TDMA    clean BUILDDIR=../$(BUILDDIR)
-	-$(MAKE) -C channel        clean BUILDDIR=../$(BUILDDIR)
-	-$(MAKE) -C Heat           clean BUILDDIR=../$(BUILDDIR)
-	-$(MAKE) -C Heat_gpu       clean BUILDDIR=../$(BUILDDIR) 2>/dev/null
-	-$(MAKE) -C channel/tests  clean BUILDDIR=../../$(BUILDDIR)
+	-$(MAKE) -C libs/filtered_tdma  clean BUILDDIR=../../$(BUILDDIR)
+	-$(MAKE) -C libs/pascal_tdma    clean BUILDDIR=../../$(BUILDDIR)
+	-$(MAKE) -C apps/channel        clean BUILDDIR=../../$(BUILDDIR)
+	-$(MAKE) -C apps/heat_cpu       clean BUILDDIR=../../$(BUILDDIR)
+	-$(MAKE) -C apps/heat_gpu       clean BUILDDIR=../../$(BUILDDIR) 2>/dev/null
+	-$(MAKE) -C apps/channel/tests  clean BUILDDIR=../../../$(BUILDDIR)
 	rm -rf $(BUILDDIR)
 
-# Remove all run-time output (stats/, instant/, restart_out/ under channel/)
+# Remove all run-time output (stats/, instant/, restart_out/ under apps/channel/)
 rm:
 	@echo "Removing run-time output directories:"
 	@for d in $(OUTDIRS); do \

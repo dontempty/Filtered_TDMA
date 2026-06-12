@@ -2,7 +2,7 @@
 # Post-process profiling results: per-kernel time (nsys), DRAM/SM utilization (ncu).
 set -e
 
-PROF_DIR=/scratch/x3319a05/Filtered_TDMA/Heat_gpu/profile_results
+PROF_DIR=/scratch/x3319a05/Filtered_TDMA/apps/heat_gpu/profile_results
 NSYS=/usr/local/cuda-13.0/bin/nsys
 
 cd "${PROF_DIR}"

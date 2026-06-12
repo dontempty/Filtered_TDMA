@@ -23,7 +23,7 @@ USE_CUDA=1 CUDA_ARCH=80 make heat_gpu   # A100=80, V100=70, H100=90
 
 실행 예시 (Heat, CPU, np=8):
 ```bash
-mpirun -np 8 build/bin/heat.out Heat/inputs/PARA_INPUT_256.txt
+mpirun -np 8 build/bin/heat.out apps/heat_cpu/inputs/PARA_INPUT_256.txt
 ```
 
 Heat 입력에서 `tdma_backend = pascal` 또는 `tdma_backend = filtered` 로
@@ -36,37 +36,34 @@ Heat 입력에서 `tdma_backend = pascal` 또는 `tdma_backend = filtered` 로
 ```
 Filtered_TDMA/
 ├── Makefile, Makefile.inc                # 최상위 오케스트레이션 + 컴파일러/CUDA 플래그
-├── Filtered_TDMA/                        # libfiltered_tdma.a
-│   ├── filtered_tdma.{cpp,hpp}           #   CPU FilteredTDMA (DistD2 + truncation)
-│   ├── filtered_tdma_cycl.cpp            #   CPU cyclic variant
-│   ├── filtered_tdma_profile.cpp         #   per-phase timing variant
-│   └── filtered_tdma_cuda.{cu,hpp}       #   GPU FilteredTDMACUDA (USE_CUDA=1)
-├── PaScaL_TDMA/                          # libpascal_tdma.a
-│   ├── pascal_tdma_many.{cpp,hpp}        #   CPU PaScaLTDMAMany (alltoall transpose)
-│   ├── pascal_tdma_single.{cpp,hpp}      #   CPU single-system variant
-│   ├── tdma_local.{cpp,hpp}              #   CPU sequential Thomas (used at nprocs==1)
-│   ├── para_range.{cpp,hpp}              #   Block range partitioning
-│   ├── pascal_tdma_many_cuda.{cu,hpp}    #   GPU PaScaLTDMAManyCUDA (USE_CUDA=1)
-│   └── tdma_local_cuda.{cu,cuh}          #   GPU Thomas + modified-Thomas kernels
-├── Heat/                                 # CPU heat ADI example
-│   ├── main.cpp                          #   Driver (topology=non-periodic walls)
-│   ├── global.{cpp,hpp}                  #   Param load (rho, eps, option, tdma_backend)
-│   ├── mpi_topology.{cpp,hpp}            #   3D Cart topology + subcomms
-│   ├── mpi_subdomain.{cpp,hpp}           #   Cell-centered half-cell mesh + ghost DDTs
-│   ├── solve_theta.cpp                   #   ADI Z→Y→X sweep loop
-│   ├── solve_theta_profile.cpp           #   Same with per-phase timing
-│   ├── tdma_backend.{cpp,hpp}            #   "filtered" | "pascal" dispatcher (host)
-│   ├── stencil_coeffs.hpp                #   Boundary-aware (8/3,-4,4/3) stencil
-│   ├── index.hpp, debug.hpp, save.hpp, …
-│   └── inputs/PARA_INPUT_{64..512}.txt   #   rho=0.25 convergence sweep
-├── Heat_gpu/                             # GPU heat ADI example (mirrors Heat/)
-│   ├── main.cpp, global.*, mpi_*         #   Host-side identical to Heat/
-│   ├── solve_theta.cu                    #   GPU kernels (RHS, boundary, build_LHS, …)
-│   ├── tdma_backend_gpu.{cu,hpp}         #   "filtered" | "pascal" dispatcher (device)
-│   ├── inputs/PARA_INPUT_{1,2,4,8}gpu_{64..512}.txt
-│   ├── run_one_np.sh                     #   sbatch (NP=1|2|4|8 env switch)
-│   └── run_convergence_a100.sh           #   Full sweep on amd_a100nv_8
-├── channel/                              # Channel flow solver (CPU, FFTW + TDMA)
+├── libs/
+│   ├── filtered_tdma/                    # libfiltered_tdma.a
+│   │   ├── filtered_tdma.{cpp,hpp}       #   CPU FilteredTDMA (DistD2 + truncation)
+│   │   ├── filtered_tdma_cycl.cpp        #   CPU cyclic variant
+│   │   ├── filtered_tdma_profile.cpp     #   per-phase timing variant
+│   │   └── filtered_tdma_cuda.{cu,hpp}   #   GPU FilteredTDMACUDA (USE_CUDA=1)
+│   └── pascal_tdma/                      # libpascal_tdma.a
+│       ├── pascal_tdma_many.{cpp,hpp}    #   CPU PaScaLTDMAMany (alltoall transpose)
+│       ├── pascal_tdma_single.{cpp,hpp}  #   CPU single-system variant
+│       ├── tdma_local.{cpp,hpp}          #   CPU sequential Thomas (used at nprocs==1)
+│       ├── para_range.{cpp,hpp}          #   Block range partitioning
+│       ├── pascal_tdma_many_cuda.{cu,hpp}#   GPU PaScaLTDMAManyCUDA (USE_CUDA=1)
+│       └── tdma_local_cuda.{cu,cuh}      #   GPU Thomas + modified-Thomas kernels
+├── apps/
+│   ├── heat_cpu/                         # CPU heat ADI example
+│   │   ├── main.cpp                      #   Driver (topology=non-periodic walls)
+│   │   ├── solve_theta.cpp               #   ADI Z→Y→X sweep loop
+│   │   ├── tdma_backend.{cpp,hpp}        #   "filtered" | "pascal" dispatcher (host)
+│   │   └── inputs/PARA_INPUT_{64..512}.txt
+│   ├── heat_gpu/                         # GPU heat ADI example (mirrors heat_cpu/)
+│   │   ├── solve_theta.cu                #   GPU kernels (RHS, boundary, build_LHS, …)
+│   │   ├── tdma_backend_gpu.{cu,hpp}     #   "filtered" | "pascal" dispatcher (device)
+│   │   ├── inputs/PARA_INPUT_{1,2,4,8}gpu_{64..512}.txt
+│   │   ├── run_one_np.sh                 #   sbatch (NP=1|2|4|8 env switch)
+│   │   └── run_convergence_a100.sh       #   Full sweep on amd_a100nv_8
+│   └── channel/                          # Channel flow solver (CPU, FFTW + TDMA)
+├── scripts/                              # Utility scripts (check_kisti.sh, etc.)
+├── results/                              # Timing CSV results
 └── build/                                # All artifacts: lib/, bin/, include/, obj/
 ```
 
@@ -123,7 +120,7 @@ N=512)을 고정해 `Nt = Tmax/dt ∝ 1/dx²`. 따라서 모든 N에서 **T_fina
 
 L2 error vs exact, 모든 결과 bit-identical (round-off 안에서 일치).
 
-### CPU 기준값 (`Heat/`, np=2×2×2)
+### CPU 기준값 (`apps/heat_cpu/`, np=2×2×2)
 
 | Backend     | nx=64       | nx=128      | nx=256      | nx=512      | order |
 |-------------|------------:|------------:|------------:|------------:|------:|
@@ -132,7 +129,7 @@ L2 error vs exact, 모든 결과 bit-identical (round-off 안에서 일치).
 
 asymptotic ratio E(h)/E(h/2) = 4.000, order = **+2.000**.
 
-### GPU 결과 (`Heat_gpu/`, KISTI Neuron cas_v100nv_8)
+### GPU 결과 (`apps/heat_gpu/`, KISTI Neuron cas_v100nv_8)
 
 3개 backend × NP=1,2,4 × 4 grid sizes = **36 케이스 모두 bit-identical**:
 
@@ -156,7 +153,7 @@ CUDA-aware HPC-X OpenMPI. job 723253. A100 (`amd_a100nv_8`)에서도 동일
 
 ### GPU 코드에 적용된 주요 변경
 
-1. **`cudaSetDevice(local_rank)` 추가** (`Heat_gpu/main.cpp`): MPI rank를 GPU에
+1. **`cudaSetDevice(local_rank)` 추가** (`apps/heat_gpu/main.cpp`): MPI rank를 GPU에
    1:1 매핑. 이전엔 모든 rank가 GPU 0에 몰려 NP=4에서 ~4× 오버서브스크립션.
 2. **PaScaL_TDMA solver를 PaScaL_TDMA_F 최신과 동기화**: shared-memory
    pipeline (`tdma_many_kernel`, `modified_thomas_kernel`) + bank-conflict
@@ -170,7 +167,7 @@ CUDA-aware HPC-X OpenMPI. job 723253. A100 (`amd_a100nv_8`)에서도 동일
    - **`cal_J_v1`/`cal_J_v2`를 GPU 커널로 이전** — reduction과 `sqrt/log`까지
      디바이스에서 처리, host는 결과 int 1개만 받음. (host libm 호출이
      NVHPC nvc++ 환경에서 MPI 후 SIGILL을 유발하던 문제 해결.)
-4. **build_lhs_x tile-transpose** (`Heat_gpu/solve_theta.cu`): 32×32 shared
+4. **build_lhs_x tile-transpose** (`apps/heat_gpu/solve_theta.cu`): 32×32 shared
    memory tile로 d_rhs(ii-fastest) read와 d_X(jj-fastest) write 양쪽 모두
    coalesced 만듦.
 
@@ -213,11 +210,11 @@ USE_CUDA=1 CUDA_ARCH=70 make heat_gpu
 
 ```bash
 # 단일 NP × 4 grid 시리즈 (~1분):
-NP=1 sbatch -p amd_a100nv_8 --gres=gpu:1 -J pascal_1g Heat_gpu/run_one_np.sh
-NP=2 sbatch -p amd_a100nv_8 --gres=gpu:2 -J pascal_2g Heat_gpu/run_one_np.sh
+NP=1 sbatch -p amd_a100nv_8 --gres=gpu:1 -J pascal_1g apps/heat_gpu/run_one_np.sh
+NP=2 sbatch -p amd_a100nv_8 --gres=gpu:2 -J pascal_2g apps/heat_gpu/run_one_np.sh
 
 # 또는 전체 스윕(3 backends × 3 분할 × 4 grid = 36 runs):
-sbatch Heat_gpu/run_convergence_a100.sh
+sbatch apps/heat_gpu/run_convergence_a100.sh
 ```
 
 V100 노드(`cas_v100nv_8`)에서도 동작하지만 PCIe 토폴로지라 GPU↔GPU 통신이
@@ -228,7 +225,7 @@ bit-identical 확인됨).
 
 ## 7. 동작 가능한 주요 입력 옵션
 
-`Heat/inputs/PARA_INPUT_*.txt`, `Heat_gpu/inputs/PARA_INPUT_*.txt`:
+`apps/heat_cpu/inputs/PARA_INPUT_*.txt`, `apps/heat_gpu/inputs/PARA_INPUT_*.txt`:
 
 ```ini
 nx = 256                # 격자 점 수 (입력); 코드 내부에서 nx++ 후 cell 개수로 사용
@@ -274,7 +271,7 @@ tdma_backend = pascal   # "pascal" | "filtered" (=filtered_v1) | "filtered_v2"
 
 ## 9. Channel solver
 
-`channel/` 디렉터리는 PaScaL_TCS 자연대류 Fortran 코드를 C++17 + FFTW3 +
+`apps/channel/` 디렉터리는 PaScaL_TCS 자연대류 Fortran 코드를 C++17 + FFTW3 +
 Filtered_TDMA로 재구성한 별도 솔버입니다. wall-normal 방향 TDMA에
 `FilteredTDMA`를 사용하며, x/y는 FFT, z는 TDMA. Build target: `make channel`.
 
@@ -296,7 +293,7 @@ PaScaL_TCS와의 모듈 대응 + 좌표 규약 + 빌드 패턴은 이 파일의 
 `cudaMemcpy` 또는 전체 배열 D2H/H2D 스테이징) 으로 빠지면서 연속
 전송 대비 100×–300× 까지 느려짐.
 
-### 변경 사항 (`Heat_gpu/ghostcell_cuda.cu`)
+### 변경 사항 (`apps/heat_gpu/ghostcell_cuda.cu`)
 
 각 면의 slab 을 2D CUDA kernel (`pack_x/y/z`) 로 **연속 device buffer**
 에 packing → 연속 포인터로 `MPI_Isend/Irecv` → 받은 buffer 를 `unpack_x/y/z`
