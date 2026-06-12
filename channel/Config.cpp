@@ -92,7 +92,8 @@ void serialize(const Config& c, std::string& out)
       << c.pert_amp << ' '
       << c.nmonitor << ' '
       << c.nstat_start << ' ' << c.nstat << ' '
-      << c.nout_stats << ' ' << c.nout << ' '
+      << c.nout_stats << ' '
+      << c.nfield_start << ' ' << c.nout << ' '
       << c.out_stats << ' ' << c.out_field << ' '
       // strings last (length-prefixed)
       << c.dir_cont_filein.size()  << ' ' << c.dir_cont_filein  << ' '
@@ -122,7 +123,8 @@ void deserialize(const std::string& in, Config& c)
       >> c.pert_amp
       >> c.nmonitor
       >> c.nstat_start >> c.nstat
-      >> c.nout_stats >> c.nout
+      >> c.nout_stats
+      >> c.nfield_start >> c.nout
       >> c.out_stats >> c.out_field;
 
     c.pbc1 = (p1 != 0); c.pbc2 = (p2 != 0); c.pbc3 = (p3 != 0);
@@ -200,13 +202,16 @@ Config Config::load(const std::string& path, MPI_Comm comm)
 
             c.pert_amp = get<double>(m, "pert_amp", 0.01);
 
-            c.nmonitor    = get<int>(m, "nmonitor",    1);
-            c.nstat_start = get<int>(m, "nstat_start", 0);
-            c.nstat       = get<int>(m, "nstat",       1);
-            c.nout_stats  = get<int>(m, "nout_stats",  1000);
-            c.nout        = get<int>(m, "nout",        10000);
-            c.out_stats   = get<int>(m, "out_stats",   1);
-            c.out_field   = get<int>(m, "out_field",   1);
+            c.nmonitor     = get<int>(m, "nmonitor",     1);
+            c.nstat_start  = get<int>(m, "nstat_start",  0);
+            c.nstat        = get<int>(m, "nstat",        1);
+            c.nout_stats   = get<int>(m, "nout_stats",   1000);
+            // nfield_start defaults to nstat_start so the two outputs share a
+            // warm-up gate by default (override per case as needed).
+            c.nfield_start = get<int>(m, "nfield_start", c.nstat_start);
+            c.nout         = get<int>(m, "nout",         10000);
+            c.out_stats    = get<int>(m, "out_stats",    1);
+            c.out_field    = get<int>(m, "out_field",    1);
 
             c.tdma_backend = get<std::string>(m, "tdma_backend", "filtered");
 
@@ -264,10 +269,10 @@ void Config::print() const
     std::printf("  restart:   in=%d out=%d  '%s' '%s'\n",
                 ContinueFilein, ContinueFileout,
                 dir_cont_filein.c_str(), dir_cont_fileout.c_str());
-    std::printf("  output:    nmonitor=%d  nstat_start=%d  nstat=%d\n",
-                nmonitor, nstat_start, nstat);
-    std::printf("             nout_stats=%d  nout=%d  out_stats=%d  out_field=%d\n",
-                nout_stats, nout, out_stats, out_field);
+    std::printf("  output:    nmonitor=%d  nstat_start=%d  nstat=%d  nout_stats=%d\n",
+                nmonitor, nstat_start, nstat, nout_stats);
+    std::printf("             nfield_start=%d  nout=%d  out_stats=%d  out_field=%d\n",
+                nfield_start, nout, out_stats, out_field);
     std::printf("             stat_dir='%s' instant_dir='%s'\n",
                 dir_statistics.c_str(), dir_instantfield.c_str());
     std::printf("  tdma:      backend=%s\n", tdma_backend.c_str());

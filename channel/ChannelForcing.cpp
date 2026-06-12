@@ -29,11 +29,13 @@ double ChannelForcing::bulk_velocity_(const Field<double>& U) const
     const auto& dy = grid_.dx(1);
     const auto& dz = grid_.dx(2);
 
+    // U is at x-face (i-½); interpolate to cell centre before volume-weighting.
     double local = 0.0;
     for (int k = 1; k <= nz; ++k)
         for (int j = 1; j <= ny; ++j)
             for (int i = 1; i <= nx; ++i)
-                local += U(i, j, k) * dx[i] * dy[j] * dz[k];
+                local += 0.5 * (U(i, j, k) + U(i + 1, j, k))
+                         * dx[i] * dy[j] * dz[k];
 
     double global = 0.0;
     MPI_Allreduce(&local, &global, 1, MPI_DOUBLE, MPI_SUM, topo_.cart());

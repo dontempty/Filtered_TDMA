@@ -161,7 +161,7 @@ void RestartIO::scatter_field_(const double* global_buf, Field<double>& f) const
 void RestartIO::write(const std::string& dir,
                       const Field<double>& U, const Field<double>& V,
                       const Field<double>& W, const Field<double>& P,
-                      const RestartState& s)
+                      const RestartState& s, long step_tag)
 {
     const int Nx_g = sub_.global_n(0);
     const int Ny_g = sub_.global_n(1);
@@ -171,10 +171,15 @@ void RestartIO::write(const std::string& dir,
     std::vector<double> buf;
     if (topo_.rank() == 0) buf.assign(N, 0.0);
 
+    // Build "_<step,8>" suffix when step_tag > 0 (legacy unsuffixed if 0).
+    char suf[32]; suf[0] = '\0';
+    if (step_tag > 0) std::snprintf(suf, sizeof(suf), "_%08ld", step_tag);
+
     auto dump = [&](const Field<double>& f, const std::string& name) {
         gather_field_(f, buf.data());
         if (topo_.rank() == 0)
-            write_blob(dir + "/" + name + ".bin", buf.data(), N * sizeof(double));
+            write_blob(dir + "/" + name + suf + ".bin",
+                       buf.data(), N * sizeof(double));
     };
     dump(U, "cont_U");
     dump(V, "cont_V");
@@ -183,7 +188,7 @@ void RestartIO::write(const std::string& dir,
 
     if (topo_.rank() == 0) {
         double meta[4] = {s.time, s.dt, static_cast<double>(s.step), s.dPdx};
-        write_blob(dir + "/cont_time.bin", meta, sizeof(meta));
+        write_blob(dir + "/cont_time" + suf + ".bin", meta, sizeof(meta));
     }
 }
 

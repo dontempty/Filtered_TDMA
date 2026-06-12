@@ -91,16 +91,18 @@ struct Config {
     //   nstat_start  : step at which stats accumulation begins
     //   nstat        : stats accumulation interval (steps), counted from nstat_start
     //   nout_stats   : stats file write interval (steps), counted from nstat_start
-    //   nout         : instant 3-D field output interval (steps)
+    //   nfield_start : step at which instant-field output begins
+    //   nout         : instant 3-D field output interval (steps), counted from nfield_start
     //   out_stats    : 1 = write stats files, 0 = skip
     //   out_field    : 1 = write instant field files, 0 = skip
-    int nmonitor    = 1;
-    int nstat_start = 0;
-    int nstat       = 1;
-    int nout_stats  = 1000;
-    int nout        = 10000;
-    int out_stats   = 1;
-    int out_field   = 1;
+    int nmonitor     = 1;
+    int nstat_start  = 0;
+    int nstat        = 1;
+    int nout_stats   = 1000;
+    int nfield_start = 0;
+    int nout         = 10000;
+    int out_stats    = 1;
+    int out_field    = 1;
 
     // ---- momentum TDMA backend selection -------------------------------
     //   "filtered" (default) — Filtered_TDMA library (truncated-filter v2)

@@ -177,10 +177,12 @@ void FilteredTDMA::solve_cycl_filtered_v2(double* __restrict A,
     }
 
     int i, j;
-    const int J  = cal_J_v2(2.0, 2.0);
-    const int lo = (n_row_ - 2) - J;
-
     auto p = setup_ptrs(A, B, C, D, n_sys_, n_row_);
+
+    // Upper-bound estimate for the reduced-system boundary solution.
+    // Same value as solve_filtered_v2: 4.0 gives margin above Poiseuille max.
+    const int J  = cal_J_v2(4.0, 4.0);
+    const int lo = (n_row_ - 2) - J;
 
     const double* __restrict C_left       = C_left_recv_.data();
     const double* __restrict D_left       = D_left_recv_.data();

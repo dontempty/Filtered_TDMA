@@ -41,6 +41,15 @@ public:
     void solve     (double* A, double* B, double* C, double* D);
     void solve_cycl(double* A, double* B, double* C, double* D);
 
+    /// FILTERED non-cyclic + sub-phase timing. Fills time_list[0..6] with:
+    ///   [0]=fwd elim  [1]=bwd sub  [2]=pack  [3]=MPI4  [4]=unpack+MPI2
+    ///   [5]=unused    [6]=cal_J + final correction
+    /// PASCAL: time_list[0..5]=0, time_list[6]=total wall time.
+    /// solve_cycl path: caller should time the whole solve_cycl() call as one
+    /// chunk; this method only handles non-cyclic.
+    void solve_profile(double* A, double* B, double* C, double* D,
+                       std::vector<double>& time_list);
+
     /// FILTERED: updates truncation radius from first-column |A/B|, |C/B|.
     /// PASCAL   : no-op.
     void set_rho(const double* A, const double* B, const double* C, int n_sys);

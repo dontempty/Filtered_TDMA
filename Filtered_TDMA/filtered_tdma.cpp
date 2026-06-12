@@ -62,6 +62,7 @@ int FilteredTDMA::cal_J_v1(const double* D0, const double* DN) {
     const int rho_end   = static_cast<int>(A_rho_.size()) - skip;
 
     double rho = 0.0;
+    #pragma omp simd reduction(max: rho)
     for (int k = rho_begin; k < rho_end; ++k) {
         double v = std::max(std::abs(A_rho_[k]), std::abs(C_rho_[k]));
         if (v > rho) rho = v;
@@ -91,6 +92,7 @@ int FilteredTDMA::cal_J_v2(double D0, double DN) {
     const int rho_end   = static_cast<int>(A_rho_.size()) - skip;
 
     double rho = 0.0;
+    #pragma omp simd reduction(max: rho)
     for (int k = rho_begin; k < rho_end; ++k) {
         double v = std::max(std::abs(A_rho_[k]), std::abs(C_rho_[k]));
         if (v > rho) rho = v;
@@ -284,20 +286,13 @@ void FilteredTDMA::solve_filtered_v2(double* __restrict A,
     }
 
     int i, j;
-    const int J  = cal_J_v2(2.0, 2.0);
-    const int lo = (n_row_ - 2) - J;
-
-    const int skip = 2;
-    const int rho_begin = skip;
-    const int rho_end   = static_cast<int>(A_rho_.size()) - skip;
-    
-    double rho = 0.0;
-    for (int k = rho_begin; k < rho_end; ++k) {
-        double v = std::max(std::abs(A_rho_[k]), std::abs(C_rho_[k]));
-        if (v > rho) rho = v;
-    }
-
     auto p = setup_ptrs(A, B, C, D, n_sys_, n_row_);
+
+    // Upper-bound estimate for the reduced-system boundary solution.
+    // Channel flow: bulk U_b=1, Poiseuille max ~1.5 → reduced solution ≤ ~2.
+    // Use 4.0 to give some margin above the Poiseuille bound.
+    const int J  = cal_J_v2(4.0, 4.0);
+    const int lo = (n_row_ - 2) - J;
 
     const double* __restrict C_left       = C_left_recv_.data();
     const double* __restrict D_left       = D_left_recv_.data();

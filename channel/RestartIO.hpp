@@ -33,11 +33,13 @@ public:
     RestartIO(const MpiTopology& topo, const Subdomain& sub);
 
     /// Write all four fields + control state to `dir`. Caller must ensure
-    /// the directory exists.
+    /// the directory exists.  When `step_tag > 0`, files are named with
+    /// "_<step_tag, 8 digits>" suffix (e.g., cont_U_00020000.bin).  Default
+    /// 0 preserves legacy unsuffixed names.
     void write(const std::string& dir,
                const Field<double>& U, const Field<double>& V,
                const Field<double>& W, const Field<double>& P,
-               const RestartState& s);
+               const RestartState& s, long step_tag = 0);
 
     /// Read all four fields + control state from `dir`. The fields must
     /// already be sized to the local subdomain.

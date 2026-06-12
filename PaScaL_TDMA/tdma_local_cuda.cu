@@ -29,7 +29,9 @@ __device__ __forceinline__ int linear_sys(int n_sys) {
 // Local Thomas — 6 shared buffers (bx+1, by); pipeline keeps the (j-1) row's
 // c/d in shared so the forward sweep only loads the new row from global.
 // Mirrors PaScaL_TDMA_F tdmas_cuda.f90 tdma_many_cuda.
-__global__ __launch_bounds__(PASCAL_TDMA_MAX_BLOCK)
+// launch_bounds(256, 4): explicit register budget cap 65536/(256*4)=64 regs.
+// Same hint as Fortran side for consistent intent across both codes.
+__global__ __launch_bounds__(256, 4)
 void tdma_many_kernel(double* __restrict__ A,
                       double* __restrict__ B,
                       double* __restrict__ C,
@@ -151,7 +153,9 @@ void tdma_cyclic_many_kernel(double* __restrict__ A,
 
 // Modified Thomas pipeline — 9 shared buffers (bx+1, by); +1 padding to
 // avoid 32-way bank conflicts. Mirrors PaScaL_TDMA_F tdmas_cuda.f90.
-__global__ __launch_bounds__(PASCAL_TDMA_MAX_BLOCK)
+// launch_bounds(256, 4): explicit register budget — matches Fortran side
+// policy for cross-language consistency.
+__global__ __launch_bounds__(256, 4)
 void modified_thomas_kernel(double* __restrict__ A,
                             double* __restrict__ B,
                             double* __restrict__ C,
@@ -221,7 +225,16 @@ void modified_thomas_kernel(double* __restrict__ A,
         D[off] = d1[tj];
     }
 
-    double a_last = a1[tj], c_last = c1[tj], d_last = d1[tj];
+    // Forward sweep 끝난 시점에 reduced row 1 (last row)을 즉시 기록 →
+    // backward sweep이 a1/c1/d1[tj]를 덮어쓰기 전이라 임시 register
+    // (a_last/c_last/d_last) 가 불필요 → register pressure 감소.
+    {
+        std::size_t boff = (std::size_t)1 * n_sys + i;
+        A_rd[boff] = a1[tj];
+        B_rd[boff] = 1.0;
+        C_rd[boff] = c1[tj];
+        D_rd[boff] = d1[tj];
+    }
 
     {
         std::size_t off_nm2 = (std::size_t)(n_row - 2) * n_sys + i;
@@ -268,12 +281,8 @@ void modified_thomas_kernel(double* __restrict__ A,
         C_rd[i] = c0[tj];
         D_rd[i] = d0[tj];
     }
-
-    std::size_t boff = (std::size_t)1 * n_sys + i;
-    A_rd[boff] = a_last;
-    B_rd[boff] = 1.0;
-    C_rd[boff] = c_last;
-    D_rd[boff] = d_last;
+    // Note: reduced row 1 was already written above (right after the forward
+    // sweep), so no extra store needed here.
 }
 
 __global__ __launch_bounds__(PASCAL_TDMA_MAX_BLOCK)

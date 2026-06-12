@@ -57,18 +57,29 @@ private:
     int  kstart_    = 0;   // 0-based global index of this rank's first cell
     long n_         = 0;
 
-    // Local Welford running means (size = nz_local_)
-    std::vector<double> U_m_;    // <u>_xy
-    std::vector<double> U2_m_;   // <u²>_xy
-    std::vector<double> V_m_;    // <v>_xy
-    std::vector<double> V2_m_;   // <v²>_xy
-    std::vector<double> Wc_m_;   // <wc>_xy  (W face → cell-centre)
-    std::vector<double> Wc2_m_;  // <wc²>_xy
-    std::vector<double> UWc_m_;  // <u·wc>_xy
-    std::vector<double> P_m_;    // <p>_xy
+    // ---- Cell-center stats (clean: no z-halo dependence) ----
+    // Used for u_rms, v_rms, w_rms, mean U/V/Wc, P_mean.
+    std::vector<double> U_m_;    // <u>_xy at zc[k]
+    std::vector<double> U2_m_;   // <u²>_xy at zc[k]
+    std::vector<double> V_m_;    // <v>_xy at zc[k]
+    std::vector<double> V2_m_;   // <v²>_xy at zc[k]
+    std::vector<double> Wc_m_;   // <wc>_xy at zc[k] (cell-center W from face interp)
+    std::vector<double> Wc2_m_;  // <wc²>_xy at zc[k]
+    std::vector<double> P_m_;    // <p>_xy at zc[k]
 
-    // Global cell-centre z-coordinates (0-indexed, size = nz_global_)
+    // ---- Corner stats (clean from PaScaL rank-boundary bias) ----
+    // Used for uw cross stat only. Stored at z-face zf[k].
+    // Output uw at zc[k] = interpolation of corner uw at zf[k] and zf[k+1].
+    std::vector<double> Ug_m_;   // <Ug>_xy at zf[k]
+    std::vector<double> Wg_m_;   // <Wg>_xy at zf[k]
+    std::vector<double> UWg_m_;  // <Ug·Wg>_xy at zf[k]
+
+    // Global cell-centre z-coordinates (0-indexed, size = nz_global_) — kept for reference
     std::vector<double> zc_global_;
+
+    // Global z-FACE positions (lower face of each global cell), size = nz_global_
+    // Stats are output at these positions (MPM-STD corner-stat convention).
+    std::vector<double> z_face_global_;
 
     void gather_to_global(const std::vector<double>& local,
                           std::vector<double>& global) const;

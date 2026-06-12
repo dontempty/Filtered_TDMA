@@ -17,6 +17,7 @@
 #include <fftw3.h>
 #include <complex>
 #include <memory>
+#include <string>
 #include <vector>
 
 #include <mpi.h>

@@ -1,4 +1,5 @@
 #include "pascal_tdma_many_cuda.hpp"
+#include "nvtx_util.hpp"
 #include "tdma_local_cuda.cuh"
 #include "para_range.hpp"
 
@@ -271,8 +272,10 @@ void PaScaLTDMAManyCUDA::ensure_E_loc(int n_sys, int n_row) {
 //  Forward all-to-all: [2 × n_sys] rd  →  [n_row_rt × n_sys_rt] rt
 // ===========================================================================
 void PaScaLTDMAManyCUDA::alltoall_forward(const double* d_rd, double* d_rt) {
+    NVTX_SCOPE("alltoall_fwd");
     // Pack: rd → sendbuf
     {
+        NVTX_SCOPE("pack_fwd");
         dim3 block(128, 1, 1);
         dim3 grid((max_ns_rt_ + block.x - 1) / block.x, N_ROW_RD, nprocs_);
         pack_rd2send_kernel<<<grid, block>>>(d_sendbuf_, d_rd, n_sys_,
@@ -282,15 +285,18 @@ void PaScaLTDMAManyCUDA::alltoall_forward(const double* d_rd, double* d_rt) {
 
     // Make pack visible to MPI before alltoall.  cudaStreamSynchronize on the
     // default stream is sufficient — matches PaScaL_TDMA_F.
-    CUDA_CHECK(cudaStreamSynchronize(0));
-
-    MPI_Alltoallv(d_sendbuf_, send_counts_fwd_.data(), send_displs_fwd_.data(),
-                  MPI_DOUBLE,
-                  d_recvbuf_, recv_counts_fwd_.data(), recv_displs_fwd_.data(),
-                  MPI_DOUBLE, comm_);
+    {
+        NVTX_SCOPE("mpi_alltoallv_fwd");
+        CUDA_CHECK(cudaStreamSynchronize(0));
+        MPI_Alltoallv(d_sendbuf_, send_counts_fwd_.data(), send_displs_fwd_.data(),
+                      MPI_DOUBLE,
+                      d_recvbuf_, recv_counts_fwd_.data(), recv_displs_fwd_.data(),
+                      MPI_DOUBLE, comm_);
+    }
 
     // Unpack: recvbuf → rt
     {
+        NVTX_SCOPE("unpack_fwd");
         dim3 block(128, 1, 1);
         dim3 grid((n_sys_rt_ + block.x - 1) / block.x, N_ROW_RD, nprocs_);
         unpack_recv2rt_kernel<<<grid, block>>>(d_rt, d_recvbuf_,
@@ -303,23 +309,28 @@ void PaScaLTDMAManyCUDA::alltoall_forward(const double* d_rd, double* d_rt) {
 //  Backward all-to-all: [n_row_rt × n_sys_rt] rt  →  [2 × n_sys] rd
 // ===========================================================================
 void PaScaLTDMAManyCUDA::alltoall_backward(const double* d_rt, double* d_rd) {
+    NVTX_SCOPE("alltoall_bwd");
     // Pack: rt → sendbuf
     {
+        NVTX_SCOPE("pack_bwd");
         dim3 block(128, 1, 1);
         dim3 grid((n_sys_rt_ + block.x - 1) / block.x, N_ROW_RD, nprocs_);
         pack_rt2send_kernel<<<grid, block>>>(d_sendbuf_, d_rt, n_sys_rt_,
                                              d_send_displs_bwd_, nprocs_);
     }
 
-    CUDA_CHECK(cudaStreamSynchronize(0));
-
-    MPI_Alltoallv(d_sendbuf_, send_counts_bwd_.data(), send_displs_bwd_.data(),
-                  MPI_DOUBLE,
-                  d_recvbuf_, recv_counts_bwd_.data(), recv_displs_bwd_.data(),
-                  MPI_DOUBLE, comm_);
+    {
+        NVTX_SCOPE("mpi_alltoallv_bwd");
+        CUDA_CHECK(cudaStreamSynchronize(0));
+        MPI_Alltoallv(d_sendbuf_, send_counts_bwd_.data(), send_displs_bwd_.data(),
+                      MPI_DOUBLE,
+                      d_recvbuf_, recv_counts_bwd_.data(), recv_displs_bwd_.data(),
+                      MPI_DOUBLE, comm_);
+    }
 
     // Unpack: recvbuf → rd
     {
+        NVTX_SCOPE("unpack_bwd");
         dim3 block(128, 1, 1);
         dim3 grid((max_ns_rt_ + block.x - 1) / block.x, N_ROW_RD, nprocs_);
         unpack_recv2rd_kernel<<<grid, block>>>(d_rd, d_recvbuf_, n_sys_,
@@ -334,21 +345,57 @@ void PaScaLTDMAManyCUDA::alltoall_backward(const double* d_rt, double* d_rd) {
 void PaScaLTDMAManyCUDA::solve(double* d_A, double* d_B, double* d_C, double* d_D,
                                int n_sys, int n_row) {
     if (nprocs_ == 1) {
+        NVTX_SCOPE("tdma_local");
         tdma_many_cuda(d_A, d_B, d_C, d_D, n_sys, n_row, block_x_, block_y_);
+        for (int i = 0; i < 5; ++i) last_ms_[i] = 0.0;
         return;
     }
 
-    pascal_tdma_modified_thomas_cuda(d_A, d_B, d_C, d_D,
-                                     d_A_rd_, d_B_rd_, d_C_rd_, d_D_rd_,
-                                     n_sys, n_row, block_x_, block_y_);
-    alltoall_forward(d_A_rd_, d_A_rt_);
-    alltoall_forward(d_C_rd_, d_C_rt_);
-    alltoall_forward(d_D_rd_, d_D_rt_);
-    tdma_many_cuda(d_A_rt_, d_B_rt_, d_C_rt_, d_D_rt_,
-                   n_sys_rt_, n_row_rt_, block_x_, block_y_);
+    NVTX_SCOPE("pascal_solve");
+
+    // Sub-phase markers on the default stream — measured between consecutive
+    // events at the end of the solve(). All kernels and MPI calls below
+    // submit to the default stream, so event ordering is well-defined.
+    cudaEventRecord(e_[0]);
+    {
+        NVTX_SCOPE("mod_thomas_fwd");
+        pascal_tdma_modified_thomas_cuda(d_A, d_B, d_C, d_D,
+                                         d_A_rd_, d_B_rd_, d_C_rd_, d_D_rd_,
+                                         n_sys, n_row, block_x_, block_y_);
+    }
+    cudaEventRecord(e_[1]);
+    {
+        NVTX_SCOPE("alltoall_fwd_x3");   // a,c,d (b is reduced locally, not sent)
+        alltoall_forward(d_A_rd_, d_A_rt_);
+        alltoall_forward(d_C_rd_, d_C_rt_);
+        alltoall_forward(d_D_rd_, d_D_rt_);
+    }
+    cudaEventRecord(e_[2]);
+    {
+        NVTX_SCOPE("reduced_tdma");
+        tdma_many_cuda(d_A_rt_, d_B_rt_, d_C_rt_, d_D_rt_,
+                       n_sys_rt_, n_row_rt_, block_x_, block_y_);
+    }
+    cudaEventRecord(e_[3]);
     alltoall_backward(d_D_rt_, d_D_rd_);
-    pascal_tdma_update_solution_cuda(d_A, d_C, d_D, d_D_rd_,
-                                     n_sys, n_row, block_x_, block_y_);
+    cudaEventRecord(e_[4]);
+    {
+        NVTX_SCOPE("update_sol");
+        pascal_tdma_update_solution_cuda(d_A, d_C, d_D, d_D_rd_,
+                                         n_sys, n_row, block_x_, block_y_);
+    }
+    cudaEventRecord(e_[5]);
+
+    // Block until last event done, then resolve elapsed times in ms.
+    cudaEventSynchronize(e_[5]);
+    float ms = 0.0f;
+    cudaEventElapsedTime(&ms, e_[0], e_[1]); last_ms_[0] = (double)ms;
+    cudaEventElapsedTime(&ms, e_[1], e_[2]); last_ms_[1] = (double)ms;
+    cudaEventElapsedTime(&ms, e_[2], e_[3]); last_ms_[2] = (double)ms;
+    cudaEventElapsedTime(&ms, e_[3], e_[4]); last_ms_[3] = (double)ms;
+    cudaEventElapsedTime(&ms, e_[4], e_[5]); last_ms_[4] = (double)ms;
+    for (int i = 0; i < 5; ++i) acc_[i] += last_ms_[i];
+    ++call_count_;
 }
 
 // ===========================================================================

@@ -19,9 +19,11 @@ TdmaBackendGPU::TdmaBackendGPU(Kind kind, int n_sys, int n_row,
     : kind_(kind), n_sys_(n_sys), n_row_(n_row)
 {
     if (kind_ == Kind::PASCAL) {
-        // 16×16 block matches PaScaL_TDMA_F defaults (256 threads per block).
+        // (128, 1): warp-aligned, full coalescing.  Replaces legacy (16, 16)
+        // which broke warp memory coalescing on modified_thomas / tdma_many.
+        // See REPORT_OPTIMIZATION_SUMMARY — modT -33%, total solve -16~20%.
         pasc_ = std::make_unique<PaScaLTDMAManyCUDA>(n_sys, myrank, nprocs, comm,
-                                                    16, 16);
+                                                    128, 1);
     } else {
         filt_ = std::make_unique<FilteredTDMACUDA>(n_sys, n_row,
                                                    myrank, nprocs, comm,

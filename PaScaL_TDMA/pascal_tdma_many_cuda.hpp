@@ -36,6 +36,17 @@ public:
     int n_row_rt() const { return n_row_rt_; }
     int nprocs()   const { return nprocs_; }
 
+    /// Sub-phase wall times (ms) measured on the GPU for the most recent
+    /// non-cyclic solve() call (cyclic variant currently does not populate).
+    /// Layout matches `acc_` semantics:
+    ///   [0] mod_thomas_fwd
+    ///   [1] alltoall_forward  (sum of A, C, D — three calls)
+    ///   [2] tdma_many on reduced system
+    ///   [3] alltoall_backward (single — D only)
+    ///   [4] update_solution
+    /// When nprocs==1 (no comm path) all entries are 0.
+    const double* last_step_times_ms() const { return last_ms_; }
+
 private:
     void ensure_E_loc(int n_sys, int n_row);
 
@@ -110,6 +121,11 @@ private:
     double      acc_[5] = {0.0, 0.0, 0.0, 0.0, 0.0};
     int         call_count_ = 0;
     cudaEvent_t e_[6] = {nullptr, nullptr, nullptr, nullptr, nullptr, nullptr};
+
+    // Sub-phase times of the most recent solve() call (ms).
+    // Indices: [0]=mod_thomas, [1]=alltoall_fwd_total, [2]=reduced_tdma,
+    //          [3]=alltoall_bwd, [4]=update_sol.
+    double      last_ms_[5] = {0.0, 0.0, 0.0, 0.0, 0.0};
 };
 
 #endif // PASCAL_TDMA_MANY_CUDA_HPP

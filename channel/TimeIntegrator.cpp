@@ -181,6 +181,101 @@ double TimeIntegrator::max_div_u_(const Field<double>& U,
     return global_max;
 }
 
+// ---- debug: locate global max |U|, |V|, |W| each step ------------------
+// Writes one row per call:
+//   step, t, dt, max|U|, U_i, U_j, U_k, max|V|, V_i, V_j, V_k,
+//                       max|W|, W_i, W_j, W_k,  max_div, div_i, div_j, div_k
+// (i,j,k are GLOBAL 1-based indices.  Owner rank is gathered via MAXLOC.)
+void TimeIntegrator::write_max_velocity_debug_(const Field<double>& U,
+                                               const Field<double>& V,
+                                               const Field<double>& W,
+                                               long step, double dt, double t,
+                                               std::FILE* fp,
+                                               bool verbose_stdout) const
+{
+    const int nx = sub_.nx(), ny = sub_.ny(), nz = sub_.nz();
+    const auto& dx = grid_.dx(0);
+    const auto& dy = grid_.dx(1);
+    const auto& dz = grid_.dx(2);
+    const int ix = sub_.ista(0) - 1;
+    const int iy = sub_.ista(1) - 1;
+    const int iz = sub_.ista(2) - 1;
+
+    // Locate local max of |U|, |V|, |W|, |divU|
+    double mu = 0, mv = 0, mw = 0, md = 0;
+    int iu=0,ju=0,ku=0, iv=0,jv=0,kv=0, iw=0,jw=0,kw=0, id=0,jd=0,kd=0;
+    for (int k = 1; k <= nz; ++k)
+        for (int j = 1; j <= ny; ++j)
+            for (int i = 1; i <= nx; ++i) {
+                double au = std::fabs(U(i,j,k));
+                double av = std::fabs(V(i,j,k));
+                double aw = std::fabs(W(i,j,k));
+                double ad = std::fabs((U(i+1,j,k)-U(i,j,k))/dx[i]
+                                    + (V(i,j+1,k)-V(i,j,k))/dy[j]
+                                    + (W(i,j,k+1)-W(i,j,k))/dz[k]);
+                if (au > mu) { mu = au; iu=i; ju=j; ku=k; }
+                if (av > mv) { mv = av; iv=i; jv=j; kv=k; }
+                if (aw > mw) { mw = aw; iw=i; jw=j; kw=k; }
+                if (ad > md) { md = ad; id=i; jd=j; kd=k; }
+            }
+
+    // MPI_MAXLOC for each field — gives global max, owner rank, and global (i,j,k).
+    auto reduce_one = [&](double local_val, int li, int lj, int lk,
+                          double& g_val, int& gi, int& gj, int& gk, int& g_rank) {
+        struct { double v; int r; } in, out;
+        int my_rank = topo_.rank();
+        in.v = local_val; in.r = my_rank;
+        MPI_Allreduce(&in, &out, 1, MPI_DOUBLE_INT, MPI_MAXLOC, topo_.cart());
+        g_val = out.v;
+        g_rank = out.r;
+        int loc[3] = { li + ix, lj + iy, lk + iz };
+        MPI_Bcast(loc, 3, MPI_INT, out.r, topo_.cart());
+        gi = loc[0]; gj = loc[1]; gk = loc[2];
+    };
+
+    double gu=0, gv=0, gw=0, gd=0;
+    int Giu=0,Gju=0,Gku=0, Giv=0,Gjv=0,Gkv=0, Giw=0,Gjw=0,Gkw=0, Gid=0,Gjd=0,Gkd=0;
+    int Ru=0, Rv=0, Rw=0, Rd=0;
+    reduce_one(mu, iu, ju, ku, gu, Giu, Gju, Gku, Ru);
+    reduce_one(mv, iv, jv, kv, gv, Giv, Gjv, Gkv, Rv);
+    reduce_one(mw, iw, jw, kw, gw, Giw, Gjw, Gkw, Rw);
+    reduce_one(md, id, jd, kd, gd, Gid, Gjd, Gkd, Rd);
+
+    if (topo_.rank() == 0) {
+        if (fp) {
+            std::fprintf(fp,
+                "%ld,%.6e,%.6e,"
+                "%.9e,%d,%d,%d,"
+                "%.9e,%d,%d,%d,"
+                "%.9e,%d,%d,%d,"
+                "%.9e,%d,%d,%d\n",
+                step, t, dt,
+                gu, Giu, Gju, Gku,
+                gv, Giv, Gjv, Gkv,
+                gw, Giw, Gjw, Gkw,
+                gd, Gid, Gjd, Gkd);
+            std::fflush(fp);
+        }
+        if (verbose_stdout) {
+            const int n3m = sub_.global_n(2);
+            std::printf("\n========================================================\n");
+            std::printf("[DIAGNOSTIC] step=%ld  t=%.6e  dt=%.6e\n", step, t, dt);
+            std::printf("--------------------------------------------------------\n");
+            std::printf("  maxDivU = %.6e   @ global (i,j,k) = (%d,%d,%d)   rank=%d\n",
+                        gd, Gid, Gjd, Gkd, Rd);
+            std::printf("  max|U|  = %.6e   @ global (i,j,k) = (%d,%d,%d)   rank=%d  k_wall=%d\n",
+                        gu, Giu, Gju, Gku, Ru, std::min(Gku, n3m - Gku + 1));
+            std::printf("  max|V|  = %.6e   @ global (i,j,k) = (%d,%d,%d)   rank=%d  k_wall=%d\n",
+                        gv, Giv, Gjv, Gkv, Rv, std::min(Gkv, n3m - Gkv + 1));
+            std::printf("  max|W|  = %.6e   @ global (i,j,k) = (%d,%d,%d)   rank=%d  k_wall=%d\n",
+                        gw, Giw, Gjw, Gkw, Rw, std::min(Gkw, n3m - Gkw + 1));
+            std::printf("  (k_wall = distance from nearest wall in cell counts; 1 = first cell at wall)\n");
+            std::printf("========================================================\n");
+            std::fflush(stdout);
+        }
+    }
+}
+
 // ---- main time loop ------------------------------------------------------
 void TimeIntegrator::run(Field<double>& U, Field<double>& V, Field<double>& W,
                          Field<double>& P, RestartState& state)
@@ -214,6 +309,9 @@ void TimeIntegrator::run(Field<double>& U, Field<double>& V, Field<double>& W,
                 "rho_max", "rho_min");
     }
 
+    // (Debug CSV is no longer opened up-front.  It is created on demand only
+    //  when an abort fires — see emergency-dump block below.)
+
     // Pre-loop: ensure valid ghosts and BCs
     halo_.exchange(U); halo_.exchange(V); halo_.exchange(W);
     halo_.exchange(P);
@@ -244,6 +342,10 @@ void TimeIntegrator::run(Field<double>& U, Field<double>& V, Field<double>& W,
         halo_.exchange(U); halo_.exchange(V); halo_.exchange(W);
         halo_.exchange(P);
         bc_.apply(U, V, W);
+
+        // ---- Divergence safety: emergency abort if |divU| > 1e-10 ----
+        const double divU_global = max_div_u_(U, V, W);
+        const bool abort_now = (divU_global > 1.0e-10);
 
         // Statistics accumulation — matches v2: every nstat steps from nstat_start
         if (step >= cfg_.nstat_start &&
@@ -299,15 +401,58 @@ void TimeIntegrator::run(Field<double>& U, Field<double>& V, Field<double>& W,
             stats_.write(sname, (int)step, cfg_.Re_b, false);
         }
 
-        // ---- 3-D field output — matches v2 ----
-        if (cfg_.out_field && cfg_.nout > 0 && step % cfg_.nout == 0)
+        // ---- 3-D field output — same start/interval pattern as stats ----
+        if (cfg_.out_field && cfg_.nout > 0
+                && step >= cfg_.nfield_start
+                && ((step - cfg_.nfield_start) % cfg_.nout == 0))
             field_out_.write_field_3d(U, V, W, P, (int)step);
 
         // ---- Restart (piggy-backs on stats write cadence) ----
         if (cfg_.ContinueFileout && step >= cfg_.nstat_start
                 && ((step - cfg_.nstat_start) % cfg_.nout_stats == 0)) {
             state.time = t; state.dt = dt; state.step = step; state.dPdx = mean_dPdx;
-            restart_.write(cfg_.dir_cont_fileout, U, V, W, P, state);
+            restart_.write(cfg_.dir_cont_fileout, U, V, W, P, state, step);
+        }
+
+        // ---- Emergency abort: divU exploded → dump everything we can ----
+        if (abort_now) {
+            if (root) {
+                std::printf("\n[ABORT] step=%ld  maxDivU=%.6e > 1.0e-10 "
+                            "— emergency dump and exit\n",
+                            step, divU_global);
+                std::fflush(stdout);
+            }
+            // Open (create) the debug CSV only on abort; write one row + header
+            // and emit a verbose location block to stdout in the same call.
+            std::FILE* abort_fp = nullptr;
+            if (root) {
+                std::string p = cfg_.dir_statistics + "/max_velocity_debug.csv";
+                abort_fp = std::fopen(p.c_str(), "a");
+                if (abort_fp && std::ftell(abort_fp) == 0) {
+                    std::fprintf(abort_fp,
+                        "step,t,dt,"
+                        "maxU,iU,jU,kU,"
+                        "maxV,iV,jV,kV,"
+                        "maxW,iW,jW,kW,"
+                        "maxDivU,iD,jD,kD\n");
+                }
+            }
+            write_max_velocity_debug_(U, V, W, step, dt, t, abort_fp, true);
+            if (root && abort_fp) std::fclose(abort_fp);
+            // stats: write whatever has been accumulated so far
+            if (stats_.samples() > 0) {
+                char sname[512];
+                std::snprintf(sname, sizeof(sname), "%s/stats_abort_%08ld.dat",
+                              cfg_.dir_statistics.c_str(), step);
+                stats_.write(sname, (int)step, cfg_.Re_b, false);
+            }
+            // 3-D field snapshot at the abort step (for post-mortem inspection)
+            field_out_.write_field_3d(U, V, W, P, (int)step);
+            // restart write — regardless of ContinueFileout setting
+            state.time = t; state.dt = dt; state.step = step;
+            state.dPdx = mean_dPdx;
+            restart_.write(cfg_.dir_cont_fileout, U, V, W, P, state, step);
+            break;
         }
     }
 
@@ -323,19 +468,38 @@ void TimeIntegrator::run(Field<double>& U, Field<double>& V, Field<double>& W,
     }
 
     if (cfg_.ContinueFileout)
-        restart_.write(cfg_.dir_cont_fileout, U, V, W, P, state);
+        restart_.write(cfg_.dir_cont_fileout, U, V, W, P, state, state.step);
 
     // ---- Momentum / TDMA timing report (accumulated from step 20001 onward) ----
     {
-        double loc[2] = { momentum_.momentum_time(), momentum_.tdma_time() };
-        double glo[2] = { 0.0, 0.0 };
-        MPI_Reduce(loc, glo, 2, MPI_DOUBLE, MPI_MAX, 0, topo_.cart());
+        double loc[5] = { momentum_.momentum_time(),
+                          momentum_.tdma_x_time(),
+                          momentum_.tdma_y_time(),
+                          momentum_.tdma_z_time(),
+                          momentum_.tdma_time() };
+        double glo[5] = { 0.0, 0.0, 0.0, 0.0, 0.0 };
+        MPI_Reduce(loc, glo, 5, MPI_DOUBLE, MPI_MAX, 0, topo_.cart());
         if (root) {
-            const double frac = (glo[0] > 0.0) ? 100.0 * glo[1] / glo[0] : 0.0;
-            std::printf("[Momentum time (step>20000)] %.6e s  (max over ranks)\n", glo[0]);
-            std::printf("[TDMA     time (step>20000)] %.6e s  (max over ranks, %.2f%% of momentum)\n",
-                        glo[1], frac);
+            const double mom = glo[0];
+            const double tx  = glo[1], ty = glo[2], tz = glo[3], ttot = glo[4];
+            const double frac = (mom > 0.0) ? 100.0 * ttot / mom : 0.0;
+            std::printf("[Momentum time (step>20000)] %.6e s  (max over ranks)\n", mom);
+            std::printf("[TDMA  x time (step>20000)]  %.6e s  (max over ranks)\n", tx);
+            std::printf("[TDMA  y time (step>20000)]  %.6e s  (max over ranks)\n", ty);
+            std::printf("[TDMA  z time (step>20000)]  %.6e s  (max over ranks)\n", tz);
+            std::printf("[TDMA total time (step>20000)] %.6e s  (max over ranks, %.2f%% of momentum)\n",
+                        ttot, frac);
         }
+    }
+
+    // ---- Per-step timing CSV: one file per rank ----
+    {
+        int my_rank = 0;
+        MPI_Comm_rank(topo_.cart(), &my_rank);
+        char path[512];
+        std::snprintf(path, sizeof(path), "%s/tdma_timing_rank%04d.csv",
+                      cfg_.dir_statistics.c_str(), my_rank);
+        momentum_.write_timing_csv(path);
     }
 
     if (root) {

@@ -24,6 +24,7 @@
 #include "HaloExchanger.hpp"
 
 #include <cmath>
+#include <cstdio>
 #include <cstring>
 
 namespace channel {
@@ -338,7 +339,11 @@ void MomentumSolver::adi_z_(Component which, Field<double>& q, double nu_dt_half
         double t0 = MPI_Wtime();
         fdma_z_->set_rho(Az_.data(), Bz_.data(), Cz_.data(), ns);
         fdma_z_->solve(Az_.data(), Bz_.data(), Cz_.data(), Dz_.data());
-        if (step_count_ > 20000) tdma_time_ += MPI_Wtime() - t0;
+        if (step_count_ > cfg_->nstat_start) {
+            double dt_z = MPI_Wtime() - t0;
+            tdma_z_time_ += dt_z;
+            tdma_last_z_  = dt_z;
+        }
     }
 
     for (int k = 1; k <= nz; ++k)
@@ -387,7 +392,11 @@ void MomentumSolver::adi_y_(Component which, Field<double>& q, double nu_dt_half
             fdma_y_->solve_cycl(Ay_.data(), By_.data(), Cy_.data(), Dy_.data());
         else
             fdma_y_->solve(Ay_.data(), By_.data(), Cy_.data(), Dy_.data());
-        if (step_count_ > 20000) tdma_time_ += MPI_Wtime() - t0;
+        if (step_count_ > cfg_->nstat_start) {
+            double dt_y = MPI_Wtime() - t0;
+            tdma_y_time_ += dt_y;
+            tdma_last_y_  = dt_y;
+        }
     }
 
     for (int k = 1; k <= nz; ++k)
@@ -438,7 +447,11 @@ void MomentumSolver::adi_x_(Component which, Field<double>& q, double nu_dt_half
             fdma_x_->solve_cycl(Ax_.data(), Bx_.data(), Cx_.data(), Dx_.data());
         else
             fdma_x_->solve(Ax_.data(), Bx_.data(), Cx_.data(), Dx_.data());
-        if (step_count_ > 20000) tdma_time_ += MPI_Wtime() - t0;
+        if (step_count_ > cfg_->nstat_start) {
+            double dt_x = MPI_Wtime() - t0;
+            tdma_x_time_ += dt_x;
+            tdma_last_x_  = dt_x;
+        }
     }
 
     for (int k = 1; k <= nz; ++k)
@@ -528,7 +541,46 @@ void MomentumSolver::advance(Field<double>& U, Field<double>& V, Field<double>& 
     Nw_old_.swap(Nw_new_);
     first_step_ = false;
 
-    if (step_count_ > 20000) momentum_time_ += MPI_Wtime() - t_adv0;
+    if (step_count_ > cfg_->nstat_start) {
+        momentum_time_ += MPI_Wtime() - t_adv0;
+        // Snapshot cumulative wall-time totals every 100 measured steps to
+        // keep the CSV compact on long runs (the final grand total is
+        // appended unconditionally inside write_timing_csv).
+        if ((step_count_ - cfg_->nstat_start) % 100 == 0) {
+            timing_step_.push_back(step_count_);
+            timing_z_   .push_back(tdma_z_time_);
+            timing_y_   .push_back(tdma_y_time_);
+            timing_x_   .push_back(tdma_x_time_);
+            timing_mom_ .push_back(momentum_time_);
+        }
+    }
+}
+
+// ---------------------------------------------------------------------------
+//  Cumulative-timing CSV writer.  One file per rank; columns:
+//      step, tdma_z_sec_cum, tdma_y_sec_cum, tdma_x_sec_cum, momentum_sec_cum
+//  Rows are snapshots of the cumulative wall-time totals (in seconds, this
+//  rank only — no MPI reduction here) sampled every 100 measured steps.
+//  The final row is always the grand total at the last step; if the run
+//  ends on a 100-step boundary the duplicate is skipped.
+// ---------------------------------------------------------------------------
+void MomentumSolver::write_timing_csv(const std::string& path) const {
+    std::FILE* fp = std::fopen(path.c_str(), "w");
+    if (!fp) return;
+    std::fprintf(fp, "step,tdma_z_sec_cum,tdma_y_sec_cum,tdma_x_sec_cum,momentum_sec_cum\n");
+    const std::size_t n = timing_step_.size();
+    for (std::size_t i = 0; i < n; ++i) {
+        std::fprintf(fp, "%ld,%.9e,%.9e,%.9e,%.9e\n",
+                     timing_step_[i], timing_z_[i], timing_y_[i],
+                     timing_x_[i], timing_mom_[i]);
+    }
+    const bool aligned = (n > 0) && (timing_step_.back() == step_count_);
+    if (step_count_ > cfg_->nstat_start && !aligned) {
+        std::fprintf(fp, "%ld,%.9e,%.9e,%.9e,%.9e\n",
+                     step_count_, tdma_z_time_, tdma_y_time_,
+                     tdma_x_time_, momentum_time_);
+    }
+    std::fclose(fp);
 }
 
 } // namespace channel

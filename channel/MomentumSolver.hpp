@@ -20,6 +20,7 @@
 #define CHANNEL_MOMENTUM_SOLVER_HPP
 
 #include <memory>
+#include <string>
 #include <vector>
 
 #include "Field.hpp"
@@ -109,12 +110,34 @@ private:
     int nx_ = 0, ny_ = 0, nz_ = 0;
 
     long   step_count_    = 0;
-    double tdma_time_     = 0.0;
+    // Per-axis FilteredTDMA wall time accumulators (only set_rho + solve/cycl
+    // — i.e., the actual TDMA work). Accumulation starts after cfg_->nstat_start.
+    double tdma_x_time_   = 0.0;
+    double tdma_y_time_   = 0.0;
+    double tdma_z_time_   = 0.0;
     double momentum_time_ = 0.0;
 
+    // Most recent step's measured wall times (set inside advance/adi_*).
+    double tdma_last_x_   = 0.0;
+    double tdma_last_y_   = 0.0;
+    double tdma_last_z_   = 0.0;
+
+    // Cumulative-time snapshots (every 100 measured steps, after warm-up).
+    // Each entry is the running total in seconds at that step; the final
+    // grand total is appended by write_timing_csv() itself.
+    std::vector<long>   timing_step_;
+    std::vector<double> timing_x_, timing_y_, timing_z_, timing_mom_;
+
 public:
-    double tdma_time()     const { return tdma_time_; }
+    // Accumulated totals (max over ranks should be done by caller).
+    double tdma_x_time()   const { return tdma_x_time_; }
+    double tdma_y_time()   const { return tdma_y_time_; }
+    double tdma_z_time()   const { return tdma_z_time_; }
+    double tdma_time()     const { return tdma_x_time_ + tdma_y_time_ + tdma_z_time_; }
     double momentum_time() const { return momentum_time_; }
+
+    // Write per-step CSV (one file per rank, written by caller after run).
+    void write_timing_csv(const std::string& path) const;
 };
 
 } // namespace channel

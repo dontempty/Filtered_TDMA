@@ -57,6 +57,18 @@ private:
     double max_div_u_(const Field<double>& U, const Field<double>& V,
                       const Field<double>& W) const;
 
+    // Debug: locate the cell with global max |U|, |V|, |W| (and global divU peak)
+    // and append one row per call to a per-rank CSV under dir_statistics/.
+    // If `verbose_stdout` is true, rank 0 also prints a formatted block to
+    // stdout (used by the divU-overflow abort path).  Pass fp = nullptr to
+    // skip the CSV write while still emitting the stdout dump.
+    void write_max_velocity_debug_(const Field<double>& U,
+                                   const Field<double>& V,
+                                   const Field<double>& W,
+                                   long step, double dt, double t,
+                                   std::FILE* fp,
+                                   bool verbose_stdout = false) const;
+
     const Config&           cfg_;
     const MpiTopology&      topo_;
     const Subdomain&        sub_;

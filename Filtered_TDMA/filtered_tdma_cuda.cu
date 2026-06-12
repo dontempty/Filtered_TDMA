@@ -61,7 +61,8 @@ __global__ void k_set_rho(double* __restrict__ d_A_rho,
 // 2..n_row-1, all in a single kernel. Each thread owns one system (column i)
 // and walks the rows internally — same structure as PaScaL_TDMA's
 // modified_thomas_kernel. Replaces (1 + n_row-2) individual kernel launches.
-__global__ void k_fwd_pass(double* A, double* B, double* C, double* D,
+__global__ __launch_bounds__(BLOCK_SYS, 4)
+void k_fwd_pass(double* A, double* B, double* C, double* D,
                            int n_sys, int n_row) {
     int i = blockIdx.x * blockDim.x + threadIdx.x;
     if (i >= n_sys) return;
@@ -87,8 +88,9 @@ __global__ void k_fwd_pass(double* A, double* B, double* C, double* D,
 
 // Merged backward sweep: rows n_row-3 .. 1. Each thread walks the rows
 // backward — single launch replaces the per-row k_bwd_step loop.
-__global__ void k_bwd_pass(double* A, double* C, double* D,
-                           int n_sys, int n_row) {
+__global__ __launch_bounds__(BLOCK_SYS, 4)
+void k_bwd_pass(double* A, double* C, double* D,
+                int n_sys, int n_row) {
     int i = blockIdx.x * blockDim.x + threadIdx.x;
     if (i >= n_sys) return;
 
@@ -106,8 +108,9 @@ __global__ void k_bwd_pass(double* A, double* C, double* D,
 // v2 merged forward sweep: row 0,1 normalize, then full update (rows 2..J),
 // then skip-A update (rows J+1..n_row-1). Single kernel — replaces
 // k_fwd_norm_01 + per-row k_fwd_step + per-row k_fwd_step_skipA loops.
-__global__ void k_fwd_pass_v2(double* A, double* B, double* C, double* D,
-                              int n_sys, int n_row, int J) {
+__global__ __launch_bounds__(BLOCK_SYS, 4)
+void k_fwd_pass_v2(double* A, double* B, double* C, double* D,
+                   int n_sys, int n_row, int J) {
     int i = blockIdx.x * blockDim.x + threadIdx.x;
     if (i >= n_sys) return;
 
@@ -141,8 +144,9 @@ __global__ void k_fwd_pass_v2(double* A, double* B, double* C, double* D,
 
 // v2 merged backward sweep — 3 phases (D-only over all, A-only up to J-1,
 // C-multiply down to lo+1). Single kernel replaces per-row launches.
-__global__ void k_bwd_pass_v2(double* A, double* C, double* D,
-                              int n_sys, int n_row, int J, int lo) {
+__global__ __launch_bounds__(BLOCK_SYS, 4)
+void k_bwd_pass_v2(double* A, double* C, double* D,
+                   int n_sys, int n_row, int J, int lo) {
     int i = blockIdx.x * blockDim.x + threadIdx.x;
     if (i >= n_sys) return;
 
@@ -167,7 +171,8 @@ __global__ void k_bwd_pass_v2(double* A, double* C, double* D,
 
 // Merged final corrections. Applies the left correction for j in [1, j_left_end]
 // and the right correction for j in [j_right_beg, n_row-2] — single launch.
-__global__ void k_final_pass(const double* A, const double* C, double* D,
+__global__ __launch_bounds__(BLOCK_SYS, 4)
+void k_final_pass(const double* A, const double* C, double* D,
                              const double* D0, const double* DN,
                              int n_sys, int n_row,
                              int j_left_end, int j_right_beg) {
