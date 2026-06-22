@@ -26,6 +26,37 @@ static constexpr int BLOCK_SYS = 256;
 
 static inline dim3 grid1D(int n) { return dim3((n + BLOCK_SYS - 1) / BLOCK_SYS); }
 
+// Warp-level max reduction using shuffle (no __syncthreads needed within a warp).
+// Caller must be in a warp of 32 active threads (tid < 32).
+__device__ inline double warp_max(double v) {
+    for (int s = 16; s > 0; s >>= 1)
+        v = fmax(v, __shfl_down_sync(0xffffffffu, v, s));
+    return v;
+}
+
+// Hybrid shared-memory + warp-shuffle tree reduction for three doubles.
+// Requires s_a/s_b/s_c to be BLOCK_SYS-element shared arrays pre-filled.
+// After the call only tid==0 holds the final maxima (in s_a[0]/s_b[0]/s_c[0]).
+__device__ inline void reduce3_max(double* s_a, double* s_b, double* s_c, int tid) {
+    // Shared-memory phase: 256 → 32
+    for (int s = BLOCK_SYS / 2; s >= 32; s >>= 1) {
+        if (tid < s) {
+            s_a[tid] = fmax(s_a[tid], s_a[tid + s]);
+            s_b[tid] = fmax(s_b[tid], s_b[tid + s]);
+            s_c[tid] = fmax(s_c[tid], s_c[tid + s]);
+        }
+        __syncthreads();
+    }
+    // Warp-shuffle phase: 32 → 1 (no sync needed)
+    if (tid < 32) {
+        double a = warp_max(s_a[tid]);
+        double b = warp_max(s_b[tid]);
+        double c = warp_max(s_c[tid]);
+        if (tid == 0) { s_a[0] = a; s_b[0] = b; s_c[0] = c; }
+    }
+    __syncthreads();  // make tid==0 result visible to all threads
+}
+
 // =============================================================================
 //  Kernels  (one thread per "system" index i ∈ [0, n_sys))
 // =============================================================================
@@ -42,10 +73,13 @@ __global__ void k_set_rho(double* __restrict__ d_A_rho,
     int k = blockIdx.x * blockDim.x + threadIdx.x;
     if (k >= n_row + 1) return;
     if (k < n_row) {
-        double bk = d_B[(std::size_t)k * n_sys];
+        // Each thread reads one element from a column-0 slice of a row-major
+        // matrix: stride = n_sys doubles.  __ldg routes through the read-only
+        // (texture) cache, which handles non-unit strides gracefully.
+        double bk = __ldg(&d_B[(std::size_t)k * n_sys]);
         if (bk != 0.0) {
-            d_A_rho[k] = fabs(d_A[(std::size_t)k * n_sys] / bk);
-            d_C_rho[k] = fabs(d_C[(std::size_t)k * n_sys] / bk);
+            d_A_rho[k] = fabs(__ldg(&d_A[(std::size_t)k * n_sys]) / bk);
+            d_C_rho[k] = fabs(__ldg(&d_C[(std::size_t)k * n_sys]) / bk);
         } else {
             d_A_rho[k] = 0.0;
             d_C_rho[k] = 0.0;
@@ -214,21 +248,6 @@ __global__ void k_pack(double* A, double* C, double* D, int n_sys) {
     A[i] = r * A[i];
 }
 
-// 5) Solve D0 from left boundary; compute left neighbor's DN.
-__global__ void k_solve_D0_left(double* D, double* d_D_right_send,
-                                const double* d_C_left, const double* d_D_left,
-                                const double* A, int n_sys) {
-    int i = blockIdx.x * blockDim.x + threadIdx.x;
-    if (i >= n_sys) return;
-    double D0 = D[i];
-    double A0 = A[i];
-    double Cl = d_C_left[i];
-    double Dl = d_D_left[i];
-    double D0_new = (D0 - A0 * Dl) / (1.0 - Cl * A0);
-    D[i] = D0_new;
-    d_D_right_send[i] = Dl - Cl * D0_new;
-}
-
 // Single-block GPU implementation of cal_J_v1: reduces A_rho/C_rho into rho,
 // reduces |D0|/|DN| over n_sys into max_D0/max_DN, computes J using device
 // math (sqrt/log). Writes the result to d_J. Replaces host-side reduction
@@ -246,40 +265,22 @@ __global__ void k_cal_J_v1(int* __restrict__ d_J,
 
     // rho over k in [2, n_row-1) of d_A_rho/d_C_rho.
     double my_rho = 0.0;
-    const int rho_begin = 2;
-    const int rho_end   = n_row + 1 - 2;
-    for (int k = rho_begin + tid; k < rho_end; k += blockDim.x) {
-        double a = d_A_rho[k]; if (a < 0.0) a = -a;
-        double c = d_C_rho[k]; if (c < 0.0) c = -c;
-        double v = a > c ? a : c;
-        if (v > my_rho) my_rho = v;
-    }
-    // |D0|, |DN| reductions over n_sys.
+    for (int k = 2 + tid; k < n_row - 1; k += blockDim.x)
+        my_rho = fmax(my_rho, fmax(fabs(d_A_rho[k]), fabs(d_C_rho[k])));
+
+    // |D0|, |DN| reductions over n_sys (coalesced reads).
     double my_D0 = 0.0, my_DN = 0.0;
     for (int i = tid; i < n_sys; i += blockDim.x) {
-        double a = D0[i]; if (a < 0.0) a = -a;
-        if (a > my_D0) my_D0 = a;
-        double b = DN[i]; if (b < 0.0) b = -b;
-        if (b > my_DN) my_DN = b;
+        my_D0 = fmax(my_D0, fabs(D0[i]));
+        my_DN = fmax(my_DN, fabs(DN[i]));
     }
 
-    s_rho[tid] = my_rho;
-    s_D0 [tid] = my_D0;
-    s_DN [tid] = my_DN;
+    s_rho[tid] = my_rho; s_D0[tid] = my_D0; s_DN[tid] = my_DN;
     __syncthreads();
-    for (int s = blockDim.x / 2; s > 0; s >>= 1) {
-        if (tid < s) {
-            if (s_rho[tid + s] > s_rho[tid]) s_rho[tid] = s_rho[tid + s];
-            if (s_D0 [tid + s] > s_D0 [tid]) s_D0 [tid] = s_D0 [tid + s];
-            if (s_DN [tid + s] > s_DN [tid]) s_DN [tid] = s_DN [tid + s];
-        }
-        __syncthreads();
-    }
+    reduce3_max(s_rho, s_D0, s_DN, tid);
 
     if (tid == 0) {
-        double rho = s_rho[0];
-        double max_D0 = s_D0[0];
-        double max_DN = s_DN[0];
+        double rho = s_rho[0], max_D0 = s_D0[0], max_DN = s_DN[0];
         int J;
         if (rho == 0.0 || rho >= 0.5) {
             J = n_row - 1;
@@ -307,32 +308,31 @@ __global__ void k_cal_J_rhs_bound(int* __restrict__ d_J,
     int tid = threadIdx.x;
 
     double my_rho = 0.0;
-    const int rho_begin = 2;
-    const int rho_end   = n_row + 1 - 2;
-    for (int k = rho_begin + tid; k < rho_end; k += blockDim.x) {
-        double a = d_A_rho[k]; if (a < 0.0) a = -a;
-        double c = d_C_rho[k]; if (c < 0.0) c = -c;
-        double v = a > c ? a : c;
-        if (v > my_rho) my_rho = v;
-    }
+    for (int k = 2 + tid; k < n_row - 1; k += blockDim.x)
+        my_rho = fmax(my_rho, fmax(fabs(d_A_rho[k]), fabs(d_C_rho[k])));
 
     double my_b = 0.0;
     std::size_t total = (std::size_t)n_row * n_sys;
-    for (std::size_t idx = (std::size_t)tid; idx < total; idx += blockDim.x) {
-        double v = d_D[idx]; if (v < 0.0) v = -v;
-        if (v > my_b) my_b = v;
-    }
+    for (std::size_t idx = (std::size_t)tid; idx < total; idx += blockDim.x)
+        my_b = fmax(my_b, fabs(d_D[idx]));
 
-    s_rho[tid] = my_rho;
-    s_b  [tid] = my_b;
+    s_rho[tid] = my_rho; s_b[tid] = my_b;
     __syncthreads();
-    for (int s = blockDim.x / 2; s > 0; s >>= 1) {
+    // Two-array reduction: reuse reduce3_max with a dummy third array.
+    // Use s_b as s_c placeholder (same pointer); a dummy shared slot is fine here.
+    for (int s = BLOCK_SYS / 2; s >= 32; s >>= 1) {
         if (tid < s) {
-            if (s_rho[tid + s] > s_rho[tid]) s_rho[tid] = s_rho[tid + s];
-            if (s_b  [tid + s] > s_b  [tid]) s_b  [tid] = s_b  [tid + s];
+            s_rho[tid] = fmax(s_rho[tid], s_rho[tid + s]);
+            s_b  [tid] = fmax(s_b  [tid], s_b  [tid + s]);
         }
         __syncthreads();
     }
+    if (tid < 32) {
+        double r = warp_max(s_rho[tid]);
+        double b = warp_max(s_b  [tid]);
+        if (tid == 0) { s_rho[0] = r; s_b[0] = b; }
+    }
+    __syncthreads();
 
     if (tid == 0) {
         double rho = s_rho[0];
@@ -361,22 +361,20 @@ __global__ void k_cal_J_v2(int* __restrict__ d_J,
     int tid = threadIdx.x;
 
     double my_rho = 0.0;
-    const int rho_begin = 2;
-    const int rho_end   = n_row + 1 - 2;
-    for (int k = rho_begin + tid; k < rho_end; k += blockDim.x) {
-        double a = d_A_rho[k]; if (a < 0.0) a = -a;
-        double c = d_C_rho[k]; if (c < 0.0) c = -c;
-        double v = a > c ? a : c;
-        if (v > my_rho) my_rho = v;
-    }
+    for (int k = 2 + tid; k < n_row - 1; k += blockDim.x)
+        my_rho = fmax(my_rho, fmax(fabs(d_A_rho[k]), fabs(d_C_rho[k])));
+
     s_rho[tid] = my_rho;
     __syncthreads();
-    for (int s = blockDim.x / 2; s > 0; s >>= 1) {
-        if (tid < s) {
-            if (s_rho[tid + s] > s_rho[tid]) s_rho[tid] = s_rho[tid + s];
-        }
+    for (int s = BLOCK_SYS / 2; s >= 32; s >>= 1) {
+        if (tid < s) s_rho[tid] = fmax(s_rho[tid], s_rho[tid + s]);
         __syncthreads();
     }
+    if (tid < 32) {
+        double r = warp_max(s_rho[tid]);
+        if (tid == 0) s_rho[0] = r;
+    }
+    __syncthreads();
 
     if (tid == 0) {
         double rho = s_rho[0];
@@ -384,8 +382,8 @@ __global__ void k_cal_J_v2(int* __restrict__ d_J,
         if (rho == 0.0 || rho >= 0.5) {
             J = n_row - 1;
         } else {
-            double abs_D0 = D0 < 0.0 ? -D0 : D0;
-            double abs_DN = DN < 0.0 ? -DN : DN;
+            double abs_D0 = fabs(D0);
+            double abs_DN = fabs(DN);
             double lambda_p = (1.0 + sqrt(1.0 - 4.0 * rho * rho)) * 0.5;
             double q = rho / lambda_p;
             double B = (abs_D0 + abs_DN) * q / (1.0 - q) + abs_D0 * q * q / (1.0 - q);
@@ -408,11 +406,29 @@ __global__ void k_pack_lastrow(double* __restrict__ dst,
     dst[i] = src[(std::size_t)(n_row - 1) * n_sys + i];
 }
 
-// 7) Unpack DN from right neighbor.
-__global__ void k_unpack_DN(double* D, const double* d_D_right_recv, int n_sys, int n_row) {
+// Single bidirectional exchange: solve BOTH interface 2x2 blocks locally
+// (one comm round, replacing the old forward-solve + back-communication).
+//   LEFT  : D0 = (D0 - A0*D_left)   / (1 - C_left*A0)
+//   RIGHT : DN = (DN - CN*D0_right) / (1 - A_right*CN)
+__global__ void k_solve_both(double* __restrict__ D,
+                             const double* __restrict__ A,
+                             const double* __restrict__ C,
+                             const double* __restrict__ C_left,
+                             const double* __restrict__ D_left,
+                             const double* __restrict__ A_right,
+                             const double* __restrict__ D0_right,
+                             int has_left, int has_right, int n_sys, int n_row) {
     int i = blockIdx.x * blockDim.x + threadIdx.x;
     if (i >= n_sys) return;
-    D[(std::size_t)(n_row - 1) * n_sys + i] = d_D_right_recv[i];
+    if (has_left) {
+        double A0 = A[i], D0 = D[i];
+        D[i] = (D0 - A0 * D_left[i]) / (1.0 - C_left[i] * A0);
+    }
+    if (has_right) {
+        std::size_t off = (std::size_t)(n_row - 1) * n_sys + i;
+        double CN = C[off], DN = D[off];
+        D[off] = (DN - CN * D0_right[i]) / (1.0 - A_right[i] * CN);
+    }
 }
 
 // =============================================================================
@@ -433,8 +449,8 @@ FilteredTDMACUDA::FilteredTDMACUDA(int n_sys, int n_row,
     CUDA_CHECK(cudaMalloc(&d_D_lastrow_send_, sizeof(double) * n_sys));
     CUDA_CHECK(cudaMalloc(&d_C_left_recv_,    sizeof(double) * n_sys));
     CUDA_CHECK(cudaMalloc(&d_D_left_recv_,    sizeof(double) * n_sys));
-    CUDA_CHECK(cudaMalloc(&d_D_right_send_,   sizeof(double) * n_sys));
-    CUDA_CHECK(cudaMalloc(&d_D_right_recv_,   sizeof(double) * n_sys));
+    CUDA_CHECK(cudaMalloc(&d_A_right_recv_,   sizeof(double) * n_sys));
+    CUDA_CHECK(cudaMalloc(&d_D0_right_recv_,  sizeof(double) * n_sys));
 
     // Per-row spectral-radius estimates + scalar J output (used by cal_J).
     CUDA_CHECK(cudaMalloc(&d_A_rho_, sizeof(double) * (n_row + 1)));
@@ -452,8 +468,8 @@ FilteredTDMACUDA::~FilteredTDMACUDA() {
     if (d_D_lastrow_send_) cudaFree(d_D_lastrow_send_);
     if (d_C_left_recv_)    cudaFree(d_C_left_recv_);
     if (d_D_left_recv_)    cudaFree(d_D_left_recv_);
-    if (d_D_right_send_)   cudaFree(d_D_right_send_);
-    if (d_D_right_recv_)   cudaFree(d_D_right_recv_);
+    if (d_A_right_recv_)   cudaFree(d_A_right_recv_);
+    if (d_D0_right_recv_)  cudaFree(d_D0_right_recv_);
     if (d_A_rho_)          cudaFree(d_A_rho_);
     if (d_C_rho_)          cudaFree(d_C_rho_);
     if (d_J_)              cudaFree(d_J_);
@@ -525,42 +541,35 @@ void FilteredTDMACUDA::solve_filtered_v1(double* d_A, double* d_B, double* d_C, 
     // 3) Pack reduced system
     k_pack<<<grid, block>>>(d_A, d_C, d_D, n_sys_);
 
-    // 4) Pack last row of C and D into dedicated contiguous send buffers,
-    //    then exchange with neighbors. Mirrors PaScaL_TDMA's CUDA-aware MPI
-    //    fast path: pack kernel → cudaStreamSynchronize → MPI_Isend/Irecv on
-    //    plain MPI_DOUBLE contiguous device buffers → MPI_Waitall.
+    // 4) Single bidirectional exchange (merged): row N-1 (C,D) -> right,
+    //    row 0 (A,D) -> left. The reduced system decouples into independent
+    //    interface 2x2 blocks, so each rank solves BOTH interfaces locally in
+    //    one comm round (was: forward exchange + solve + back-communication).
+    //    Row 0 (d_A,d_D first n_sys) is already contiguous → sent directly.
     k_pack_lastrow<<<grid, block>>>(d_C_lastrow_send_, d_C, n_sys_, n_row_);
     k_pack_lastrow<<<grid, block>>>(d_D_lastrow_send_, d_D, n_sys_, n_row_);
     CUDA_CHECK(cudaStreamSynchronize(0));
     {
-        MPI_Request req[4];
-        MPI_Isend(d_C_lastrow_send_, n_sys_, MPI_DOUBLE, right_rank_, 1, comm_, &req[0]);
-        MPI_Irecv(d_C_left_recv_,    n_sys_, MPI_DOUBLE, left_rank_,  1, comm_, &req[1]);
-        MPI_Isend(d_D_lastrow_send_, n_sys_, MPI_DOUBLE, right_rank_, 2, comm_, &req[2]);
-        MPI_Irecv(d_D_left_recv_,    n_sys_, MPI_DOUBLE, left_rank_,  2, comm_, &req[3]);
-        MPI_Waitall(4, req, MPI_STATUSES_IGNORE);
+        MPI_Request req[8];
+        int nreq = 0;
+        MPI_Isend(d_C_lastrow_send_, n_sys_, MPI_DOUBLE, right_rank_, 1, comm_, &req[nreq++]);
+        MPI_Irecv(d_C_left_recv_,    n_sys_, MPI_DOUBLE, left_rank_,  1, comm_, &req[nreq++]);
+        MPI_Isend(d_D_lastrow_send_, n_sys_, MPI_DOUBLE, right_rank_, 2, comm_, &req[nreq++]);
+        MPI_Irecv(d_D_left_recv_,    n_sys_, MPI_DOUBLE, left_rank_,  2, comm_, &req[nreq++]);
+        MPI_Isend(d_A,               n_sys_, MPI_DOUBLE, left_rank_,  3, comm_, &req[nreq++]);
+        MPI_Irecv(d_A_right_recv_,   n_sys_, MPI_DOUBLE, right_rank_, 3, comm_, &req[nreq++]);
+        MPI_Isend(d_D,               n_sys_, MPI_DOUBLE, left_rank_,  4, comm_, &req[nreq++]);
+        MPI_Irecv(d_D0_right_recv_,  n_sys_, MPI_DOUBLE, right_rank_, 4, comm_, &req[nreq++]);
+        MPI_Waitall(nreq, req, MPI_STATUSES_IGNORE);
     }
 
-    // 5) Solve D0 from left boundary (writes d_D_right_send_)
-    if (left_rank_ != MPI_PROC_NULL) {
-        k_solve_D0_left<<<grid, block>>>(d_D, d_D_right_send_,
-                                         d_C_left_recv_, d_D_left_recv_,
-                                         d_A, n_sys_);
-    }
-
-    // 6) Exchange DN: d_D_right_send_ is already a dedicated buffer.
-    CUDA_CHECK(cudaStreamSynchronize(0));
-    {
-        MPI_Request req[2];
-        MPI_Isend(d_D_right_send_, n_sys_, MPI_DOUBLE, left_rank_,  3, comm_, &req[0]);
-        MPI_Irecv(d_D_right_recv_, n_sys_, MPI_DOUBLE, right_rank_, 3, comm_, &req[1]);
-        MPI_Waitall(2, req, MPI_STATUSES_IGNORE);
-    }
-
-    // 7) Unpack DN from right neighbor
-    if (right_rank_ != MPI_PROC_NULL) {
-        k_unpack_DN<<<grid, block>>>(d_D, d_D_right_recv_, n_sys_, n_row_);
-    }
+    // 5) Solve both interface 2x2 blocks locally (no second round).
+    k_solve_both<<<grid, block>>>(d_D, d_A, d_C,
+                                  d_C_left_recv_, d_D_left_recv_,
+                                  d_A_right_recv_, d_D0_right_recv_,
+                                  (left_rank_  != MPI_PROC_NULL) ? 1 : 0,
+                                  (right_rank_ != MPI_PROC_NULL) ? 1 : 0,
+                                  n_sys_, n_row_);
 
     // 8) Compute J on device (no D2H), then apply final corrections.
     const double* D0_dev = d_D;
@@ -587,8 +596,6 @@ void FilteredTDMACUDA::solve_filtered_v2(double* d_A, double* d_B, double* d_C, 
     // Compute J from boundary rows only (n_sys elements each, not n_row*n_sys).
     // k_cal_J_v1 reads D0 and DN — the pre-solve first/last rows of d_D — which
     // is n_row× cheaper than the full-RHS scan of k_cal_J_rhs_bound.
-    // Correctness: the v2 filter correction is conservative, so a slightly
-    // tighter J (from boundary estimates) is sufficient.
     const double* D0_pre = d_D;
     const double* DN_pre = d_D + (std::size_t)(n_row_ - 1) * n_sys_;
     k_cal_J_v1<<<1, BLOCK_SYS>>>(d_J_, d_A_rho_, d_C_rho_,
@@ -603,40 +610,32 @@ void FilteredTDMACUDA::solve_filtered_v2(double* d_A, double* d_B, double* d_C, 
     // 3) Pack reduced system
     k_pack<<<grid, block>>>(d_A, d_C, d_D, n_sys_);
 
-    // 4) Pack last row into dedicated contiguous send buffers, then exchange.
-    //    Same CUDA-aware-MPI fast path as v1 / PaScaL_TDMA.
+    // 4) Single bidirectional exchange (merged — see solve_filtered_v1):
+    //    row N-1 (C,D) -> right ; row 0 (A,D, contiguous) -> left. One round.
     k_pack_lastrow<<<grid, block>>>(d_C_lastrow_send_, d_C, n_sys_, n_row_);
     k_pack_lastrow<<<grid, block>>>(d_D_lastrow_send_, d_D, n_sys_, n_row_);
     CUDA_CHECK(cudaStreamSynchronize(0));
     {
-        MPI_Request req[4];
-        MPI_Isend(d_C_lastrow_send_, n_sys_, MPI_DOUBLE, right_rank_, 1, comm_, &req[0]);
-        MPI_Irecv(d_C_left_recv_,    n_sys_, MPI_DOUBLE, left_rank_,  1, comm_, &req[1]);
-        MPI_Isend(d_D_lastrow_send_, n_sys_, MPI_DOUBLE, right_rank_, 2, comm_, &req[2]);
-        MPI_Irecv(d_D_left_recv_,    n_sys_, MPI_DOUBLE, left_rank_,  2, comm_, &req[3]);
-        MPI_Waitall(4, req, MPI_STATUSES_IGNORE);
+        MPI_Request req[8];
+        int nreq = 0;
+        MPI_Isend(d_C_lastrow_send_, n_sys_, MPI_DOUBLE, right_rank_, 1, comm_, &req[nreq++]);
+        MPI_Irecv(d_C_left_recv_,    n_sys_, MPI_DOUBLE, left_rank_,  1, comm_, &req[nreq++]);
+        MPI_Isend(d_D_lastrow_send_, n_sys_, MPI_DOUBLE, right_rank_, 2, comm_, &req[nreq++]);
+        MPI_Irecv(d_D_left_recv_,    n_sys_, MPI_DOUBLE, left_rank_,  2, comm_, &req[nreq++]);
+        MPI_Isend(d_A,               n_sys_, MPI_DOUBLE, left_rank_,  3, comm_, &req[nreq++]);
+        MPI_Irecv(d_A_right_recv_,   n_sys_, MPI_DOUBLE, right_rank_, 3, comm_, &req[nreq++]);
+        MPI_Isend(d_D,               n_sys_, MPI_DOUBLE, left_rank_,  4, comm_, &req[nreq++]);
+        MPI_Irecv(d_D0_right_recv_,  n_sys_, MPI_DOUBLE, right_rank_, 4, comm_, &req[nreq++]);
+        MPI_Waitall(nreq, req, MPI_STATUSES_IGNORE);
     }
 
-    // 5) D0 from left
-    if (left_rank_ != MPI_PROC_NULL) {
-        k_solve_D0_left<<<grid, block>>>(d_D, d_D_right_send_,
-                                         d_C_left_recv_, d_D_left_recv_,
-                                         d_A, n_sys_);
-    }
-
-    // 6) Exchange DN
-    CUDA_CHECK(cudaStreamSynchronize(0));
-    {
-        MPI_Request req[2];
-        MPI_Isend(d_D_right_send_, n_sys_, MPI_DOUBLE, left_rank_,  3, comm_, &req[0]);
-        MPI_Irecv(d_D_right_recv_, n_sys_, MPI_DOUBLE, right_rank_, 3, comm_, &req[1]);
-        MPI_Waitall(2, req, MPI_STATUSES_IGNORE);
-    }
-
-    // 7) Unpack DN
-    if (right_rank_ != MPI_PROC_NULL) {
-        k_unpack_DN<<<grid, block>>>(d_D, d_D_right_recv_, n_sys_, n_row_);
-    }
+    // 5) Solve both interface 2x2 blocks locally (no second round).
+    k_solve_both<<<grid, block>>>(d_D, d_A, d_C,
+                                  d_C_left_recv_, d_D_left_recv_,
+                                  d_A_right_recv_, d_D0_right_recv_,
+                                  (left_rank_  != MPI_PROC_NULL) ? 1 : 0,
+                                  (right_rank_ != MPI_PROC_NULL) ? 1 : 0,
+                                  n_sys_, n_row_);
 
     // 8) Final corrections — d_J_ already holds the correct J from step 1.
     const double* D0_dev = d_D;

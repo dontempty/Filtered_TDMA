@@ -77,13 +77,15 @@ void tdma_many_kernel(double* __restrict__ A,
         D[off] = d1[tj];
     }
 
+    // Backward substitution: keep the previous D in a register (d_prev)
+    // instead of routing through shared memory d1[tj] — eliminates one
+    // shared-memory read-write per iteration.
+    double d_prev = d1[tj];
     for (int j = n_row - 2; j >= 0; --j) {
         std::size_t off = (std::size_t)j * n_sys + i;
-        c0[tj] = C[off];
-        d0[tj] = D[off];
-        d0[tj] = d0[tj] - c0[tj] * d1[tj];
-        d1[tj] = d0[tj];
-        D[off] = d0[tj];
+        double d = D[off] - C[off] * d_prev;
+        D[off]  = d;
+        d_prev  = d;
     }
 }
 

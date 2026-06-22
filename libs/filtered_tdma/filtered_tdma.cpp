@@ -35,8 +35,9 @@ FilteredTDMA::FilteredTDMA(int n_sys, int n_row,
     C_left_recv_.resize(n_sys);
     D_left_recv_.resize(n_sys);
 
-    D_right_send_.resize(n_sys);
-    D_right_recv_.resize(n_sys);
+    // Single bidirectional exchange buffers (right neighbor's row 0).
+    A_right_recv_.resize(n_sys);
+    D0_right_recv_.resize(n_sys);
 
     // Spectral radius arrays (+1 for safe indexing from solve_theta)
     A_rho_.resize(n_row + 1);
@@ -180,10 +181,10 @@ void FilteredTDMA::solve_filtered_v1(double* __restrict A,
     int i, j;
     auto p = setup_ptrs(A, B, C, D, n_sys_, n_row_);
 
-    const double* __restrict C_left  = C_left_recv_.data();
-    const double* __restrict D_left  = D_left_recv_.data();
-          double* __restrict D_right_send = D_right_send_.data();
-    const double* __restrict D_right_recv = D_right_recv_.data();
+    const double* __restrict C_left   = C_left_recv_.data();
+    const double* __restrict D_left   = D_left_recv_.data();
+    const double* __restrict A_right  = A_right_recv_.data();
+    const double* __restrict D0_right = D0_right_recv_.data();
 
     // 1) Forward Elimination
     #pragma omp simd
@@ -236,43 +237,41 @@ void FilteredTDMA::solve_filtered_v1(double* __restrict A,
         p.A0[i] =  r * p.A0[i];
     }
 
-    // 4) Send C[N-1], D[N-1] to right; recv C_left, D_left from left
+    // 4) Single bidirectional exchange of both interfaces' reduced rows:
+    //      my row N-1 (C,D) -> right   ;  my row 0 (A,D) -> left
+    //    recv: left's row N-1 (LEFT 2x2), right's row 0 (RIGHT 2x2).
+    //    Replaces the old 2-round forward/back-communication: the reduced
+    //    system decouples into independent interface 2x2 blocks, so each rank
+    //    solves BOTH its interfaces locally (redundant 2x2, one comm round).
     {
-        MPI_Request req[4];
-        MPI_Isend(C, 1, rowN_type_, right_rank_, 1, comm_, &req[0]);
-        MPI_Irecv(C_left_recv_.data(), n_sys_, MPI_DOUBLE, left_rank_,  1, comm_, &req[1]);
-        MPI_Isend(D, 1, rowN_type_, right_rank_, 2, comm_, &req[2]);
-        MPI_Irecv(D_left_recv_.data(), n_sys_, MPI_DOUBLE, left_rank_,  2, comm_, &req[3]);
-        MPI_Waitall(4, req, MPI_STATUSES_IGNORE);
+        MPI_Request req[8];
+        int nreq = 0;
+        MPI_Isend(C, 1, rowN_type_,             right_rank_, 1, comm_, &req[nreq++]);
+        MPI_Irecv(C_left_recv_.data(),   n_sys_, MPI_DOUBLE, left_rank_,  1, comm_, &req[nreq++]);
+        MPI_Isend(D, 1, rowN_type_,             right_rank_, 2, comm_, &req[nreq++]);
+        MPI_Irecv(D_left_recv_.data(),   n_sys_, MPI_DOUBLE, left_rank_,  2, comm_, &req[nreq++]);
+        MPI_Isend(A, n_sys_, MPI_DOUBLE,         left_rank_,  3, comm_, &req[nreq++]);
+        MPI_Irecv(A_right_recv_.data(),  n_sys_, MPI_DOUBLE, right_rank_, 3, comm_, &req[nreq++]);
+        MPI_Isend(D, n_sys_, MPI_DOUBLE,         left_rank_,  4, comm_, &req[nreq++]);
+        MPI_Irecv(D0_right_recv_.data(), n_sys_, MPI_DOUBLE, right_rank_, 4, comm_, &req[nreq++]);
+        MPI_Waitall(nreq, req, MPI_STATUSES_IGNORE);
     }
 
-    // 5) Solve D0 from left boundary; compute left neighbor's DN
+    // 5) Solve both interface 2x2 blocks locally (no second round):
+    //      LEFT  : x_0   = (D0 - A0*D_left)  / (1 - C_left*A0)
+    //      RIGHT : x_N-1 = (DN - CN*D0_right)/ (1 - A_right*CN)
     {
-        const bool has_left = (left_rank_ != MPI_PROC_NULL);
+        const bool has_left  = (left_rank_  != MPI_PROC_NULL);
+        const bool has_right = (right_rank_ != MPI_PROC_NULL);
         if (has_left) {
             #pragma omp simd
-            for (i = 0; i < n_sys_; ++i) {
-                p.D0[i]         = (p.D0[i] - p.A0[i] * D_left[i]) / (1.0 - C_left[i] * p.A0[i]);
-                D_right_send[i] = D_left[i] - C_left[i] * p.D0[i];
-            }
+            for (i = 0; i < n_sys_; ++i)
+                p.D0[i] = (p.D0[i] - p.A0[i] * D_left[i]) / (1.0 - C_left[i] * p.A0[i]);
         }
-    }
-
-    // 6) Send computed DN to left neighbor; recv own DN from right neighbor
-    {
-        MPI_Request req[2];
-        MPI_Isend(D_right_send_.data(), n_sys_, MPI_DOUBLE, left_rank_,  3, comm_, &req[0]);
-        MPI_Irecv(D_right_recv_.data(), n_sys_, MPI_DOUBLE, right_rank_, 3, comm_, &req[1]);
-        MPI_Waitall(2, req, MPI_STATUSES_IGNORE);
-    }
-
-    // 7) Unpack DN from right neighbor
-    {
-        const bool has_right = (right_rank_ != MPI_PROC_NULL);
         if (has_right) {
             #pragma omp simd
             for (i = 0; i < n_sys_; ++i)
-                p.DN[i] = D_right_recv[i];
+                p.DN[i] = (p.DN[i] - p.CN[i] * D0_right[i]) / (1.0 - A_right[i] * p.CN[i]);
         }
     }
 
@@ -319,10 +318,10 @@ void FilteredTDMA::solve_filtered_v2(double* __restrict A,
     const int J  = cal_J_rhs_bound(D);
     const int lo = (n_row_ - 2) - J;
 
-    const double* __restrict C_left       = C_left_recv_.data();
-    const double* __restrict D_left       = D_left_recv_.data();
-          double* __restrict D_right_send = D_right_send_.data();
-    const double* __restrict D_right_recv = D_right_recv_.data();
+    const double* __restrict C_left   = C_left_recv_.data();
+    const double* __restrict D_left   = D_left_recv_.data();
+    const double* __restrict A_right  = A_right_recv_.data();
+    const double* __restrict D0_right = D0_right_recv_.data();
 
     // 1) Forward Elimination
     #pragma omp simd
@@ -401,43 +400,36 @@ void FilteredTDMA::solve_filtered_v2(double* __restrict A,
         p.A0[i] =  r * p.A0[i];
     }
 
-    // 4) Send C[N-1], D[N-1] to right; recv C_left, D_left from left
+    // 4) Single bidirectional exchange (see solve_filtered_v1 for derivation):
+    //      my row N-1 (C,D) -> right ;  my row 0 (A,D) -> left
+    //      recv left's row N-1 (LEFT 2x2) and right's row 0 (RIGHT 2x2).
     {
-        MPI_Request req[4];
-        MPI_Isend(C, 1, rowN_type_, right_rank_, 1, comm_, &req[0]);
-        MPI_Irecv(C_left_recv_.data(), n_sys_, MPI_DOUBLE, left_rank_,  1, comm_, &req[1]);
-        MPI_Isend(D, 1, rowN_type_, right_rank_, 2, comm_, &req[2]);
-        MPI_Irecv(D_left_recv_.data(), n_sys_, MPI_DOUBLE, left_rank_,  2, comm_, &req[3]);
-        MPI_Waitall(4, req, MPI_STATUSES_IGNORE);
+        MPI_Request req[8];
+        int nreq = 0;
+        MPI_Isend(C, 1, rowN_type_,             right_rank_, 1, comm_, &req[nreq++]);
+        MPI_Irecv(C_left_recv_.data(),   n_sys_, MPI_DOUBLE, left_rank_,  1, comm_, &req[nreq++]);
+        MPI_Isend(D, 1, rowN_type_,             right_rank_, 2, comm_, &req[nreq++]);
+        MPI_Irecv(D_left_recv_.data(),   n_sys_, MPI_DOUBLE, left_rank_,  2, comm_, &req[nreq++]);
+        MPI_Isend(A, n_sys_, MPI_DOUBLE,         left_rank_,  3, comm_, &req[nreq++]);
+        MPI_Irecv(A_right_recv_.data(),  n_sys_, MPI_DOUBLE, right_rank_, 3, comm_, &req[nreq++]);
+        MPI_Isend(D, n_sys_, MPI_DOUBLE,         left_rank_,  4, comm_, &req[nreq++]);
+        MPI_Irecv(D0_right_recv_.data(), n_sys_, MPI_DOUBLE, right_rank_, 4, comm_, &req[nreq++]);
+        MPI_Waitall(nreq, req, MPI_STATUSES_IGNORE);
     }
 
-    // 5) Solve D0 from left boundary; compute left neighbor's DN
+    // 5) Solve both interface 2x2 blocks locally (no second round).
     {
-        const bool has_left = (left_rank_ != MPI_PROC_NULL);
+        const bool has_left  = (left_rank_  != MPI_PROC_NULL);
+        const bool has_right = (right_rank_ != MPI_PROC_NULL);
         if (has_left) {
             #pragma omp simd
-            for (i = 0; i < n_sys_; ++i) {
-                p.D0[i]         = (p.D0[i] - p.A0[i] * D_left[i]) / (1.0 - C_left[i] * p.A0[i]);
-                D_right_send[i] = D_left[i] - C_left[i] * p.D0[i];
-            }
+            for (i = 0; i < n_sys_; ++i)
+                p.D0[i] = (p.D0[i] - p.A0[i] * D_left[i]) / (1.0 - C_left[i] * p.A0[i]);
         }
-    }
-
-    // 6) Send computed DN to left neighbor; recv own DN from right neighbor
-    {
-        MPI_Request req[2];
-        MPI_Isend(D_right_send_.data(), n_sys_, MPI_DOUBLE, left_rank_,  3, comm_, &req[0]);
-        MPI_Irecv(D_right_recv_.data(), n_sys_, MPI_DOUBLE, right_rank_, 3, comm_, &req[1]);
-        MPI_Waitall(2, req, MPI_STATUSES_IGNORE);
-    }
-
-    // 7) Unpack DN from right neighbor
-    {
-        const bool has_right = (right_rank_ != MPI_PROC_NULL);
         if (has_right) {
             #pragma omp simd
             for (i = 0; i < n_sys_; ++i)
-                p.DN[i] = D_right_recv[i];
+                p.DN[i] = (p.DN[i] - p.CN[i] * D0_right[i]) / (1.0 - A_right[i] * p.CN[i]);
         }
     }
 

@@ -136,25 +136,22 @@ void MPISubdomain::indices(const GlobalParams&,
 void MPISubdomain::mesh(const GlobalParams& params,
                         int rankx, int ranky, int rankz,
                         int npx, int npy, int npz) {
+    // Ghost-cell layout: all cells at uniform cell centres.
+    // x_sub[0] = x0 - dx/2 (ghost outside domain), x_sub[nx_sub] = xN + dx/2 (ghost).
+    // The general formula x0 + dx/2 + (ista-2+i)*dx naturally produces these.
     double ddx = params.lx / (params.nx - 1);
     for (int i = 0; i <= nx_sub; ++i) {
-        if      (rankx == 0     && i == 0)      x_sub[i] = params.x0;
-        else if (rankx == npx-1 && i == nx_sub) x_sub[i] = params.xN;
-        else                                    x_sub[i] = params.x0 + ddx/2.0 + (ista - 2 + i) * ddx;
+        x_sub[i]   = params.x0 + ddx/2.0 + (ista - 2 + i) * ddx;
         dmx_sub[i] = ddx;
     }
     double ddy = params.ly / (params.ny - 1);
     for (int j = 0; j <= ny_sub; ++j) {
-        if      (ranky == 0     && j == 0)      y_sub[j] = params.y0;
-        else if (ranky == npy-1 && j == ny_sub) y_sub[j] = params.yN;
-        else                                    y_sub[j] = params.y0 + ddy/2.0 + (jsta - 2 + j) * ddy;
+        y_sub[j]   = params.y0 + ddy/2.0 + (jsta - 2 + j) * ddy;
         dmy_sub[j] = ddy;
     }
     double ddz = params.lz / (params.nz - 1);
     for (int k = 0; k <= nz_sub; ++k) {
-        if      (rankz == 0     && k == 0)      z_sub[k] = params.z0;
-        else if (rankz == npz-1 && k == nz_sub) z_sub[k] = params.zN;
-        else                                    z_sub[k] = params.z0 + ddz/2.0 + (ksta - 2 + k) * ddz;
+        z_sub[k]   = params.z0 + ddz/2.0 + (ksta - 2 + k) * ddz;
         dmz_sub[k] = ddz;
     }
 }
@@ -170,25 +167,67 @@ void MPISubdomain::initialization(std::vector<double>& theta) {
             }
 }
 
+// Exact Dirichlet BC (time-independent part):
+//   x=±1 : u_BC = -cos(π*y)*cos(π*z)
+//   y=±1 : u_BC = -cos(π*x)*cos(π*z)
+//   z=±1 : u_BC = -cos(π*x)*cos(π*y)
+// Ghost cell formula: u_ghost = 2*u_BC - u_adjacent  (host path: sets the
+// initial-condition ghosts before the H2D copy; the device refreshes them
+// every step via the physical-ghost kernel in solve_theta.cu).
 void MPISubdomain::boundary(std::vector<double>& theta) {
     int nx1 = nx_sub + 1, ny1 = ny_sub + 1, nz1 = nz_sub + 1;
 
-    for (int k = 0; k < nz1; ++k)
-        for (int j = 0; j < ny1; ++j) {
-            int jk = idx_jk(j, k, ny1);
-            theta_x_left_sub[jk]  = theta[idx_ijk(0,     j, k, nx1, ny1)];
-            theta_x_right_sub[jk] = theta[idx_ijk(nx1-1, j, k, nx1, ny1)];
-        }
-    for (int k = 0; k < nz1; ++k)
-        for (int i = 0; i < nx1; ++i) {
-            int ik = idx_ik(i, k, nx1);
-            theta_y_left_sub[ik]  = theta[idx_ijk(i, 0,     k, nx1, ny1)];
-            theta_y_right_sub[ik] = theta[idx_ijk(i, ny1-1, k, nx1, ny1)];
-        }
-    for (int j = 0; j < ny1; ++j)
-        for (int i = 0; i < nx1; ++i) {
-            int ij = idx_ij(i, j, nx1);
-            theta_z_left_sub[ij]  = theta[idx_ijk(i, j, 0,     nx1, ny1)];
-            theta_z_right_sub[ij] = theta[idx_ijk(i, j, nz1-1, nx1, ny1)];
-        }
+    // X ghosts
+    if (theta_x_left_index[1]) {
+        for (int k = 1; k < nz1-1; ++k)
+            for (int j = 1; j < ny1-1; ++j) {
+                double ubc = -cos(Pi*y_sub[j]) * cos(Pi*z_sub[k]);
+                theta[idx_ijk(0, j, k, nx1, ny1)] =
+                    2.0*ubc - theta[idx_ijk(1, j, k, nx1, ny1)];
+            }
+    }
+    if (theta_x_right_index[nx_sub-1]) {
+        for (int k = 1; k < nz1-1; ++k)
+            for (int j = 1; j < ny1-1; ++j) {
+                double ubc = -cos(Pi*y_sub[j]) * cos(Pi*z_sub[k]);
+                theta[idx_ijk(nx_sub, j, k, nx1, ny1)] =
+                    2.0*ubc - theta[idx_ijk(nx_sub-1, j, k, nx1, ny1)];
+            }
+    }
+
+    // Y ghosts
+    if (theta_y_left_index[1]) {
+        for (int k = 1; k < nz1-1; ++k)
+            for (int i = 1; i < nx1-1; ++i) {
+                double ubc = -cos(Pi*x_sub[i]) * cos(Pi*z_sub[k]);
+                theta[idx_ijk(i, 0, k, nx1, ny1)] =
+                    2.0*ubc - theta[idx_ijk(i, 1, k, nx1, ny1)];
+            }
+    }
+    if (theta_y_right_index[ny_sub-1]) {
+        for (int k = 1; k < nz1-1; ++k)
+            for (int i = 1; i < nx1-1; ++i) {
+                double ubc = -cos(Pi*x_sub[i]) * cos(Pi*z_sub[k]);
+                theta[idx_ijk(i, ny_sub, k, nx1, ny1)] =
+                    2.0*ubc - theta[idx_ijk(i, ny_sub-1, k, nx1, ny1)];
+            }
+    }
+
+    // Z ghosts
+    if (theta_z_left_index[1]) {
+        for (int j = 1; j < ny1-1; ++j)
+            for (int i = 1; i < nx1-1; ++i) {
+                double ubc = -cos(Pi*x_sub[i]) * cos(Pi*y_sub[j]);
+                theta[idx_ijk(i, j, 0, nx1, ny1)] =
+                    2.0*ubc - theta[idx_ijk(i, j, 1, nx1, ny1)];
+            }
+    }
+    if (theta_z_right_index[nz_sub-1]) {
+        for (int j = 1; j < ny1-1; ++j)
+            for (int i = 1; i < nx1-1; ++i) {
+                double ubc = -cos(Pi*x_sub[i]) * cos(Pi*y_sub[j]);
+                theta[idx_ijk(i, j, nz_sub, nx1, ny1)] =
+                    2.0*ubc - theta[idx_ijk(i, j, nz_sub-1, nx1, ny1)];
+            }
+    }
 }

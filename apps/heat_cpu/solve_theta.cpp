@@ -76,14 +76,19 @@ void SolveTheta::run(std::vector<double>& theta) {
         timing_csv::timing_init(n_events, n_timing, MPI_COMM_WORLD);
     std::vector<double> local_times(n_events, 0.0);
 
+    // Uniform stencil (ghost-cell approach): same coefficients everywhere.
+    const auto sx0 = compute_stencil(dt, sub_.dmx_sub[1]);
+    const auto sy0 = compute_stencil(dt, sub_.dmy_sub[1]);
+    const auto sz0 = compute_stencil(dt, sub_.dmz_sub[1]);
+
     for (int t_step = 0; t_step < max_iter; ++t_step) {
 
-        // Refresh FilteredTDMA truncation threshold each step (channel pattern:
-        // eps_ = dt / (N*N) inside the library — see filtered_tdma.hpp).
-        // No-op for PaScaL backend.
         solver_x.set_eps_constant(dt);
         solver_y.set_eps_constant(dt);
         solver_z.set_eps_constant(dt);
+
+        // Update physical-boundary ghost cells: u_ghost = 2*u_BC - u_adjacent
+        sub_.boundary(theta);
 
         double rhs_t0, rhs_t1;
         double solve_z_t0, solve_z_t1;
@@ -92,34 +97,24 @@ void SolveTheta::run(std::vector<double>& theta) {
         double comm_t0, comm_t1;
 
         // ============================================================
-        // RHS computation
+        // RHS computation (ghost cells already set in theta[])
         // ============================================================
         rhs_t0 = MPI_Wtime();
         for (k = 1; k < nz1-1; ++k) {
-            auto sz = compute_stencil(dt, sub_.dmz_sub[k],
-                                      sub_.theta_z_left_index[k],
-                                      sub_.theta_z_right_index[k]);
             for (j = 1; j < ny1-1; ++j) {
-                auto sy = compute_stencil(dt, sub_.dmy_sub[j],
-                                          sub_.theta_y_left_index[j],
-                                          sub_.theta_y_right_index[j]);
                 for (i = 1; i < nx1-1; ++i) {
-                    auto sx = compute_stencil(dt, sub_.dmx_sub[i],
-                                              sub_.theta_x_left_index[i],
-                                              sub_.theta_x_right_index[i]);
+                    ijk    = idx_ijk(i,   j,   k,   nx1, ny1);
+                    int ip = idx_ijk(i+1, j,   k,   nx1, ny1);
+                    int im = idx_ijk(i-1, j,   k,   nx1, ny1);
+                    int jp = idx_ijk(i,   j+1, k,   nx1, ny1);
+                    int jm = idx_ijk(i,   j-1, k,   nx1, ny1);
+                    int kp = idx_ijk(i,   j,   k+1, nx1, ny1);
+                    int km = idx_ijk(i,   j,   k-1, nx1, ny1);
 
-                    ijk          = idx_ijk(i,   j,   k,   nx1, ny1);
-                    int ip       = idx_ijk(i+1, j,   k,   nx1, ny1);
-                    int im       = idx_ijk(i-1, j,   k,   nx1, ny1);
-                    int jp       = idx_ijk(i,   j+1, k,   nx1, ny1);
-                    int jm       = idx_ijk(i,   j-1, k,   nx1, ny1);
-                    int kp       = idx_ijk(i,   j,   k+1, nx1, ny1);
-                    int km       = idx_ijk(i,   j,   k-1, nx1, ny1);
-
-                    rhs[ijk] = (sx.c*theta[ip] + sx.a*theta[im])
-                             + (sy.c*theta[jp] + sy.a*theta[jm])
-                             + (sz.c*theta[kp] + sz.a*theta[km])
-                             + (1.0 + sx.b + sy.b + sz.b) * theta[ijk]
+                    rhs[ijk] = (sx0.c*theta[ip] + sx0.a*theta[im])
+                             + (sy0.c*theta[jp] + sy0.a*theta[jm])
+                             + (sz0.c*theta[kp] + sz0.a*theta[km])
+                             + (1.0 + sx0.b + sy0.b + sz0.b) * theta[ijk]
                              + dt * 3.0 * Pi*Pi * cos(Pi*sub_.x_sub[i])
                                                 * cos(Pi*sub_.y_sub[j])
                                                 * cos(Pi*sub_.z_sub[k]);
@@ -129,71 +124,30 @@ void SolveTheta::run(std::vector<double>& theta) {
         rhs_t1 = MPI_Wtime();
 
         // ============================================================
-        // Z-boundary correction
-        // ============================================================
-        for (j = 1; j < ny1-1; ++j) {
-            auto sy = compute_stencil(dt, sub_.dmy_sub[j],
-                                      sub_.theta_y_left_index[j],
-                                      sub_.theta_y_right_index[j]);
-            for (i = 1; i < nx1-1; ++i) {
-                auto sx = compute_stencil(dt, sub_.dmx_sub[i],
-                                          sub_.theta_x_left_index[i],
-                                          sub_.theta_x_right_index[i]);
-
-                // k=0 boundary
-                double dz0 = sub_.dmz_sub[0];
-                double coef_za = (dt / 2.0 / (dz0*dz0)) * (1.0 + 5.0/3.0);
-
-                for (int dj = -1; dj <= 1; ++dj) {
-                    double cy_val = (dj == -1) ? -sy.a : (dj == 0) ? (1.0-sy.b) : -sy.c;
-                    idx    = idx_ij(i,   j+dj, nx1);
-                    idx_ip = idx_ij(i+1, j+dj, nx1);
-                    idx_im = idx_ij(i-1, j+dj, nx1);
-                    rhs[idx_ijk(i, j, 1, nx1, ny1)] +=
-                        coef_za * cy_val *
-                        (-sx.a * sub_.theta_z_left_sub[idx_im]
-                       + (1.0 - sx.b) * sub_.theta_z_left_sub[idx]
-                       - sx.c * sub_.theta_z_left_sub[idx_ip])
-                        * sub_.theta_z_left_index[1];
-                }
-
-                // k=nz1-1 boundary
-                double dzN = sub_.dmz_sub[nz1-1];
-                double coef_zc = (dt / 2.0 / (dzN*dzN)) * (1.0 + 5.0/3.0);
-
-                for (int dj = -1; dj <= 1; ++dj) {
-                    double cy_val = (dj == -1) ? -sy.a : (dj == 0) ? (1.0-sy.b) : -sy.c;
-                    idx    = idx_ij(i,   j+dj, nx1);
-                    idx_ip = idx_ij(i+1, j+dj, nx1);
-                    idx_im = idx_ij(i-1, j+dj, nx1);
-                    rhs[idx_ijk(i, j, nz1-2, nx1, ny1)] +=
-                        coef_zc * cy_val *
-                        (-sx.a * sub_.theta_z_right_sub[idx_im]
-                       + (1.0 - sx.b) * sub_.theta_z_right_sub[idx]
-                       - sx.c * sub_.theta_z_right_sub[idx_ip])
-                        * sub_.theta_z_right_index[nz1-2];
-                }
-            }
-        }
-
-        // ============================================================
-        // Z solve
+        // Z solve — build TDMA then add implicit ghost correction
         // ============================================================
         MPI_Barrier(MPI_COMM_WORLD);
         solve_z_t0 = MPI_Wtime();
         for (j = 1; j < ny1-1; ++j) {
             for (k = 1; k < nz1-1; ++k) {
-                auto sz = compute_stencil(dt, sub_.dmz_sub[k],
-                                          sub_.theta_z_left_index[k],
-                                          sub_.theta_z_right_index[k]);
                 for (i = 1; i < nx1-1; ++i) {
-                    ijk = idx_ijk(i, j, k, nx1, ny1);
                     int ik = idx_ik(i-1, k-1, nx1-2);
-                    Azz[ik] = -sz.a;
-                    Bzz[ik] = 1.0 - sz.b;
-                    Czz[ik] = -sz.c;
-                    Dzz[ik] = rhs[ijk];
+                    Azz[ik] = -sz0.a;
+                    Bzz[ik] = 1.0 - sz0.b;
+                    Czz[ik] = -sz0.c;
+                    Dzz[ik] = rhs[idx_ijk(i, j, k, nx1, ny1)];
                 }
+            }
+            // Implicit ghost correction: D[kk=0] += sz.a * theta[k=0]
+            if (sub_.theta_z_left_index[1]) {
+                for (i = 1; i < nx1-1; ++i)
+                    Dzz[idx_ik(i-1, 0, nx1-2)] +=
+                        sz0.a * theta[idx_ijk(i, j, 0, nx1, ny1)];
+            }
+            if (sub_.theta_z_right_index[nz1-2]) {
+                for (i = 1; i < nx1-1; ++i)
+                    Dzz[idx_ik(i-1, nz1-3, nx1-2)] +=
+                        sz0.c * theta[idx_ijk(i, j, nz1-1, nx1, ny1)];
             }
             solver_z.set_rho(Azz.data(), Bzz.data(), Czz.data());
             solver_z.solve(Azz.data(), Bzz.data(), Czz.data(), Dzz.data());
@@ -204,54 +158,29 @@ void SolveTheta::run(std::vector<double>& theta) {
         solve_z_t1 = MPI_Wtime();
 
         // ============================================================
-        // Y-boundary correction
-        // ============================================================
-        for (k = 1; k < nz1-1; ++k) {
-            for (i = 1; i < nx1-1; ++i) {
-                auto sx = compute_stencil(dt, sub_.dmx_sub[i],
-                                          sub_.theta_x_left_index[i],
-                                          sub_.theta_x_right_index[i]);
-                // j=0
-                double dy0 = sub_.dmy_sub[0];
-                double coef_ya = (dt / 2.0 / (dy0*dy0)) * (1.0 + 5.0/3.0);
-                idx    = idx_ik(i,   k, nx1);
-                idx_ip = idx_ik(i+1, k, nx1);
-                idx_im = idx_ik(i-1, k, nx1);
-                rhs[idx_ijk(i, 1, k, nx1, ny1)] +=
-                    coef_ya * sub_.theta_y_left_index[1] *
-                    (-sx.a * sub_.theta_y_left_sub[idx_im]
-                   + (1.0-sx.b) * sub_.theta_y_left_sub[idx]
-                   - sx.c * sub_.theta_y_left_sub[idx_ip]);
-
-                // j=ny1-1
-                double dyN = sub_.dmy_sub[ny1-1];
-                double coef_yc = (dt / 2.0 / (dyN*dyN)) * (1.0 + 5.0/3.0);
-                rhs[idx_ijk(i, ny1-2, k, nx1, ny1)] +=
-                    coef_yc * sub_.theta_y_right_index[ny1-2] *
-                    (-sx.a * sub_.theta_y_right_sub[idx_im]
-                   + (1.0-sx.b) * sub_.theta_y_right_sub[idx]
-                   - sx.c * sub_.theta_y_right_sub[idx_ip]);
-            }
-        }
-
-        // ============================================================
         // Y solve
         // ============================================================
         MPI_Barrier(MPI_COMM_WORLD);
         solve_y_t0 = MPI_Wtime();
         for (k = 1; k < nz1-1; ++k) {
             for (j = 1; j < ny1-1; ++j) {
-                auto sy = compute_stencil(dt, sub_.dmy_sub[j],
-                                          sub_.theta_y_left_index[j],
-                                          sub_.theta_y_right_index[j]);
                 for (i = 1; i < nx1-1; ++i) {
-                    ijk = idx_ijk(i, j, k, nx1, ny1);
                     int ij = idx_ij(i-1, j-1, nx1-2);
-                    Ayy[ij] = -sy.a;
-                    Byy[ij] = 1.0 - sy.b;
-                    Cyy[ij] = -sy.c;
-                    Dyy[ij] = rhs[ijk];
+                    Ayy[ij] = -sy0.a;
+                    Byy[ij] = 1.0 - sy0.b;
+                    Cyy[ij] = -sy0.c;
+                    Dyy[ij] = rhs[idx_ijk(i, j, k, nx1, ny1)];
                 }
+            }
+            if (sub_.theta_y_left_index[1]) {
+                for (i = 1; i < nx1-1; ++i)
+                    Dyy[idx_ij(i-1, 0, nx1-2)] +=
+                        sy0.a * theta[idx_ijk(i, 0, k, nx1, ny1)];
+            }
+            if (sub_.theta_y_right_index[ny1-2]) {
+                for (i = 1; i < nx1-1; ++i)
+                    Dyy[idx_ij(i-1, ny1-3, nx1-2)] +=
+                        sy0.c * theta[idx_ijk(i, ny1-1, k, nx1, ny1)];
             }
             solver_y.set_rho(Ayy.data(), Byy.data(), Cyy.data());
             solver_y.solve(Ayy.data(), Byy.data(), Cyy.data(), Dyy.data());
@@ -262,43 +191,29 @@ void SolveTheta::run(std::vector<double>& theta) {
         solve_y_t1 = MPI_Wtime();
 
         // ============================================================
-        // X-boundary correction
-        // ============================================================
-        for (k = 1; k < nz1-1; ++k) {
-            for (j = 1; j < ny1-1; ++j) {
-                // i=0
-                double dx0 = sub_.dmx_sub[0];
-                double coef_xa = (dt / 2.0 / (dx0*dx0)) * (1.0 + 5.0/3.0);
-                idx = idx_jk(j, k, ny1);
-                rhs[idx_ijk(1, j, k, nx1, ny1)] +=
-                    coef_xa * sub_.theta_x_left_index[1] * sub_.theta_x_left_sub[idx];
-
-                // i=nx1-1
-                double dxN = sub_.dmx_sub[nx1-1];
-                double coef_xc = (dt / 2.0 / (dxN*dxN)) * (1.0 + 5.0/3.0);
-                rhs[idx_ijk(nx1-2, j, k, nx1, ny1)] +=
-                    coef_xc * sub_.theta_x_right_index[nx1-2] * sub_.theta_x_right_sub[idx];
-            }
-        }
-
-        // ============================================================
         // X solve
         // ============================================================
         MPI_Barrier(MPI_COMM_WORLD);
         solve_x_t0 = MPI_Wtime();
         for (k = 1; k < nz1-1; ++k) {
             for (i = 1; i < nx1-1; ++i) {
-                auto sx = compute_stencil(dt, sub_.dmx_sub[i],
-                                          sub_.theta_x_left_index[i],
-                                          sub_.theta_x_right_index[i]);
                 for (j = 1; j < ny1-1; ++j) {
-                    ijk = idx_ijk(i, j, k, nx1, ny1);
                     int ji = idx_ji(j-1, i-1, ny1-2);
-                    Axx[ji] = -sx.a;
-                    Bxx[ji] = 1.0 - sx.b;
-                    Cxx[ji] = -sx.c;
-                    Dxx[ji] = rhs[ijk];
+                    Axx[ji] = -sx0.a;
+                    Bxx[ji] = 1.0 - sx0.b;
+                    Cxx[ji] = -sx0.c;
+                    Dxx[ji] = rhs[idx_ijk(i, j, k, nx1, ny1)];
                 }
+            }
+            if (sub_.theta_x_left_index[1]) {
+                for (j = 1; j < ny1-1; ++j)
+                    Dxx[idx_ji(j-1, 0, ny1-2)] +=
+                        sx0.a * theta[idx_ijk(0, j, k, nx1, ny1)];
+            }
+            if (sub_.theta_x_right_index[nx1-2]) {
+                for (j = 1; j < ny1-1; ++j)
+                    Dxx[idx_ji(j-1, nx1-3, ny1-2)] +=
+                        sx0.c * theta[idx_ijk(nx1-1, j, k, nx1, ny1)];
             }
             solver_x.set_rho(Axx.data(), Bxx.data(), Cxx.data());
             solver_x.solve(Axx.data(), Bxx.data(), Cxx.data(), Dxx.data());

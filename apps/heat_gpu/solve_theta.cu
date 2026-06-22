@@ -43,18 +43,76 @@ namespace {
 
 constexpr double D_PI = 3.14159265358979323846;
 
-// Device-side stencil computation, mirrors stencil_coeffs.hpp
-__device__ inline void d_stencil(double dt, double dd, int lb, int rb,
+// Device-side uniform cell-centre stencil (ghost-cell Dirichlet BC).
+// Mirrors stencil_coeffs.hpp compute_stencil(dt, dd): all rows identical, so the
+// normalized off-diagonal ρ = rho on every row (< 1/2 for any stable rho).
+__device__ inline void d_stencil(double dt, double dd,
                                  double& a, double& b, double& c) {
     double base = dt / (2.0 * dd * dd);
-    a = base * ( 1.0 + (5.0/3.0) * lb + (1.0/3.0) * rb);
-    b = base * (-2.0 -        2.0 * lb -        2.0 * rb);
-    c = base * ( 1.0 + (1.0/3.0) * lb + (5.0/3.0) * rb);
+    a = base;
+    b = -2.0 * base;
+    c = base;
 }
 
 // Full-grid 3D indexer: theta[(k * ny + j) * nx + i]
 __device__ inline std::size_t idx_full_d(int i, int j, int k, int nx, int ny) {
     return ((std::size_t)k * ny + (std::size_t)j) * nx + (std::size_t)i;
+}
+
+// =============================================================================
+//  Physical-boundary ghost fill:  u_ghost = 2*u_BC - u_adjacent
+//  (only the rank owning a domain face writes its ghost; interior faces are
+//   filled by the MPI halo exchange).  Refreshed every step before the RHS.
+// =============================================================================
+__global__ void ghost_x_kernel(double* __restrict__ d_theta,
+                               const double* __restrict__ y_sub,
+                               const double* __restrict__ z_sub,
+                               const int* __restrict__ x_lb, const int* __restrict__ x_rb,
+                               int nx, int ny, int nz) {
+    int jj = blockIdx.x * blockDim.x + threadIdx.x;
+    int kk = blockIdx.y * blockDim.y + threadIdx.y;
+    int iy = ny - 2, iz = nz - 2;
+    if (jj >= iy || kk >= iz) return;
+    int j = jj + 1, k = kk + 1;
+    double ubc = -cos(D_PI*y_sub[j]) * cos(D_PI*z_sub[k]);
+    if (x_lb[1])
+        d_theta[idx_full_d(0, j, k, nx, ny)]    = 2.0*ubc - d_theta[idx_full_d(1, j, k, nx, ny)];
+    if (x_rb[nx-2])
+        d_theta[idx_full_d(nx-1, j, k, nx, ny)] = 2.0*ubc - d_theta[idx_full_d(nx-2, j, k, nx, ny)];
+}
+
+__global__ void ghost_y_kernel(double* __restrict__ d_theta,
+                               const double* __restrict__ x_sub,
+                               const double* __restrict__ z_sub,
+                               const int* __restrict__ y_lb, const int* __restrict__ y_rb,
+                               int nx, int ny, int nz) {
+    int ii = blockIdx.x * blockDim.x + threadIdx.x;
+    int kk = blockIdx.y * blockDim.y + threadIdx.y;
+    int ix = nx - 2, iz = nz - 2;
+    if (ii >= ix || kk >= iz) return;
+    int i = ii + 1, k = kk + 1;
+    double ubc = -cos(D_PI*x_sub[i]) * cos(D_PI*z_sub[k]);
+    if (y_lb[1])
+        d_theta[idx_full_d(i, 0, k, nx, ny)]    = 2.0*ubc - d_theta[idx_full_d(i, 1, k, nx, ny)];
+    if (y_rb[ny-2])
+        d_theta[idx_full_d(i, ny-1, k, nx, ny)] = 2.0*ubc - d_theta[idx_full_d(i, ny-2, k, nx, ny)];
+}
+
+__global__ void ghost_z_kernel(double* __restrict__ d_theta,
+                               const double* __restrict__ x_sub,
+                               const double* __restrict__ y_sub,
+                               const int* __restrict__ z_lb, const int* __restrict__ z_rb,
+                               int nx, int ny, int nz) {
+    int ii = blockIdx.x * blockDim.x + threadIdx.x;
+    int jj = blockIdx.y * blockDim.y + threadIdx.y;
+    int ix = nx - 2, iy = ny - 2;
+    if (ii >= ix || jj >= iy) return;
+    int i = ii + 1, j = jj + 1;
+    double ubc = -cos(D_PI*x_sub[i]) * cos(D_PI*y_sub[j]);
+    if (z_lb[1])
+        d_theta[idx_full_d(i, j, 0, nx, ny)]    = 2.0*ubc - d_theta[idx_full_d(i, j, 1, nx, ny)];
+    if (z_rb[nz-2])
+        d_theta[idx_full_d(i, j, nz-1, nx, ny)] = 2.0*ubc - d_theta[idx_full_d(i, j, nz-2, nx, ny)];
 }
 
 // =============================================================================
@@ -79,9 +137,9 @@ __global__ void rhs_kernel(double* __restrict__ d_rhs,
     if (ii >= ix || jj >= iy || kk >= iz) return;
     int i = ii + 1, j = jj + 1, k = kk + 1;
 
-    double sxa, sxb, sxc;  d_stencil(dt, dmx[i], x_lb[i], x_rb[i], sxa, sxb, sxc);
-    double sya, syb, syc;  d_stencil(dt, dmy[j], y_lb[j], y_rb[j], sya, syb, syc);
-    double sza, szb, szc;  d_stencil(dt, dmz[k], z_lb[k], z_rb[k], sza, szb, szc);
+    double sxa, sxb, sxc;  d_stencil(dt, dmx[i], sxa, sxb, sxc);
+    double sya, syb, syc;  d_stencil(dt, dmy[j], sya, syb, syc);
+    double sza, szb, szc;  d_stencil(dt, dmz[k], sza, szb, szc);
 
     double t   = d_theta[idx_full_d(i,   j,   k,   nx, ny)];
     double tip = d_theta[idx_full_d(i+1, j,   k,   nx, ny)];
@@ -106,148 +164,6 @@ __global__ void rhs_kernel(double* __restrict__ d_rhs,
 }
 
 // =============================================================================
-//  Z-boundary correction
-// =============================================================================
-__global__ void z_boundary_kernel(double* __restrict__ d_rhs,
-                                  const double* __restrict__ theta_z_left,
-                                  const double* __restrict__ theta_z_right,
-                                  const int* __restrict__ z_lb_flag,
-                                  const int* __restrict__ z_rb_flag,
-                                  const double* __restrict__ dmx,
-                                  const double* __restrict__ dmy,
-                                  const double* __restrict__ dmz,
-                                  const int* __restrict__ x_lb, const int* __restrict__ x_rb,
-                                  const int* __restrict__ y_lb, const int* __restrict__ y_rb,
-                                  int nx, int ny, int nz, double dt) {
-    int ii = blockIdx.x * blockDim.x + threadIdx.x;
-    int jj = blockIdx.y * blockDim.y + threadIdx.y;
-    int ix = nx - 2, iy = ny - 2, iz = nz - 2;
-    if (ii >= ix || jj >= iy) return;
-    int i = ii + 1, j = jj + 1;
-
-    double sxa, sxb, sxc;  d_stencil(dt, dmx[i], x_lb[i], x_rb[i], sxa, sxb, sxc);
-    double sya, syb, syc;  d_stencil(dt, dmy[j], y_lb[j], y_rb[j], sya, syb, syc);
-
-    // Left wall (k=1 interior cell touches k=0 wall via theta_z_left_sub)
-    {
-        double dz0 = dmz[0];
-        double coef = (dt * 0.5 / (dz0*dz0)) * (1.0 + 5.0/3.0);
-        double accum = 0.0;
-        for (int dj = -1; dj <= 1; ++dj) {
-            double cy = (dj == -1) ? -sya : (dj == 0) ? (1.0 - syb) : -syc;
-            // theta_z_left_sub uses idx_ij(i, j+dj, nx) = (j+dj)*nx + i
-            std::size_t off    = (std::size_t)(j+dj) * nx + i;
-            std::size_t off_ip = (std::size_t)(j+dj) * nx + (i+1);
-            std::size_t off_im = (std::size_t)(j+dj) * nx + (i-1);
-            accum += coef * cy *
-                     (-sxa        * theta_z_left[off_im]
-                     + (1.0-sxb) * theta_z_left[off]
-                     - sxc        * theta_z_left[off_ip])
-                     * (double)z_lb_flag[1];
-        }
-        std::size_t ci = ((std::size_t)0 * iy + jj) * ix + ii;     // k=1 → kk=0
-        d_rhs[ci] += accum;
-    }
-    // Right wall (k=nz-2 interior cell touches k=nz-1 wall)
-    {
-        double dzN = dmz[nz-1];
-        double coef = (dt * 0.5 / (dzN*dzN)) * (1.0 + 5.0/3.0);
-        double accum = 0.0;
-        for (int dj = -1; dj <= 1; ++dj) {
-            double cy = (dj == -1) ? -sya : (dj == 0) ? (1.0 - syb) : -syc;
-            std::size_t off    = (std::size_t)(j+dj) * nx + i;
-            std::size_t off_ip = (std::size_t)(j+dj) * nx + (i+1);
-            std::size_t off_im = (std::size_t)(j+dj) * nx + (i-1);
-            accum += coef * cy *
-                     (-sxa        * theta_z_right[off_im]
-                     + (1.0-sxb) * theta_z_right[off]
-                     - sxc        * theta_z_right[off_ip])
-                     * (double)z_rb_flag[nz-2];
-        }
-        std::size_t ci = ((std::size_t)(iz-1) * iy + jj) * ix + ii;
-        d_rhs[ci] += accum;
-    }
-}
-
-// =============================================================================
-//  Y-boundary correction
-// =============================================================================
-__global__ void y_boundary_kernel(double* __restrict__ d_rhs,
-                                  const double* __restrict__ theta_y_left,
-                                  const double* __restrict__ theta_y_right,
-                                  const int* __restrict__ y_lb_flag,
-                                  const int* __restrict__ y_rb_flag,
-                                  const double* __restrict__ dmx,
-                                  const double* __restrict__ dmy,
-                                  const int* __restrict__ x_lb, const int* __restrict__ x_rb,
-                                  int nx, int ny, int nz, double dt) {
-    int ii = blockIdx.x * blockDim.x + threadIdx.x;
-    int kk = blockIdx.y * blockDim.y + threadIdx.y;
-    int ix = nx - 2, iy = ny - 2, iz = nz - 2;
-    if (ii >= ix || kk >= iz) return;
-    int i = ii + 1, k = kk + 1;
-
-    double sxa, sxb, sxc; d_stencil(dt, dmx[i], x_lb[i], x_rb[i], sxa, sxb, sxc);
-
-    // theta_y_*_sub uses idx_ik(i, k, nx) = k*nx + i
-    std::size_t off    = (std::size_t)k * nx + i;
-    std::size_t off_ip = (std::size_t)k * nx + (i+1);
-    std::size_t off_im = (std::size_t)k * nx + (i-1);
-
-    {
-        double dy0 = dmy[0];
-        double coef = (dt * 0.5 / (dy0*dy0)) * (1.0 + 5.0/3.0);
-        std::size_t ci = ((std::size_t)kk * iy + 0) * ix + ii;     // j=1 → jj=0
-        d_rhs[ci] += coef * (double)y_lb_flag[1] *
-                     (-sxa * theta_y_left[off_im]
-                     + (1.0-sxb) * theta_y_left[off]
-                     - sxc * theta_y_left[off_ip]);
-    }
-    {
-        double dyN = dmy[ny-1];
-        double coef = (dt * 0.5 / (dyN*dyN)) * (1.0 + 5.0/3.0);
-        std::size_t ci = ((std::size_t)kk * iy + (iy-1)) * ix + ii;
-        d_rhs[ci] += coef * (double)y_rb_flag[ny-2] *
-                     (-sxa * theta_y_right[off_im]
-                     + (1.0-sxb) * theta_y_right[off]
-                     - sxc * theta_y_right[off_ip]);
-    }
-}
-
-// =============================================================================
-//  X-boundary correction
-// =============================================================================
-__global__ void x_boundary_kernel(double* __restrict__ d_rhs,
-                                  const double* __restrict__ theta_x_left,
-                                  const double* __restrict__ theta_x_right,
-                                  const int* __restrict__ x_lb_flag,
-                                  const int* __restrict__ x_rb_flag,
-                                  const double* __restrict__ dmx,
-                                  int nx, int ny, int nz, double dt) {
-    int jj = blockIdx.x * blockDim.x + threadIdx.x;
-    int kk = blockIdx.y * blockDim.y + threadIdx.y;
-    int ix = nx - 2, iy = ny - 2, iz = nz - 2;
-    if (jj >= iy || kk >= iz) return;
-    int j = jj + 1, k = kk + 1;
-
-    // theta_x_*_sub uses idx_jk(j, k, ny) = k*ny + j
-    std::size_t off = (std::size_t)k * ny + j;
-
-    {
-        double dx0 = dmx[0];
-        double coef = (dt * 0.5 / (dx0*dx0)) * (1.0 + 5.0/3.0);
-        std::size_t ci = ((std::size_t)kk * iy + jj) * ix + 0;     // i=1 → ii=0
-        d_rhs[ci] += coef * (double)x_lb_flag[1] * theta_x_left[off];
-    }
-    {
-        double dxN = dmx[nx-1];
-        double coef = (dt * 0.5 / (dxN*dxN)) * (1.0 + 5.0/3.0);
-        std::size_t ci = ((std::size_t)kk * iy + jj) * ix + (ix-1);
-        d_rhs[ci] += coef * (double)x_rb_flag[nx-2] * theta_x_right[off];
-    }
-}
-
-// =============================================================================
 //  Build LHS for Z-direction sweep.
 //  Layout: d_X[ ((kk * iy) + jj) * ix + ii ]  — same as d_rhs.
 //  Treated by TDMA as [n_row=iz × n_sys=ix*iy], row-major.
@@ -257,6 +173,7 @@ __global__ void build_lhs_z_kernel(double* __restrict__ d_A,
                                    double* __restrict__ d_C,
                                    double* __restrict__ d_D,
                                    const double* __restrict__ d_rhs,
+                                   const double* __restrict__ d_theta,
                                    const double* __restrict__ dmz,
                                    const int* __restrict__ z_lb,
                                    const int* __restrict__ z_rb,
@@ -267,13 +184,20 @@ __global__ void build_lhs_z_kernel(double* __restrict__ d_A,
     if (ii >= ix || jj >= iy || kk >= iz) return;
     int k = kk + 1;
 
-    double sa, sb, sc;  d_stencil(dt, dmz[k], z_lb[k], z_rb[k], sa, sb, sc);
+    double sa, sb, sc;  d_stencil(dt, dmz[k], sa, sb, sc);
 
     std::size_t off = ((std::size_t)kk * iy + jj) * ix + ii;
     d_A[off] = -sa;
     d_B[off] = 1.0 - sb;
     d_C[off] = -sc;
-    d_D[off] = d_rhs[off];
+    double rhs = d_rhs[off];
+    // Implicit Dirichlet ghost correction: move known wall ghost to the RHS
+    // (mirrors the CPU "D[boundary row] += s.a/s.c * theta[ghost]").
+    int nx = ix + 2, ny = iy + 2, nz = iz + 2;
+    int i = ii + 1, j = jj + 1;
+    if (kk == 0      && z_lb[1])  rhs += sa * d_theta[idx_full_d(i, j, 0,    nx, ny)];
+    if (kk == iz - 1 && z_rb[iz]) rhs += sc * d_theta[idx_full_d(i, j, nz-1, nx, ny)];
+    d_D[off] = rhs;
 }
 
 // Copy Z-solution back into rhs (same layout as the build).
@@ -294,6 +218,7 @@ __global__ void build_lhs_y_kernel(double* __restrict__ d_A,
                                    double* __restrict__ d_C,
                                    double* __restrict__ d_D,
                                    const double* __restrict__ d_rhs,
+                                   const double* __restrict__ d_theta,
                                    const double* __restrict__ dmy,
                                    const int* __restrict__ y_lb,
                                    const int* __restrict__ y_rb,
@@ -304,14 +229,19 @@ __global__ void build_lhs_y_kernel(double* __restrict__ d_A,
     if (ii >= ix || jj >= iy || kk >= iz) return;
     int j = jj + 1;
 
-    double sa, sb, sc;  d_stencil(dt, dmy[j], y_lb[j], y_rb[j], sa, sb, sc);
+    double sa, sb, sc;  d_stencil(dt, dmy[j], sa, sb, sc);
 
     std::size_t off_y   = ((std::size_t)jj * iz + kk) * ix + ii;
     std::size_t off_rhs = ((std::size_t)kk * iy + jj) * ix + ii;
     d_A[off_y] = -sa;
     d_B[off_y] = 1.0 - sb;
     d_C[off_y] = -sc;
-    d_D[off_y] = d_rhs[off_rhs];
+    double rhs = d_rhs[off_rhs];
+    int nx = ix + 2, ny = iy + 2;
+    int i = ii + 1, k = kk + 1;
+    if (jj == 0      && y_lb[1])  rhs += sa * d_theta[idx_full_d(i, 0,    k, nx, ny)];
+    if (jj == iy - 1 && y_rb[iy]) rhs += sc * d_theta[idx_full_d(i, ny-1, k, nx, ny)];
+    d_D[off_y] = rhs;
 }
 
 // Copy Y-solution back into rhs (transposing j↔k).
@@ -334,6 +264,7 @@ __global__ void build_lhs_x_kernel(double* __restrict__ d_A,
                                    double* __restrict__ d_C,
                                    double* __restrict__ d_D,
                                    const double* __restrict__ d_rhs,
+                                   const double* __restrict__ d_theta,
                                    const double* __restrict__ dmx,
                                    const int* __restrict__ x_lb,
                                    const int* __restrict__ x_rb,
@@ -364,12 +295,17 @@ __global__ void build_lhs_x_kernel(double* __restrict__ d_A,
         if (ii_g < ix && jj_g < iy) {
             int i = ii_g + 1;
             double sa, sb, sc;
-            d_stencil(dt, dmx[i], x_lb[i], x_rb[i], sa, sb, sc);
+            d_stencil(dt, dmx[i], sa, sb, sc);
             std::size_t off_x = ((std::size_t)ii_g * iz + kk) * iy + jj_g;
             d_A[off_x] = -sa;
             d_B[off_x] = 1.0 - sb;
             d_C[off_x] = -sc;
-            d_D[off_x] = tile[tx][ty];
+            double rhs = tile[tx][ty];
+            int nx = ix + 2, ny = iy + 2;
+            int j = jj_g + 1, k = kk + 1;
+            if (ii_g == 0      && x_lb[1])  rhs += sa * d_theta[idx_full_d(0,    j, k, nx, ny)];
+            if (ii_g == ix - 1 && x_rb[ix]) rhs += sc * d_theta[idx_full_d(nx-1, j, k, nx, ny)];
+            d_D[off_x] = rhs;
         }
     }
 }
@@ -483,12 +419,6 @@ void SolveTheta::profile(std::vector<double>& theta) {
     int*    d_y_rb    = alloc_and_copy(sub_.theta_y_right_index);
     int*    d_z_lb    = alloc_and_copy(sub_.theta_z_left_index);
     int*    d_z_rb    = alloc_and_copy(sub_.theta_z_right_index);
-    double* d_th_xL   = alloc_and_copy(sub_.theta_x_left_sub);
-    double* d_th_xR   = alloc_and_copy(sub_.theta_x_right_sub);
-    double* d_th_yL   = alloc_and_copy(sub_.theta_y_left_sub);
-    double* d_th_yR   = alloc_and_copy(sub_.theta_y_right_sub);
-    double* d_th_zL   = alloc_and_copy(sub_.theta_z_left_sub);
-    double* d_th_zR   = alloc_and_copy(sub_.theta_z_right_sub);
 
     // theta H2D — once
     CUDA_CHECK(cudaMemcpy(d_theta, theta.data(), sizeof(double) * full_n,
@@ -545,6 +475,15 @@ void SolveTheta::profile(std::vector<double>& theta) {
         MPI_Barrier(MPI_COMM_WORLD);
         t0 = MPI_Wtime();
         sub_.ghostcellUpdateDevice(d_theta, cx, cy, cz);
+        // Physical-boundary ghost fill: u_ghost = 2*u_BC - u_adjacent.
+        // (Refreshes the Dirichlet ghosts of d_theta from the current interior;
+        //  disjoint from the inter-rank halo faces above.)
+        ghost_x_kernel<<<g_yz, b2>>>(d_theta, d_y_sub, d_z_sub,
+                                     d_x_lb, d_x_rb, nx_full, ny_full, nz_full);
+        ghost_y_kernel<<<g_xz, b2>>>(d_theta, d_x_sub, d_z_sub,
+                                     d_y_lb, d_y_rb, nx_full, ny_full, nz_full);
+        ghost_z_kernel<<<g_xy, b2>>>(d_theta, d_x_sub, d_y_sub,
+                                     d_z_lb, d_z_rb, nx_full, ny_full, nz_full);
         CUDA_CHECK(cudaDeviceSynchronize());
         t1 = MPI_Wtime();
         local_times[5] = t1 - t0;
@@ -571,16 +510,10 @@ void SolveTheta::profile(std::vector<double>& theta) {
         t1 = MPI_Wtime();
         local_times[0] = t1 - t0;
 
-        // --- Z direction (boundary correction + build_LHS + TDMA + copy back) ---
+        // --- Z direction (build_LHS + implicit ghost corr + TDMA + copy back) ---
         MPI_Barrier(MPI_COMM_WORLD);
         t0 = MPI_Wtime();
-        z_boundary_kernel<<<g_xy, b2>>>(d_rhs,
-                                        d_th_zL, d_th_zR,
-                                        d_z_lb, d_z_rb,
-                                        d_dmx, d_dmy, d_dmz,
-                                        d_x_lb, d_x_rb, d_y_lb, d_y_rb,
-                                        nx_full, ny_full, nz_full, dt);
-        build_lhs_z_kernel<<<g3, b3>>>(d_A, d_B, d_C, d_D, d_rhs,
+        build_lhs_z_kernel<<<g3, b3>>>(d_A, d_B, d_C, d_D, d_rhs, d_theta,
                                        d_dmz, d_z_lb, d_z_rb, ix, iy, iz, dt);
         solver_z.set_rho_device(d_A, d_B, d_C);
         solver_z.solve(d_A, d_B, d_C, d_D);
@@ -596,13 +529,7 @@ void SolveTheta::profile(std::vector<double>& theta) {
         // --- Y direction ---
         MPI_Barrier(MPI_COMM_WORLD);
         t0 = MPI_Wtime();
-        y_boundary_kernel<<<g_xz, b2>>>(d_rhs,
-                                        d_th_yL, d_th_yR,
-                                        d_y_lb, d_y_rb,
-                                        d_dmx, d_dmy,
-                                        d_x_lb, d_x_rb,
-                                        nx_full, ny_full, nz_full, dt);
-        build_lhs_y_kernel<<<g3, b3>>>(d_A, d_B, d_C, d_D, d_rhs,
+        build_lhs_y_kernel<<<g3, b3>>>(d_A, d_B, d_C, d_D, d_rhs, d_theta,
                                        d_dmy, d_y_lb, d_y_rb, ix, iy, iz, dt);
         solver_y.set_rho_device(d_A, d_B, d_C);
         solver_y.solve(d_A, d_B, d_C, d_D);
@@ -614,12 +541,7 @@ void SolveTheta::profile(std::vector<double>& theta) {
         // --- X direction ---
         MPI_Barrier(MPI_COMM_WORLD);
         t0 = MPI_Wtime();
-        x_boundary_kernel<<<g_yz, b2>>>(d_rhs,
-                                        d_th_xL, d_th_xR,
-                                        d_x_lb, d_x_rb,
-                                        d_dmx,
-                                        nx_full, ny_full, nz_full, dt);
-        build_lhs_x_kernel<<<g3_lhs_x, b3_lhs_x>>>(d_A, d_B, d_C, d_D, d_rhs,
+        build_lhs_x_kernel<<<g3_lhs_x, b3_lhs_x>>>(d_A, d_B, d_C, d_D, d_rhs, d_theta,
                                        d_dmx, d_x_lb, d_x_rb, ix, iy, iz, dt);
         solver_x.set_rho_device(d_A, d_B, d_C);
         solver_x.solve(d_A, d_B, d_C, d_D);
@@ -681,8 +603,5 @@ void SolveTheta::profile(std::vector<double>& theta) {
     safe_free((void*&)d_x_lb); safe_free((void*&)d_x_rb);
     safe_free((void*&)d_y_lb); safe_free((void*&)d_y_rb);
     safe_free((void*&)d_z_lb); safe_free((void*&)d_z_rb);
-    safe_free((void*&)d_th_xL); safe_free((void*&)d_th_xR);
-    safe_free((void*&)d_th_yL); safe_free((void*&)d_th_yR);
-    safe_free((void*&)d_th_zL); safe_free((void*&)d_th_zR);
     sub_.freeGhostBufsDevice();
 }

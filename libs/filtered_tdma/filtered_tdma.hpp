@@ -83,8 +83,11 @@ private:
     std::vector<double> C_left_recv_;
     std::vector<double> D_left_recv_;
 
-    std::vector<double> D_right_send_;
-    std::vector<double> D_right_recv_;
+    // Single bidirectional exchange: left neighbor's row N-1 (C,D) and right
+    // neighbor's row 0 (A,D) — each rank solves both interface 2x2 blocks
+    // locally (one comm round, no back-communication).
+    std::vector<double> A_right_recv_;
+    std::vector<double> D0_right_recv_;
 
     // Spectral radius estimates (set externally before each solve)
     std::vector<double> A_rho_;

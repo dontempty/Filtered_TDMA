@@ -85,17 +85,11 @@ void SolveTheta::profile(std::vector<double>& theta) {
         // RHS computation
         // ============================================================
         for (k = 1; k < nz1-1; ++k) {
-            auto sz = compute_stencil(dt, sub_.dmz_sub[k],
-                                      sub_.theta_z_left_index[k],
-                                      sub_.theta_z_right_index[k]);
+            auto sz = compute_stencil(dt, sub_.dmz_sub[k]);
             for (j = 1; j < ny1-1; ++j) {
-                auto sy = compute_stencil(dt, sub_.dmy_sub[j],
-                                          sub_.theta_y_left_index[j],
-                                          sub_.theta_y_right_index[j]);
+                auto sy = compute_stencil(dt, sub_.dmy_sub[j]);
                 for (i = 1; i < nx1-1; ++i) {
-                    auto sx = compute_stencil(dt, sub_.dmx_sub[i],
-                                              sub_.theta_x_left_index[i],
-                                              sub_.theta_x_right_index[i]);
+                    auto sx = compute_stencil(dt, sub_.dmx_sub[i]);
 
                     ijk          = idx_ijk(i,   j,   k,   nx1, ny1);
                     int ip       = idx_ijk(i+1, j,   k,   nx1, ny1);
@@ -120,13 +114,9 @@ void SolveTheta::profile(std::vector<double>& theta) {
         // Z-boundary correction
         // ============================================================
         for (j = 1; j < ny1-1; ++j) {
-            auto sy = compute_stencil(dt, sub_.dmy_sub[j],
-                                      sub_.theta_y_left_index[j],
-                                      sub_.theta_y_right_index[j]);
+            auto sy = compute_stencil(dt, sub_.dmy_sub[j]);
             for (i = 1; i < nx1-1; ++i) {
-                auto sx = compute_stencil(dt, sub_.dmx_sub[i],
-                                          sub_.theta_x_left_index[i],
-                                          sub_.theta_x_right_index[i]);
+                auto sx = compute_stencil(dt, sub_.dmx_sub[i]);
 
                 // k=0 boundary
                 double dz0 = sub_.dmz_sub[0];
@@ -169,9 +159,7 @@ void SolveTheta::profile(std::vector<double>& theta) {
         // ============================================================
         for (j = 1; j < ny1-1; ++j) {
             for (k = 1; k < nz1-1; ++k) {
-                auto sz = compute_stencil(dt, sub_.dmz_sub[k],
-                                          sub_.theta_z_left_index[k],
-                                          sub_.theta_z_right_index[k]);
+                auto sz = compute_stencil(dt, sub_.dmz_sub[k]);
                 for (i = 1; i < nx1-1; ++i) {
                     ijk = idx_ijk(i, j, k, nx1, ny1);
                     int ik = idx_ik(i-1, k-1, nx1-2);
@@ -198,9 +186,7 @@ void SolveTheta::profile(std::vector<double>& theta) {
         // ============================================================
         for (k = 1; k < nz1-1; ++k) {
             for (i = 1; i < nx1-1; ++i) {
-                auto sx = compute_stencil(dt, sub_.dmx_sub[i],
-                                          sub_.theta_x_left_index[i],
-                                          sub_.theta_x_right_index[i]);
+                auto sx = compute_stencil(dt, sub_.dmx_sub[i]);
                 // j=0
                 double dy0 = sub_.dmy_sub[0];
                 double coef_ya = (dt / 2.0 / (dy0*dy0)) * (1.0 + 5.0/3.0);
@@ -229,9 +215,7 @@ void SolveTheta::profile(std::vector<double>& theta) {
         // ============================================================
         for (k = 1; k < nz1-1; ++k) {
             for (j = 1; j < ny1-1; ++j) {
-                auto sy = compute_stencil(dt, sub_.dmy_sub[j],
-                                          sub_.theta_y_left_index[j],
-                                          sub_.theta_y_right_index[j]);
+                auto sy = compute_stencil(dt, sub_.dmy_sub[j]);
                 for (i = 1; i < nx1-1; ++i) {
                     ijk = idx_ijk(i, j, k, nx1, ny1);
                     int ij = idx_ij(i-1, j-1, nx1-2);
@@ -278,9 +262,7 @@ void SolveTheta::profile(std::vector<double>& theta) {
         // ============================================================
         for (k = 1; k < nz1-1; ++k) {
             for (i = 1; i < nx1-1; ++i) {
-                auto sx = compute_stencil(dt, sub_.dmx_sub[i],
-                                          sub_.theta_x_left_index[i],
-                                          sub_.theta_x_right_index[i]);
+                auto sx = compute_stencil(dt, sub_.dmx_sub[i]);
                 for (j = 1; j < ny1-1; ++j) {
                     ijk = idx_ijk(i, j, k, nx1, ny1);
                     int ji = idx_ji(j-1, i-1, ny1-2);

@@ -78,8 +78,10 @@ private:
     double* d_D_lastrow_send_ = nullptr;
     double* d_C_left_recv_   = nullptr;
     double* d_D_left_recv_   = nullptr;
-    double* d_D_right_send_  = nullptr;
-    double* d_D_right_recv_  = nullptr;
+    // Single bidirectional exchange: right neighbor's row-0 (A, D), used to
+    // solve the right-interface 2x2 locally (one comm round, no 2nd round).
+    double* d_A_right_recv_  = nullptr;
+    double* d_D0_right_recv_ = nullptr;
 
     // Per-row spectral radius estimates (device)
     double* d_A_rho_ = nullptr;
