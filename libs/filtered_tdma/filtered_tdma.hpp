@@ -63,9 +63,12 @@ public:
     }
 
 private:
-    /// Estimate cutoff index J from worst-case bounds. (v1)
+    /// Estimate cutoff index J using ||A^{-1}|| * ||b|| bound:
+    ///   B = q(2+q) / ((1-q)(1-2rho)) * max|D_rhs|
+    /// D must point to the full [n_row x n_sys] RHS array before elimination.
+    int cal_J_rhs_bound(const double* D);
+    /// Legacy estimators kept for reference (no longer called).
     int cal_J_v1(const double* D0, const double* DN);
-    /// Estimate cutoff index J from worst-case bounds. (v2)
     int cal_J_v2(double D0, double DN);
 
     // --- MPI plan data ---

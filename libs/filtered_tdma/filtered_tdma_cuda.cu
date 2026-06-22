@@ -108,11 +108,13 @@ void k_bwd_pass(double* A, double* C, double* D,
 // v2 merged forward sweep: row 0,1 normalize, then full update (rows 2..J),
 // then skip-A update (rows J+1..n_row-1). Single kernel — replaces
 // k_fwd_norm_01 + per-row k_fwd_step + per-row k_fwd_step_skipA loops.
+// J is read from device memory (broadcast via L2 cache, no D2H copy needed).
 __global__ __launch_bounds__(BLOCK_SYS, 4)
 void k_fwd_pass_v2(double* A, double* B, double* C, double* D,
-                   int n_sys, int n_row, int J) {
+                   int n_sys, int n_row, const int* __restrict__ d_J) {
     int i = blockIdx.x * blockDim.x + threadIdx.x;
     if (i >= n_sys) return;
+    const int J = __ldg(d_J);
 
     double r0 = 1.0 / B[i];
     A[i] *= r0; C[i] *= r0; D[i] *= r0;
@@ -144,11 +146,14 @@ void k_fwd_pass_v2(double* A, double* B, double* C, double* D,
 
 // v2 merged backward sweep — 3 phases (D-only over all, A-only up to J-1,
 // C-multiply down to lo+1). Single kernel replaces per-row launches.
+// J is read from device memory; lo is derived on-device (lo = (n_row-2) - J).
 __global__ __launch_bounds__(BLOCK_SYS, 4)
 void k_bwd_pass_v2(double* A, double* C, double* D,
-                   int n_sys, int n_row, int J, int lo) {
+                   int n_sys, int n_row, const int* __restrict__ d_J) {
     int i = blockIdx.x * blockDim.x + threadIdx.x;
     if (i >= n_sys) return;
+    const int J  = __ldg(d_J);
+    const int lo = (n_row - 2) - J;
 
     for (int j = n_row - 3; j >= 1; --j) {
         std::size_t off_j  = (std::size_t)j * n_sys + i;
@@ -169,21 +174,22 @@ void k_bwd_pass_v2(double* A, double* C, double* D,
     }
 }
 
-// Merged final corrections. Applies the left correction for j in [1, j_left_end]
-// and the right correction for j in [j_right_beg, n_row-2] — single launch.
+// Merged final corrections. Applies the left correction for j in [1, J]
+// and the right correction for j in [(n_row-1)-J, n_row-2] — single launch.
+// J read from device memory (no D2H copy required).
 __global__ __launch_bounds__(BLOCK_SYS, 4)
 void k_final_pass(const double* A, const double* C, double* D,
-                             const double* D0, const double* DN,
-                             int n_sys, int n_row,
-                             int j_left_end, int j_right_beg) {
+                  const double* D0, const double* DN,
+                  int n_sys, int n_row, const int* __restrict__ d_J) {
     int i = blockIdx.x * blockDim.x + threadIdx.x;
     if (i >= n_sys) return;
 
+    const int J = __ldg(d_J);
     double d0 = D0[i];
     double dn = DN[i];
-    int jL = j_left_end;
-    if (jL > n_row - 2) jL = n_row - 2;
-    int jR = j_right_beg < 1 ? 1 : j_right_beg;
+    int jL = J < n_row - 2 ? J : n_row - 2;
+    int jR = (n_row - 1) - J;
+    if (jR < 1) jR = 1;
 
     for (int j = 1; j <= jL; ++j) {
         std::size_t off = (std::size_t)j * n_sys + i;
@@ -282,6 +288,63 @@ __global__ void k_cal_J_v1(int* __restrict__ d_J,
             double q = rho / lambda_p;
             double K = (max_D0 + max_DN) * q / (1.0 - q);
             int Jcomp = (int)(log(eps / K) / log(q)) + 1;
+            J = (Jcomp < n_row - 1) ? Jcomp : n_row - 1;
+        }
+        *d_J = J;
+    }
+}
+
+// Single-block GPU implementation of cal_J_rhs_bound.
+// Reduces max|d_D| over all n_row*n_sys elements, then computes
+//   B = q(2+q) / ((1-q)(1-2*rho)) * max_b,  J = floor(log(eps/B)/log(q)) + 1.
+__global__ void k_cal_J_rhs_bound(int* __restrict__ d_J,
+                                   const double* __restrict__ d_A_rho,
+                                   const double* __restrict__ d_C_rho,
+                                   const double* __restrict__ d_D,
+                                   int n_sys, int n_row, double eps) {
+    __shared__ double s_rho[BLOCK_SYS];
+    __shared__ double s_b  [BLOCK_SYS];
+    int tid = threadIdx.x;
+
+    double my_rho = 0.0;
+    const int rho_begin = 2;
+    const int rho_end   = n_row + 1 - 2;
+    for (int k = rho_begin + tid; k < rho_end; k += blockDim.x) {
+        double a = d_A_rho[k]; if (a < 0.0) a = -a;
+        double c = d_C_rho[k]; if (c < 0.0) c = -c;
+        double v = a > c ? a : c;
+        if (v > my_rho) my_rho = v;
+    }
+
+    double my_b = 0.0;
+    std::size_t total = (std::size_t)n_row * n_sys;
+    for (std::size_t idx = (std::size_t)tid; idx < total; idx += blockDim.x) {
+        double v = d_D[idx]; if (v < 0.0) v = -v;
+        if (v > my_b) my_b = v;
+    }
+
+    s_rho[tid] = my_rho;
+    s_b  [tid] = my_b;
+    __syncthreads();
+    for (int s = blockDim.x / 2; s > 0; s >>= 1) {
+        if (tid < s) {
+            if (s_rho[tid + s] > s_rho[tid]) s_rho[tid] = s_rho[tid + s];
+            if (s_b  [tid + s] > s_b  [tid]) s_b  [tid] = s_b  [tid + s];
+        }
+        __syncthreads();
+    }
+
+    if (tid == 0) {
+        double rho = s_rho[0];
+        int J;
+        if (rho == 0.0 || rho >= 0.5) {
+            J = n_row - 1;
+        } else {
+            double max_b = s_b[0];
+            double lambda_p = (1.0 + sqrt(1.0 - 4.0 * rho * rho)) * 0.5;
+            double q = rho / lambda_p;
+            double B = q * (2.0 + q) / ((1.0 - q) * (1.0 - 2.0 * rho)) * max_b;
+            int Jcomp = (int)(log(eps / B) / log(q)) + 1;
             J = (Jcomp < n_row - 1) ? Jcomp : n_row - 1;
         }
         *d_J = J;
@@ -432,6 +495,14 @@ int FilteredTDMACUDA::cal_J_v2(double D0, double DN) {
     return J;
 }
 
+int FilteredTDMACUDA::cal_J_rhs_bound(const double* d_D) {
+    k_cal_J_rhs_bound<<<1, BLOCK_SYS>>>(d_J_, d_A_rho_, d_C_rho_,
+                                        d_D, n_sys_, n_row_, eps_);
+    int J = 0;
+    CUDA_CHECK(cudaMemcpy(&J, d_J_, sizeof(int), cudaMemcpyDeviceToHost));
+    return J;
+}
+
 // =============================================================================
 //  solve_filtered_v1
 // =============================================================================
@@ -491,14 +562,13 @@ void FilteredTDMACUDA::solve_filtered_v1(double* d_A, double* d_B, double* d_C, 
         k_unpack_DN<<<grid, block>>>(d_D, d_D_right_recv_, n_sys_, n_row_);
     }
 
-    // 8) Final corrections — single launch covers both left and right ranges.
+    // 8) Compute J on device (no D2H), then apply final corrections.
     const double* D0_dev = d_D;
     const double* DN_dev = d_D + (std::size_t)(n_row_ - 1) * n_sys_;
-    int J = cal_J_v1(D0_dev, DN_dev);
-    const int j_left_end  = J;
-    const int j_right_beg = (n_row_ - 1) - J;
+    k_cal_J_v1<<<1, BLOCK_SYS>>>(d_J_, d_A_rho_, d_C_rho_,
+                                  D0_dev, DN_dev, n_sys_, n_row_, eps_);
     k_final_pass<<<grid, block>>>(d_A, d_C, d_D, D0_dev, DN_dev,
-                                  n_sys_, n_row_, j_left_end, j_right_beg);
+                                  n_sys_, n_row_, d_J_);
 }
 
 // =============================================================================
@@ -514,15 +584,21 @@ void FilteredTDMACUDA::solve_filtered_v2(double* d_A, double* d_B, double* d_C, 
     const dim3 block(BLOCK_SYS);
     const dim3 grid = grid1D(n_sys_);
 
-    // J is computed up-front from a conservative bound on D0/DN (=2.0 each).
-    const int J  = cal_J_v2(2.0, 2.0);
-    const int lo = (n_row_ - 2) - J;
+    // Compute J from boundary rows only (n_sys elements each, not n_row*n_sys).
+    // k_cal_J_v1 reads D0 and DN — the pre-solve first/last rows of d_D — which
+    // is n_row× cheaper than the full-RHS scan of k_cal_J_rhs_bound.
+    // Correctness: the v2 filter correction is conservative, so a slightly
+    // tighter J (from boundary estimates) is sufficient.
+    const double* D0_pre = d_D;
+    const double* DN_pre = d_D + (std::size_t)(n_row_ - 1) * n_sys_;
+    k_cal_J_v1<<<1, BLOCK_SYS>>>(d_J_, d_A_rho_, d_C_rho_,
+                                  D0_pre, DN_pre, n_sys_, n_row_, eps_);
 
-    // 1) Forward elimination — full (j≤J) + skip-A (j>J), single kernel.
-    k_fwd_pass_v2<<<grid, block>>>(d_A, d_B, d_C, d_D, n_sys_, n_row_, J);
+    // 1) Forward elimination — reads J from d_J_ via __ldg.
+    k_fwd_pass_v2<<<grid, block>>>(d_A, d_B, d_C, d_D, n_sys_, n_row_, d_J_);
 
-    // 2) Backward substitution — 3 phases, single kernel.
-    k_bwd_pass_v2<<<grid, block>>>(d_A, d_C, d_D, n_sys_, n_row_, J, lo);
+    // 2) Backward substitution — reads J (and derives lo) from d_J_.
+    k_bwd_pass_v2<<<grid, block>>>(d_A, d_C, d_D, n_sys_, n_row_, d_J_);
 
     // 3) Pack reduced system
     k_pack<<<grid, block>>>(d_A, d_C, d_D, n_sys_);
@@ -562,12 +638,10 @@ void FilteredTDMACUDA::solve_filtered_v2(double* d_A, double* d_B, double* d_C, 
         k_unpack_DN<<<grid, block>>>(d_D, d_D_right_recv_, n_sys_, n_row_);
     }
 
-    // 8) Final corrections (same merged kernel as v1).
+    // 8) Final corrections — d_J_ already holds the correct J from step 1.
     const double* D0_dev = d_D;
     const double* DN_dev = d_D + (std::size_t)(n_row_ - 1) * n_sys_;
-    const int j_left_end  = J;
-    const int j_right_beg = lo + 1;
     k_final_pass<<<grid, block>>>(d_A, d_C, d_D, D0_dev, DN_dev,
-                                  n_sys_, n_row_, j_left_end, j_right_beg);
+                                  n_sys_, n_row_, d_J_);
     (void)d_B;
 }

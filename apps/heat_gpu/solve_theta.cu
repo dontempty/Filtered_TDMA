@@ -433,8 +433,10 @@ void SolveTheta::profile(std::vector<double>& theta) {
     int ix = nx_full - 2;              // interior count
     int iy = ny_full - 2;
     int iz = nz_full - 2;
-    int max_iter = params_.Nt;
-    double dt    = params_.dt;
+    int max_iter  = params_.Nt;
+    int n_warmup  = params_.Nt_warmup;
+    int n_timing  = max_iter - n_warmup;
+    double dt     = params_.dt;
 
     auto cx = topo_.commX();
     auto cy = topo_.commY();
@@ -526,12 +528,14 @@ void SolveTheta::profile(std::vector<double>& theta) {
     // -------------------------------------------------------------------
     //  Time-step loop  (per-step, per-rank, per-event timing → long CSV)
     //  Events: rhs, solve_z, solve_y, solve_x, etc, comm
-    //  t_step==0 is treated as a warmup — measured but NOT written to CSV.
+    //  Timing CSV is written only for scaling tests (option != "order").
     // -------------------------------------------------------------------
+    const bool do_timing = (params_.option != "order");
     const std::vector<std::string> event_names =
         {"rhs", "solve_z", "solve_y", "solve_x", "etc", "comm"};
     const int n_events = (int)event_names.size();
-    timing_csv::timing_init(n_events, max_iter - 1, MPI_COMM_WORLD);
+    if (do_timing)
+        timing_csv::timing_init(n_events, n_timing, MPI_COMM_WORLD);
     std::vector<double> local_times(n_events, 0.0);
 
     for (int t_step = 0; t_step < max_iter; ++t_step) {
@@ -624,21 +628,21 @@ void SolveTheta::profile(std::vector<double>& theta) {
         t1 = MPI_Wtime();
         local_times[3] = t1 - t0;
 
-        // Skip t_step==0 (warmup): record only steps 1..max_iter-1.
-        if (t_step >= 1) {
-            timing_csv::timing_record(t_step, local_times, MPI_COMM_WORLD);
+        // Skip warmup steps; record only the timed phase.
+        if (do_timing && t_step >= n_warmup) {
+            timing_csv::timing_record(t_step - n_warmup, local_times, MPI_COMM_WORLD);
         }
     }
 
     // -------------------------------------------------------------------
-    //  Write long-format CSV (rank 0 only).
+    //  Write long-format CSV (rank 0 only) — scaling tests only.
     //  Path:  results/timing_<N>_<npx><npy><npz>_<backend>.csv
-    //  Meta:  # grid=NxNxN, np=NP (npx,npy,npz), dt=..., Tmax=..., solver_kind=<backend>
+    //  Meta:  # grid=NxNxN, np=NP (npx,npy,npz), dt=..., Nt=..., solver_kind=<backend>
     // -------------------------------------------------------------------
-    {
+    if (do_timing) {
         char meta[256];
         std::snprintf(meta, sizeof(meta),
-                      "grid=%dx%dx%d, np=%d (%d,%d,%d), dt=%10.3E, Tmax=%d, solver_kind=%s",
+                      "grid=%dx%dx%d, np=%d (%d,%d,%d), dt=%10.3E, Nt=%d, solver_kind=%s",
                       params_.nx, params_.ny, params_.nz,
                       cx.nprocs * cy.nprocs * cz.nprocs,
                       params_.np_dim[0], params_.np_dim[1], params_.np_dim[2],
@@ -656,8 +660,8 @@ void SolveTheta::profile(std::vector<double>& theta) {
         }
 
         timing_csv::timing_save_csv(fn, event_names, meta, MPI_COMM_WORLD);
-        timing_csv::timing_cleanup();
     }
+    timing_csv::timing_cleanup();
 
     // -------------------------------------------------------------------
     //  D2H once

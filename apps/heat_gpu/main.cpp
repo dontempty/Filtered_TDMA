@@ -67,27 +67,29 @@ int main(int argc, char** argv) {
     SolveTheta solver(params, topo, sub);
     solver.run(theta);
 
-    // 6) Compute L2 error
-    double local_error = 0.0;
-    for (int k = 1; k < sub.nz_sub; ++k)
-        for (int j = 1; j < sub.ny_sub; ++j)
-            for (int i = 1; i < sub.nx_sub; ++i) {
-                int ijk = idx_ijk(i, j, k, sub.nx_sub+1, sub.ny_sub+1);
-                double exact = sin(Pi * sub.x_sub[i]) * sin(Pi * sub.y_sub[j])
-                             * sin(Pi * sub.z_sub[k])
-                             * exp(-3.0 * Pi * Pi * params.Nt * params.dt)
-                             + cos(Pi * sub.x_sub[i]) * cos(Pi * sub.y_sub[j])
-                             * cos(Pi * sub.z_sub[k]);
-                double diff = theta[ijk] - exact;
-                local_error += diff * diff;
-            }
+    // 6) Compute L2 error — only for order-of-accuracy tests
+    if (params.option == "order") {
+        double local_error = 0.0;
+        for (int k = 1; k < sub.nz_sub; ++k)
+            for (int j = 1; j < sub.ny_sub; ++j)
+                for (int i = 1; i < sub.nx_sub; ++i) {
+                    int ijk = idx_ijk(i, j, k, sub.nx_sub+1, sub.ny_sub+1);
+                    double exact = sin(Pi * sub.x_sub[i]) * sin(Pi * sub.y_sub[j])
+                                 * sin(Pi * sub.z_sub[k])
+                                 * exp(-3.0 * Pi * Pi * params.Nt * params.dt)
+                                 + cos(Pi * sub.x_sub[i]) * cos(Pi * sub.y_sub[j])
+                                 * cos(Pi * sub.z_sub[k]);
+                    double diff = theta[ijk] - exact;
+                    local_error += diff * diff;
+                }
 
-    double global_error;
-    MPI_Allreduce(&local_error, &global_error, 1, MPI_DOUBLE, MPI_SUM, MPI_COMM_WORLD);
-    if (myrank == 0) {
-        std::cout << "Global L2 error = "
-                  << std::sqrt(global_error / params.nx / params.ny / params.nz)
-                  << "\n";
+        double global_error;
+        MPI_Allreduce(&local_error, &global_error, 1, MPI_DOUBLE, MPI_SUM, MPI_COMM_WORLD);
+        if (myrank == 0) {
+            std::cout << "Global L2 error = "
+                      << std::sqrt(global_error / params.nx / params.ny / params.nz)
+                      << "\n";
+        }
     }
 
     // 7) Cleanup

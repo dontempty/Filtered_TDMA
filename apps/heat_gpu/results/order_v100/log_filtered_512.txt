@@ -1,0 +1,6 @@
+[Tmax] = 0.00195312 | [max_iter] = 128
+[nx] = 512 | [ny] = 512 | [nz] = 512
+[rho] = 0.25
+[backend] = filtered
+ [Timing] CSV saved to results/timing_513_111_filtered.csv
+Global L2 error = 6.46409e-07

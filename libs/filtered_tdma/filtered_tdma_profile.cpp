@@ -201,7 +201,7 @@ void FilteredTDMA::solve_filtered_v2_profile(double* __restrict A,
 
     int i, j;
     double t0, t1;
-    const int J  = cal_J_v2(2.0, 2.0);
+    const int J  = cal_J_rhs_bound(D);
     const int lo = (n_row_ - 2) - J;
     auto p = setup_ptrs(A, B, C, D, n_sys_, n_row_);
 

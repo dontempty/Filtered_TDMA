@@ -20,10 +20,11 @@
 
 class TdmaBackend {
 public:
-    enum class Kind { FILTERED, PASCAL };
+    enum class Kind { FILTERED, FILTERED_V2, PASCAL };
 
-    // "filtered" (default) or "pascal" (case-insensitive); also accepts
-    // "pascal_tdma" / "filtered_tdma".
+    // "filtered" / "filtered_v1" → v1 (solution-based J)
+    // "filtered_v2"              → v2 (RHS-bound J)
+    // "pascal" / "pascal_tdma"  → PaScaL_TDMA
     static Kind parse(const std::string& s);
 
     TdmaBackend(Kind kind, int n_sys, int n_row,

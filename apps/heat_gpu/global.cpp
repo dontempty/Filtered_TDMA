@@ -44,8 +44,10 @@ void GlobalParams::load(const std::string& filename) {
     np_dim[2]    = std::stoi(param.at("npz"));
     rho          = std::stod(param.at("rho"));
     eps_constant = std::stod(param.at("eps"));
-    Tmax         = std::stod(param.at("Tmax"));
-    dt           = std::stod(param.at("dt"));
+    Tmax         = param.count("Tmax")   ? std::stod(param.at("Tmax")) : 0.0;
+    dt           = param.count("dt")     ? std::stod(param.at("dt"))   : 0.0;
+    Nt           = param.count("Nt")     ? std::stoi(param.at("Nt"))   : 0;
+    Nt_warmup    = param.count("warmup") ? std::stoi(param.at("warmup")) : 0;
     option       = param.at("option");
     if (auto it = param.find("tdma_backend"); it != param.end()) {
         tdma_backend = it->second;
@@ -64,25 +66,22 @@ void GlobalParams::load(const std::string& filename) {
     dy = ly / (ny - 1);
     dz = lz / (nz - 1);
 
-    // Save input values for strong option (timing benchmarks use input directly)
-    const double Tmax_in = Tmax;
-    const double dt_in   = dt;
-
-    // Time step from rho
-    dt = rho / (1.0 - 2.0 * rho) * (2.0 * dx * dx);
-
-    // Reference Tmax (fixed at 512-grid equivalent × 128 steps)
-    double dt_N = rho / (1.0 - 2.0 * rho) * (2.0 * (lx / 512.0) * (lx / 512.0));
-    Tmax = dt_N * 128.0;
-
     if (option == "order") {
-        Nt = static_cast<int>(std::round(Tmax / dt));
-    } else if (option == "strong") {
-        // Use input Tmax/dt directly (rho ignored for timing benchmarks)
-        Tmax = Tmax_in;
-        dt   = dt_in;
+        // dt from rho and dx (spatial convergence: uniform grid)
+        dt   = rho / (1.0 - 2.0 * rho) * (2.0 * dx * dx);
+        // Reference Tmax: 512-grid equivalent × 128 steps
+        double dt_N = rho / (1.0 - 2.0 * rho) * (2.0 * (lx / 512.0) * (lx / 512.0));
+        Tmax = dt_N * 128.0;
         Nt   = static_cast<int>(std::round(Tmax / dt));
+    } else if (option == "strong") {
+        // dt from rho and dz so that rho_z is fixed regardless of nz.
+        // Nt (total steps incl. warmup) and warmup are read from input.
+        dt   = rho / (1.0 - 2.0 * rho) * (2.0 * dz * dz);
+        Tmax = Nt * dt;
     } else {
-        Nt = static_cast<int>(std::round(Tmax / dt));
+        dt   = rho / (1.0 - 2.0 * rho) * (2.0 * dx * dx);
+        double dt_N = rho / (1.0 - 2.0 * rho) * (2.0 * (lx / 512.0) * (lx / 512.0));
+        Tmax = dt_N * 128.0;
+        Nt   = static_cast<int>(std::round(Tmax / dt));
     }
 }

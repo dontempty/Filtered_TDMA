@@ -57,8 +57,11 @@ public:
     void set_rho_device(const double* d_A, const double* d_B, const double* d_C);
 
 private:
-    /// Estimate cutoff index J from worst-case bounds (matches CPU exactly).
-    /// `D0_dev`, `DN_dev` are pointers to row 0 / row n_row-1 of D on device.
+    /// Estimate cutoff index J using ||A^{-1}|| * ||b|| bound:
+    ///   B = q(2+q) / ((1-q)(1-2rho)) * max|d_D|
+    /// d_D must be the full [n_row x n_sys] RHS device array before elimination.
+    int cal_J_rhs_bound(const double* d_D);
+    /// Legacy estimators kept for reference (no longer called).
     int cal_J_v1(const double* D0_dev, const double* DN_dev);
     int cal_J_v2(double D0, double DN);
 

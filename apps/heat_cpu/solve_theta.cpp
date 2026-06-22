@@ -3,7 +3,9 @@
 #include "index.hpp"
 #include "stencil_coeffs.hpp"
 #include "debug.hpp"
+#include "timing_csv.hpp"
 
+#include <cstdlib>
 #include <iostream>
 #include <string>
 #include <cmath>
@@ -63,6 +65,16 @@ void SolveTheta::run(std::vector<double>& theta) {
         std::cout << "[eps const] = " << eps_c << "\n";
         std::cout << "[backend] = " << params_.tdma_backend << "\n";
     }
+
+    const bool do_timing = (params_.option != "order");
+    const int n_warmup   = params_.Nt_warmup;
+    const int n_timing   = max_iter - n_warmup;
+    const std::vector<std::string> event_names =
+        {"rhs", "solve_z", "solve_y", "solve_x", "comm"};
+    const int n_events = (int)event_names.size();
+    if (do_timing)
+        timing_csv::timing_init(n_events, n_timing, MPI_COMM_WORLD);
+    std::vector<double> local_times(n_events, 0.0);
 
     for (int t_step = 0; t_step < max_iter; ++t_step) {
 
@@ -305,21 +317,45 @@ void SolveTheta::run(std::vector<double>& theta) {
         comm_t1 = MPI_Wtime();
 
         // ============================================================
-        // Save timing data (strong scaling mode)
+        // Record timing (scaling tests only, after warmup)
         // ============================================================
-        if (params_.option == "strong") {
-            int nptot = params_.np_dim[0] * params_.np_dim[1] * params_.np_dim[2];
-            save_timing_data(
-                "results/t_" + std::to_string(nptot) + "_" + std::to_string(t_step) + ".txt",
-                MPI_COMM_WORLD,
-                {"rhs", "solve_z", "solve_y", "solve_x", "comm"},
-                {rhs_t1 - rhs_t0,
-                 solve_z_t1 - solve_z_t0,
-                 solve_y_t1 - solve_y_t0,
-                 solve_x_t1 - solve_x_t0,
-                 comm_t1 - comm_t0}
-            );
+        if (do_timing) {
+            local_times[0] = rhs_t1    - rhs_t0;
+            local_times[1] = solve_z_t1 - solve_z_t0;
+            local_times[2] = solve_y_t1 - solve_y_t0;
+            local_times[3] = solve_x_t1 - solve_x_t0;
+            local_times[4] = comm_t1   - comm_t0;
+            if (t_step >= n_warmup)
+                timing_csv::timing_record(t_step - n_warmup, local_times, MPI_COMM_WORLD);
         }
 
     } // end time loop
+
+    // ------------------------------------------------------------------
+    //  Write CSV (scaling tests only).
+    //  Path:  results/timing_<nx>_<npx><npy><npz>_<backend>.csv
+    // ------------------------------------------------------------------
+    if (do_timing) {
+        char meta[256];
+        std::snprintf(meta, sizeof(meta),
+                      "grid=%dx%dx%d, np=%d (%d,%d,%d), dt=%10.3E, Nt=%d, solver_kind=%s",
+                      params_.nx, params_.ny, params_.nz,
+                      params_.np_dim[0] * params_.np_dim[1] * params_.np_dim[2],
+                      params_.np_dim[0], params_.np_dim[1], params_.np_dim[2],
+                      dt, max_iter, params_.tdma_backend.c_str());
+
+        char fn[256];
+        const char* env_path = std::getenv("TIMING_CSV");
+        if (env_path && env_path[0] != '\0') {
+            std::snprintf(fn, sizeof(fn), "%s", env_path);
+        } else {
+            std::snprintf(fn, sizeof(fn), "results/timing_%d_%d%d%d_%s.csv",
+                          params_.nx,
+                          params_.np_dim[0], params_.np_dim[1], params_.np_dim[2],
+                          params_.tdma_backend.c_str());
+        }
+
+        timing_csv::timing_save_csv(fn, event_names, meta, MPI_COMM_WORLD);
+    }
+    timing_csv::timing_cleanup();
 }

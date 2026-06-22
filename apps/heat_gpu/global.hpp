@@ -13,6 +13,7 @@ public:
     double Tmax, dt;
     double rho, eps_constant;
     int Nt;
+    int Nt_warmup;
 
     int nx, ny, nz;
     int nxm, nym, nzm;
