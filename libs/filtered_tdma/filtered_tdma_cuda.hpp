@@ -2,18 +2,20 @@
 #define FILTERED_TDMA_CUDA_HPP
 
 #include <mpi.h>
+#include <cuda_runtime.h>
 
-/// CUDA / GPU version of FilteredTDMA.
+/// CUDA implementation of the Filtered TDMA solver.
 ///
-/// Mirrors the CPU class (same DistD2 algorithm, same MPI subarray-based
-/// boundary-row exchange), but every per-row sweep over `n_sys` runs as a
-/// CUDA kernel and all working buffers (`A_rho`, `C_rho`, the 4 receive /
-/// send rows of size `n_sys`) live in GPU memory.
+/// Solves a distributed tridiagonal system split across `nprocs` ranks along
+/// the row dimension. Each rank holds `n_row` rows of `n_sys` independent
+/// systems. All matrix/RHS arrays are device pointers (row-major, n_row×n_sys).
 ///
-/// All input pointers passed to `solve_filtered_v1/v2()` must be **device
-/// pointers**, row-major `[n_row × n_sys]`. The MPI Isend/Irecv calls use
-/// these device pointers directly — a CUDA-aware MPI build is required
-/// (matches the `PaScaLTDMAManyCUDA` requirement on the same partition).
+/// Communication uses CUDA-aware MPI (P2P Isend/Irecv with neighbor ranks).
+/// Two packed 2×n_sys buffers are exchanged per solve, one in each direction.
+///
+/// v1: standard forward/backward sweep (all rows updated).
+/// v2: filtered sweep — computes cutoff J before the forward pass and skips
+///     A updates for rows beyond J, reducing compute when rho is small.
 class FilteredTDMACUDA {
 public:
     FilteredTDMACUDA(int n_sys, int n_row,
@@ -26,18 +28,12 @@ public:
     FilteredTDMACUDA(const FilteredTDMACUDA&)            = delete;
     FilteredTDMACUDA& operator=(const FilteredTDMACUDA&) = delete;
 
-    /// Filtered_TDMA (v1). Device pointers required. `d_D` overwritten on
-    /// return with the solution.
     void solve_filtered_v1(double* d_A, double* d_B, double* d_C, double* d_D);
-
-    /// Filtered_TDMA (v2). Device pointers required.
     void solve_filtered_v2(double* d_A, double* d_B, double* d_C, double* d_D);
 
-    /// Periodic (cyclic) variants. The multi-rank body is identical to the
-    /// non-cyclic solve — the cyclic coupling comes from a PERIODIC MPI
-    /// communicator (rank 0's left neighbor = last rank), so every rank has
-    /// both interface 2x2 blocks. Only the nprocs==1 local fallback differs
-    /// (tdma_cyclic_many_cuda instead of tdma_many_cuda).
+    /// Periodic variants: rank 0's left neighbor is the last rank, giving every
+    /// rank real interface blocks on both sides. The multi-rank body is identical
+    /// to the non-periodic solve; only the nprocs==1 fallback differs.
     void solve_cycl_filtered_v1(double* d_A, double* d_B, double* d_C, double* d_D);
     void solve_cycl_filtered_v2(double* d_A, double* d_B, double* d_C, double* d_D);
 
@@ -65,16 +61,12 @@ public:
     void set_rho_device(const double* d_A, const double* d_B, const double* d_C);
 
 private:
-    /// Estimate cutoff index J using ||A^{-1}|| * ||b|| bound:
-    ///   B = q(2+q) / ((1-q)(1-2rho)) * max|d_D|
-    /// d_D must be the full [n_row x n_sys] RHS device array before elimination.
+    // Estimate cutoff J from boundary rows D[0,:] and D[n_row-1,:] using the
+    // v2 formula. Result written to d_J_ on device; also returns J via D2H copy.
     int cal_J_rhs_bound(const double* d_D);
-    /// Legacy estimators kept for reference (no longer called).
-    int cal_J_v1(const double* D0_dev, const double* DN_dev);
-    int cal_J_v2(double D0, double DN);
 
-    // Multi-rank (nprocs>1) solve bodies, shared by the cyclic and non-cyclic
-    // public entry points. Cyclic-ness is purely a property of comm_ here.
+    // Shared solve bodies for both the cyclic and non-cyclic public entry points.
+    // Cyclic-ness is encoded in comm_ (periodic communicator → both boundaries active).
     void v1_multirank(double* d_A, double* d_B, double* d_C, double* d_D);
     void v2_multirank(double* d_A, double* d_B, double* d_C, double* d_D);
 
@@ -83,18 +75,15 @@ private:
     int          n_sys_, n_row_, nprocs_;
     int          left_rank_, right_rank_;
 
-    // Device receive / send buffers for neighbor boundary data.
-    // d_*_lastrow_send_ are dedicated contiguous staging buffers for the
-    // CUDA-aware MPI fast path (pack kernel → cudaStreamSynchronize →
-    // MPI on plain MPI_DOUBLE). Mirrors PaScaL_TDMA's d_sendbuf_/d_recvbuf_.
-    double* d_C_lastrow_send_ = nullptr;
-    double* d_D_lastrow_send_ = nullptr;
-    double* d_C_left_recv_   = nullptr;
-    double* d_D_left_recv_   = nullptr;
-    // Single bidirectional exchange: right neighbor's row-0 (A, D), used to
-    // solve the right-interface 2x2 locally (one comm round, no 2nd round).
-    double* d_A_right_recv_  = nullptr;
-    double* d_D0_right_recv_ = nullptr;
+    // Packed 2-message exchange buffers (each 2*n_sys doubles).
+    // send_right: [C_lastrow | D_lastrow] → right neighbor (tags 1)
+    // send_left : [A_row0   | D_row0  ] → left  neighbor (tag 2)
+    // recv_left : [C | D] from left  (C_left = recv_left, D_left = recv_left+n_sys)
+    // recv_right: [A | D] from right (A_right= recv_right, D0_right= recv_right+n_sys)
+    double* d_send_right_ = nullptr;
+    double* d_send_left_  = nullptr;
+    double* d_recv_left_  = nullptr;
+    double* d_recv_right_ = nullptr;
 
     // Per-row spectral radius estimates (device)
     double* d_A_rho_ = nullptr;
@@ -106,6 +95,27 @@ private:
     double* d_E_     = nullptr;
 
     double eps_;
+
+    // --- per-solve timing ---
+    double last_comm_ms_ = 0.0;  // pure MPI time (after GPU sync)
+    double last_gpu_ms_  = 0.0;  // GPU kernel time (CUDA events)
+
+    // 4 events to bracket pre-comm and post-comm kernel groups.
+    // Initialized in ctor, destroyed in dtor.
+    cudaEvent_t e_gpu_start_     = nullptr;  // before first kernel
+    cudaEvent_t e_gpu_pre_end_   = nullptr;  // after last pre-comm kernel
+    cudaEvent_t e_gpu_post_start_= nullptr;  // before k_solve_both
+    cudaEvent_t e_gpu_post_end_  = nullptr;  // after k_final_pass
+
+public:
+    /// Pure MPI wall-clock time (ms) for the most recent solve call.
+    /// Measured AFTER cudaStreamSynchronize — excludes GPU sync wait.
+    double last_comm_ms() const { return last_comm_ms_; }
+
+    /// GPU kernel execution time (ms) for the most recent solve call.
+    /// Sum of pre-comm kernels (fwd, bwd+pack, pack_lastrow/row0) and
+    /// post-comm kernels (solve_both, cal_J, final_pass).
+    double last_gpu_ms()  const { return last_gpu_ms_; }
 };
 
 #endif // FILTERED_TDMA_CUDA_HPP

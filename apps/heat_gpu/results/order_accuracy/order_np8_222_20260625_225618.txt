@@ -1,0 +1,26 @@
+# Order-of-accuracy  np=8  decomp=2x2x2  Thu Jun 25 22:56:18 KST 2026
+# Node=gpu56  Binary: 609K Jun 25 22:49
+
+=== backend=filtered_v1  rho=0.25 ===
+  N=64  L2=0.000124417
+  N=128  L2=3.43422e-05
+  N=256  L2=8.6119e-06
+  N=512  L2=2.16478e-06
+
+=== backend=filtered_v1  rho=0.40 ===
+  N=64  L2=0.00116969
+  N=128  L2=0.00183021
+  N=256  L2=2.8008
+  N=512  L2=5.08376e+15
+
+=== backend=filtered_v2  rho=0.25 ===
+  N=64  L2=0.000124417
+  N=128  L2=3.43422e-05
+  N=256  L2=8.6119e-06
+  N=512  L2=2.16478e-06
+
+=== backend=filtered_v2  rho=0.40 ===
+  N=64  L2=0.0011697
+  N=128  L2=0.00183021
+  N=256  L2=2.8008
+  N=512  L2=5.08376e+15

@@ -138,16 +138,24 @@ void SolveTheta::run(std::vector<double>& theta) {
                     Dzz[ik] = rhs[idx_ijk(i, j, k, nx1, ny1)];
                 }
             }
-            // Implicit ghost correction: D[kk=0] += sz.a * theta[k=0]
+            // Fully-implicit Dirichlet wall: fold the ghost's unknown part into
+            // the diagonal (1+2base -> 1+3base) instead of lagging it at theta^n;
+            // move only the known 2*uBC = (ghost + boundary cell) to the RHS.
             if (sub_.theta_z_left_index[1]) {
-                for (i = 1; i < nx1-1; ++i)
-                    Dzz[idx_ik(i-1, 0, nx1-2)] +=
-                        sz0.a * theta[idx_ijk(i, j, 0, nx1, ny1)];
+                for (i = 1; i < nx1-1; ++i) {
+                    int row = idx_ik(i-1, 0, nx1-2);
+                    Dzz[row] += sz0.a * (theta[idx_ijk(i, j, 0, nx1, ny1)]
+                                       + theta[idx_ijk(i, j, 1, nx1, ny1)]);
+                    Bzz[row] += sz0.a;
+                }
             }
             if (sub_.theta_z_right_index[nz1-2]) {
-                for (i = 1; i < nx1-1; ++i)
-                    Dzz[idx_ik(i-1, nz1-3, nx1-2)] +=
-                        sz0.c * theta[idx_ijk(i, j, nz1-1, nx1, ny1)];
+                for (i = 1; i < nx1-1; ++i) {
+                    int row = idx_ik(i-1, nz1-3, nx1-2);
+                    Dzz[row] += sz0.c * (theta[idx_ijk(i, j, nz1-1, nx1, ny1)]
+                                       + theta[idx_ijk(i, j, nz1-2, nx1, ny1)]);
+                    Bzz[row] += sz0.c;
+                }
             }
             solver_z.set_rho(Azz.data(), Bzz.data(), Czz.data());
             if (params_.periodic[2])
@@ -176,14 +184,20 @@ void SolveTheta::run(std::vector<double>& theta) {
                 }
             }
             if (sub_.theta_y_left_index[1]) {
-                for (i = 1; i < nx1-1; ++i)
-                    Dyy[idx_ij(i-1, 0, nx1-2)] +=
-                        sy0.a * theta[idx_ijk(i, 0, k, nx1, ny1)];
+                for (i = 1; i < nx1-1; ++i) {
+                    int row = idx_ij(i-1, 0, nx1-2);
+                    Dyy[row] += sy0.a * (theta[idx_ijk(i, 0, k, nx1, ny1)]
+                                       + theta[idx_ijk(i, 1, k, nx1, ny1)]);
+                    Byy[row] += sy0.a;
+                }
             }
             if (sub_.theta_y_right_index[ny1-2]) {
-                for (i = 1; i < nx1-1; ++i)
-                    Dyy[idx_ij(i-1, ny1-3, nx1-2)] +=
-                        sy0.c * theta[idx_ijk(i, ny1-1, k, nx1, ny1)];
+                for (i = 1; i < nx1-1; ++i) {
+                    int row = idx_ij(i-1, ny1-3, nx1-2);
+                    Dyy[row] += sy0.c * (theta[idx_ijk(i, ny1-1, k, nx1, ny1)]
+                                       + theta[idx_ijk(i, ny1-2, k, nx1, ny1)]);
+                    Byy[row] += sy0.c;
+                }
             }
             solver_y.set_rho(Ayy.data(), Byy.data(), Cyy.data());
             if (params_.periodic[1])
@@ -212,14 +226,20 @@ void SolveTheta::run(std::vector<double>& theta) {
                 }
             }
             if (sub_.theta_x_left_index[1]) {
-                for (j = 1; j < ny1-1; ++j)
-                    Dxx[idx_ji(j-1, 0, ny1-2)] +=
-                        sx0.a * theta[idx_ijk(0, j, k, nx1, ny1)];
+                for (j = 1; j < ny1-1; ++j) {
+                    int row = idx_ji(j-1, 0, ny1-2);
+                    Dxx[row] += sx0.a * (theta[idx_ijk(0, j, k, nx1, ny1)]
+                                       + theta[idx_ijk(1, j, k, nx1, ny1)]);
+                    Bxx[row] += sx0.a;
+                }
             }
             if (sub_.theta_x_right_index[nx1-2]) {
-                for (j = 1; j < ny1-1; ++j)
-                    Dxx[idx_ji(j-1, nx1-3, ny1-2)] +=
-                        sx0.c * theta[idx_ijk(nx1-1, j, k, nx1, ny1)];
+                for (j = 1; j < ny1-1; ++j) {
+                    int row = idx_ji(j-1, nx1-3, ny1-2);
+                    Dxx[row] += sx0.c * (theta[idx_ijk(nx1-1, j, k, nx1, ny1)]
+                                       + theta[idx_ijk(nx1-2, j, k, nx1, ny1)]);
+                    Bxx[row] += sx0.c;
+                }
             }
             solver_x.set_rho(Axx.data(), Bxx.data(), Cxx.data());
             if (params_.periodic[0])

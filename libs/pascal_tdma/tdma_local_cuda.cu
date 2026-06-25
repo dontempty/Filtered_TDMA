@@ -26,66 +26,40 @@ __device__ __forceinline__ int linear_sys(int n_sys) {
     return blockIdx.x * block_total() + linear_tid();
 }
 
-// Local Thomas — 6 shared buffers (bx+1, by); pipeline keeps the (j-1) row's
-// c/d in shared so the forward sweep only loads the new row from global.
-// Mirrors PaScaL_TDMA_F tdmas_cuda.f90 tdma_many_cuda.
-// launch_bounds(256, 4): explicit register budget cap 65536/(256*4)=64 regs.
-// Same hint as Fortran side for consistent intent across both codes.
-__global__ __launch_bounds__(256, 4)
+// Local Thomas — register-resident scalars, mirrors Fortran tdma_many_cuda.
+// No shared memory: each thread owns one column and keeps the sliding-window
+// (c0, d0 from row j-1) in registers, identical to Fortran local variables.
+__global__ __launch_bounds__(256)
 void tdma_many_kernel(double* __restrict__ A,
                       double* __restrict__ B,
                       double* __restrict__ C,
                       double* __restrict__ D,
                       int n_sys, int n_row) {
-    const int tx = threadIdx.x;
-    const int ty = threadIdx.y;
-    const int bx = blockDim.x;
-    const int by = blockDim.y;
-    int i = blockIdx.x * (bx * by) + ty * bx + tx;
+    int i = blockIdx.x * blockDim.x * blockDim.y
+          + threadIdx.y * blockDim.x + threadIdx.x;
     if (i >= n_sys) return;
 
-    const int slots = (bx + 1) * by;
-    extern __shared__ double smem[];
-    double* a1 = smem + 0 * slots;
-    double* b1 = smem + 1 * slots;
-    double* c0 = smem + 2 * slots;
-    double* c1 = smem + 3 * slots;
-    double* d0 = smem + 4 * slots;
-    double* d1 = smem + 5 * slots;
-    const int tj = ty * (bx + 1) + tx;
-
-    b1[tj] = B[i];
-    c1[tj] = C[i];
-    d1[tj] = D[i];
-    d1[tj] /= b1[tj];
-    c1[tj] /= b1[tj];
-    C[i] = c1[tj];
-    D[i] = d1[tj];
+    // Row 0: normalize (b is never stored back; only c and d needed later)
+    double b1 = B[i], c1 = C[i], d1 = D[i];
+    d1 /= b1;  c1 /= b1;
+    C[i] = c1;  D[i] = d1;
 
     for (int j = 1; j < n_row; ++j) {
+        double c0 = c1, d0 = d1;
         std::size_t off = (std::size_t)j * n_sys + i;
-        c0[tj] = c1[tj];
-        d0[tj] = d1[tj];
-        a1[tj] = A[off];
-        b1[tj] = B[off];
-        c1[tj] = C[off];
-        d1[tj] = D[off];
-        double r = 1.0 / (b1[tj] - a1[tj] * c0[tj]);
-        d1[tj] = r * (d1[tj] - a1[tj] * d0[tj]);
-        c1[tj] = r * c1[tj];
-        C[off] = c1[tj];
-        D[off] = d1[tj];
+        double a1 = A[off];
+        b1 = B[off];  c1 = C[off];  d1 = D[off];
+        double r = 1.0 / (b1 - a1 * c0);
+        d1 = r * (d1 - a1 * d0);
+        c1 = r * c1;
+        C[off] = c1;  D[off] = d1;
     }
 
-    // Backward substitution: keep the previous D in a register (d_prev)
-    // instead of routing through shared memory d1[tj] — eliminates one
-    // shared-memory read-write per iteration.
-    double d_prev = d1[tj];
+    double d_prev = d1;
     for (int j = n_row - 2; j >= 0; --j) {
         std::size_t off = (std::size_t)j * n_sys + i;
         double d = D[off] - C[off] * d_prev;
-        D[off]  = d;
-        d_prev  = d;
+        D[off] = d;  d_prev = d;
     }
 }
 
@@ -153,11 +127,11 @@ void tdma_cyclic_many_kernel(double* __restrict__ A,
     }
 }
 
-// Modified Thomas pipeline — 9 shared buffers (bx+1, by); +1 padding to
-// avoid 32-way bank conflicts. Mirrors PaScaL_TDMA_F tdmas_cuda.f90.
-// launch_bounds(256, 4): explicit register budget — matches Fortran side
-// policy for cross-language consistency.
-__global__ __launch_bounds__(256, 4)
+// Modified Thomas — register-resident scalars, mirrors Fortran tdma_modified_cuda.
+// No shared memory: a0/b0/c0/d0 hold row j-1, a1/b1/c1/d1 hold row j.
+// The _sh suffix in Fortran is just a naming convention; they are plain
+// local scalars (registers), not Fortran shared-memory variables.
+__global__ __launch_bounds__(256)
 void modified_thomas_kernel(double* __restrict__ A,
                             double* __restrict__ B,
                             double* __restrict__ C,
@@ -167,124 +141,65 @@ void modified_thomas_kernel(double* __restrict__ A,
                             double* __restrict__ C_rd,
                             double* __restrict__ D_rd,
                             int n_sys, int n_row) {
-    int i = linear_sys(n_sys);
+    int i = blockIdx.x * blockDim.x * blockDim.y
+          + threadIdx.y * blockDim.x + threadIdx.x;
     if (i >= n_sys) return;
 
-    const int slots = (blockDim.x + 1) * blockDim.y;
-    const int tj    = threadIdx.y * (blockDim.x + 1) + threadIdx.x;
-    extern __shared__ double smem[];
-    double* a0 = smem + 0 * slots;
-    double* b0 = smem + 1 * slots;
-    double* c0 = smem + 2 * slots;
-    double* d0 = smem + 3 * slots;
-    double* a1 = smem + 4 * slots;
-    double* b1 = smem + 5 * slots;
-    double* c1 = smem + 6 * slots;
-    double* d1 = smem + 7 * slots;
-    double* r0 = smem + 8 * slots;
+    // Row 0
+    double a0 = A[i], b0 = B[i], c0 = C[i], d0 = D[i];
+    a0 /= b0;  c0 /= b0;  d0 /= b0;
+    A[i] = a0;  C[i] = c0;  D[i] = d0;
 
-    a0[tj] = A[i];
-    b0[tj] = B[i];
-    c0[tj] = C[i];
-    d0[tj] = D[i];
-    a0[tj] /= b0[tj];
-    c0[tj] /= b0[tj];
-    d0[tj] /= b0[tj];
-    A[i] = a0[tj];
-    C[i] = c0[tj];
-    D[i] = d0[tj];
-
+    // Row 1
     std::size_t off1 = (std::size_t)1 * n_sys + i;
-    a1[tj] = A[off1];
-    b1[tj] = B[off1];
-    c1[tj] = C[off1];
-    d1[tj] = D[off1];
-    a1[tj] /= b1[tj];
-    c1[tj] /= b1[tj];
-    d1[tj] /= b1[tj];
-    A[off1] = a1[tj];
-    C[off1] = c1[tj];
-    D[off1] = d1[tj];
+    double a1 = A[off1], b1 = B[off1], c1 = C[off1], d1 = D[off1];
+    a1 /= b1;  c1 /= b1;  d1 /= b1;
+    A[off1] = a1;  C[off1] = c1;  D[off1] = d1;
 
+    // Forward elimination rows 2..n_row-1
     for (int j = 2; j < n_row; ++j) {
-        a0[tj] = a1[tj];
-        c0[tj] = c1[tj];
-        d0[tj] = d1[tj];
-
+        a0 = a1;  c0 = c1;  d0 = d1;
         std::size_t off = (std::size_t)j * n_sys + i;
-        a1[tj] = A[off];
-        b1[tj] = B[off];
-        c1[tj] = C[off];
-        d1[tj] = D[off];
-
-        r0[tj] =  1.0 / (b1[tj] - a1[tj] * c0[tj]);
-        d1[tj] =  r0[tj] * (d1[tj] - a1[tj] * d0[tj]);
-        c1[tj] =  r0[tj] * c1[tj];
-        a1[tj] = -r0[tj] * a1[tj] * a0[tj];
-
-        A[off] = a1[tj];
-        C[off] = c1[tj];
-        D[off] = d1[tj];
+        a1 = A[off];  b1 = B[off];  c1 = C[off];  d1 = D[off];
+        double r0 = 1.0 / (b1 - a1 * c0);
+        d1 =  r0 * (d1 - a1 * d0);
+        c1 =  r0 * c1;
+        a1 = -r0 * a1 * a0;
+        A[off] = a1;  C[off] = c1;  D[off] = d1;
     }
 
-    // Forward sweep 끝난 시점에 reduced row 1 (last row)을 즉시 기록 →
-    // backward sweep이 a1/c1/d1[tj]를 덮어쓰기 전이라 임시 register
-    // (a_last/c_last/d_last) 가 불필요 → register pressure 감소.
+    // Reduced row 1 (last row of forward sweep) — still in registers
     {
         std::size_t boff = (std::size_t)1 * n_sys + i;
-        A_rd[boff] = a1[tj];
-        B_rd[boff] = 1.0;
-        C_rd[boff] = c1[tj];
-        D_rd[boff] = d1[tj];
+        A_rd[boff] = a1;  B_rd[boff] = 1.0;  C_rd[boff] = c1;  D_rd[boff] = d1;
     }
 
+    // Backward sweep — load row n_row-2 into (a1,c1,d1) sliding window
     {
         std::size_t off_nm2 = (std::size_t)(n_row - 2) * n_sys + i;
-        a1[tj] = A[off_nm2];
-        c1[tj] = C[off_nm2];
-        d1[tj] = D[off_nm2];
+        a1 = A[off_nm2];  c1 = C[off_nm2];  d1 = D[off_nm2];
     }
 
     for (int j = n_row - 3; j >= 1; --j) {
         std::size_t off = (std::size_t)j * n_sys + i;
-        a0[tj] = A[off];
-        c0[tj] = C[off];
-        d0[tj] = D[off];
-
-        d0[tj] = d0[tj] - c0[tj] * d1[tj];
-        a0[tj] = a0[tj] - c0[tj] * a1[tj];
-        c0[tj] = -c0[tj] * c1[tj];
-
-        a1[tj] = a0[tj];
-        c1[tj] = c0[tj];
-        d1[tj] = d0[tj];
-
-        A[off] = a0[tj];
-        C[off] = c0[tj];
-        D[off] = d0[tj];
+        a0 = A[off];  c0 = C[off];  d0 = D[off];
+        d0 = d0 - c0 * d1;
+        a0 = a0 - c0 * a1;
+        c0 = -c0 * c1;
+        a1 = a0;  c1 = c0;  d1 = d0;
+        A[off] = a0;  C[off] = c0;  D[off] = d0;
     }
 
+    // Final 2×2 reduction at row 0
     {
-        a0[tj] = A[i];
-        c0[tj] = C[i];
-        d0[tj] = D[i];
-
-        r0[tj] = 1.0 / (1.0 - a1[tj] * c0[tj]);
-        d0[tj] =  r0[tj] * (d0[tj] - c0[tj] * d1[tj]);
-        a0[tj] =  r0[tj] * a0[tj];
-        c0[tj] = -r0[tj] * c0[tj] * c1[tj];
-
-        D[i] = d0[tj];
-        A[i] = a0[tj];
-        C[i] = c0[tj];
-
-        A_rd[i] = a0[tj];
-        B_rd[i] = 1.0;
-        C_rd[i] = c0[tj];
-        D_rd[i] = d0[tj];
+        a0 = A[i];  c0 = C[i];  d0 = D[i];
+        double r0 = 1.0 / (1.0 - a1 * c0);
+        d0 =  r0 * (d0 - c0 * d1);
+        a0 =  r0 * a0;
+        c0 = -r0 * c0 * c1;
+        D[i] = d0;  A[i] = a0;  C[i] = c0;
+        A_rd[i] = a0;  B_rd[i] = 1.0;  C_rd[i] = c0;  D_rd[i] = d0;
     }
-    // Note: reduced row 1 was already written above (right after the forward
-    // sweep), so no extra store needed here.
 }
 
 __global__ __launch_bounds__(PASCAL_TDMA_MAX_BLOCK)
@@ -316,9 +231,7 @@ void tdma_many_cuda(double* d_A, double* d_B, double* d_C, double* d_D,
     int block_total_v = block_x * block_y;
     dim3 block(block_x, block_y);
     dim3 grid = grid_for(n_sys, block_total_v);
-    std::size_t smem_bytes = 6 * (std::size_t)(block_x + 1)
-                               * (std::size_t)block_y * sizeof(double);
-    tdma_many_kernel<<<grid, block, smem_bytes, stream>>>(
+    tdma_many_kernel<<<grid, block, 0, stream>>>(
         d_A, d_B, d_C, d_D, n_sys, n_row);
 }
 
@@ -339,9 +252,7 @@ void pascal_tdma_modified_thomas_cuda(double* d_A, double* d_B, double* d_C, dou
     int block_total_v = block_x * block_y;
     dim3 block(block_x, block_y);
     dim3 grid = grid_for(n_sys, block_total_v);
-    std::size_t smem_bytes = 9 * (std::size_t)(block_x + 1)
-                               * (std::size_t)block_y * sizeof(double);
-    modified_thomas_kernel<<<grid, block, smem_bytes, stream>>>(
+    modified_thomas_kernel<<<grid, block, 0, stream>>>(
         d_A, d_B, d_C, d_D, d_A_rd, d_B_rd, d_C_rd, d_D_rd, n_sys, n_row);
 }
 

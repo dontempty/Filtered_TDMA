@@ -58,13 +58,11 @@ FilteredTDMA::~FilteredTDMA() {
 // ============================================================================
 
 int FilteredTDMA::cal_J_rhs_bound(const double* D) {
-    const int skip = 2;
-    const int rho_begin = skip;
-    const int rho_end   = static_cast<int>(A_rho_.size()) - skip;
+    const int m = static_cast<int>(A_rho_.size());
 
     double rho = 0.0;
     #pragma omp simd reduction(max: rho)
-    for (int k = rho_begin; k < rho_end; ++k) {
+    for (int k = 1; k < m-1; ++k) {
         double v = std::max(std::abs(A_rho_[k]), std::abs(C_rho_[k]));
         if (v > rho) rho = v;
     }
@@ -86,13 +84,11 @@ int FilteredTDMA::cal_J_rhs_bound(const double* D) {
 }
 
 int FilteredTDMA::cal_J_v1(const double* D0, const double* DN) {
-    const int skip = 2;
-    const int rho_begin = skip;
-    const int rho_end   = static_cast<int>(A_rho_.size()) - skip;
+    const int m = static_cast<int>(A_rho_.size());
 
     double rho = 0.0;
     #pragma omp simd reduction(max: rho)
-    for (int k = rho_begin; k < rho_end; ++k) {
+    for (int k = 1; k < m-1; ++k) {
         double v = std::max(std::abs(A_rho_[k]), std::abs(C_rho_[k]));
         if (v > rho) rho = v;
     }
@@ -116,13 +112,11 @@ int FilteredTDMA::cal_J_v1(const double* D0, const double* DN) {
 }
 
 int FilteredTDMA::cal_J_v2(double D0, double DN) {
-    const int skip = 2;
-    const int rho_begin = skip;
-    const int rho_end   = static_cast<int>(A_rho_.size()) - skip;
+    const int m = static_cast<int>(A_rho_.size());
 
     double rho = 0.0;
     #pragma omp simd reduction(max: rho)
-    for (int k = rho_begin; k < rho_end; ++k) {
+    for (int k = 1; k < m-1; ++k) {
         double v = std::max(std::abs(A_rho_[k]), std::abs(C_rho_[k]));
         if (v > rho) rho = v;
     }

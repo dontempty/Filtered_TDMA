@@ -188,15 +188,24 @@ __global__ void build_lhs_z_kernel(double* __restrict__ d_A,
 
     std::size_t off = ((std::size_t)kk * iy + jj) * ix + ii;
     d_A[off] = -sa;
-    d_B[off] = 1.0 - sb;
     d_C[off] = -sc;
+    double dB  = 1.0 - sb;
     double rhs = d_rhs[off];
-    // Implicit Dirichlet ghost correction: move known wall ghost to the RHS
-    // (mirrors the CPU "D[boundary row] += s.a/s.c * theta[ghost]").
+    // Fully-implicit Dirichlet wall: the reflection ghost u0 = 2*uBC - u1 has a
+    // part (-u1) that depends on THIS solve's unknown, so it belongs on the
+    // diagonal (1+2*base -> 1+3*base), NOT lagged on the RHS at theta^n. Move
+    // only the known 2*uBC = (ghost + boundary cell) to the RHS.
     int nx = ix + 2, ny = iy + 2, nz = iz + 2;
     int i = ii + 1, j = jj + 1;
-    if (kk == 0      && z_lb[1])  rhs += sa * d_theta[idx_full_d(i, j, 0,    nx, ny)];
-    if (kk == iz - 1 && z_rb[iz]) rhs += sc * d_theta[idx_full_d(i, j, nz-1, nx, ny)];
+    if (kk == 0      && z_lb[1]) {
+        rhs += sa * (d_theta[idx_full_d(i, j, 0, nx, ny)] + d_theta[idx_full_d(i, j, 1, nx, ny)]);
+        dB  += sa;
+    }
+    if (kk == iz - 1 && z_rb[iz]) {
+        rhs += sc * (d_theta[idx_full_d(i, j, nz-1, nx, ny)] + d_theta[idx_full_d(i, j, nz-2, nx, ny)]);
+        dB  += sc;
+    }
+    d_B[off] = dB;
     d_D[off] = rhs;
 }
 
@@ -234,13 +243,22 @@ __global__ void build_lhs_y_kernel(double* __restrict__ d_A,
     std::size_t off_y   = ((std::size_t)jj * iz + kk) * ix + ii;
     std::size_t off_rhs = ((std::size_t)kk * iy + jj) * ix + ii;
     d_A[off_y] = -sa;
-    d_B[off_y] = 1.0 - sb;
     d_C[off_y] = -sc;
+    double dB  = 1.0 - sb;
     double rhs = d_rhs[off_rhs];
+    // Fully-implicit Dirichlet wall (see build_lhs_z): fold the ghost's unknown
+    // part into the diagonal; only 2*uBC = (ghost + boundary cell) goes to RHS.
     int nx = ix + 2, ny = iy + 2;
     int i = ii + 1, k = kk + 1;
-    if (jj == 0      && y_lb[1])  rhs += sa * d_theta[idx_full_d(i, 0,    k, nx, ny)];
-    if (jj == iy - 1 && y_rb[iy]) rhs += sc * d_theta[idx_full_d(i, ny-1, k, nx, ny)];
+    if (jj == 0      && y_lb[1]) {
+        rhs += sa * (d_theta[idx_full_d(i, 0, k, nx, ny)] + d_theta[idx_full_d(i, 1, k, nx, ny)]);
+        dB  += sa;
+    }
+    if (jj == iy - 1 && y_rb[iy]) {
+        rhs += sc * (d_theta[idx_full_d(i, ny-1, k, nx, ny)] + d_theta[idx_full_d(i, ny-2, k, nx, ny)]);
+        dB  += sc;
+    }
+    d_B[off_y] = dB;
     d_D[off_y] = rhs;
 }
 
@@ -298,13 +316,21 @@ __global__ void build_lhs_x_kernel(double* __restrict__ d_A,
             d_stencil(dt, dmx[i], sa, sb, sc);
             std::size_t off_x = ((std::size_t)ii_g * iz + kk) * iy + jj_g;
             d_A[off_x] = -sa;
-            d_B[off_x] = 1.0 - sb;
             d_C[off_x] = -sc;
+            double dB  = 1.0 - sb;
             double rhs = tile[tx][ty];
+            // Fully-implicit Dirichlet wall (see build_lhs_z).
             int nx = ix + 2, ny = iy + 2;
             int j = jj_g + 1, k = kk + 1;
-            if (ii_g == 0      && x_lb[1])  rhs += sa * d_theta[idx_full_d(0,    j, k, nx, ny)];
-            if (ii_g == ix - 1 && x_rb[ix]) rhs += sc * d_theta[idx_full_d(nx-1, j, k, nx, ny)];
+            if (ii_g == 0      && x_lb[1]) {
+                rhs += sa * (d_theta[idx_full_d(0, j, k, nx, ny)] + d_theta[idx_full_d(1, j, k, nx, ny)]);
+                dB  += sa;
+            }
+            if (ii_g == ix - 1 && x_rb[ix]) {
+                rhs += sc * (d_theta[idx_full_d(nx-1, j, k, nx, ny)] + d_theta[idx_full_d(nx-2, j, k, nx, ny)]);
+                dB  += sc;
+            }
+            d_B[off_x] = dB;
             d_D[off_x] = rhs;
         }
     }
@@ -462,7 +488,9 @@ void SolveTheta::profile(std::vector<double>& theta) {
     // -------------------------------------------------------------------
     const bool do_timing = (params_.option != "order");
     const std::vector<std::string> event_names =
-        {"rhs", "solve_z", "solve_y", "solve_x", "etc", "comm"};
+        {"rhs", "solve_z", "solve_y", "solve_x", "etc", "comm",
+         "tdma_z_comm", "tdma_y_comm", "tdma_x_comm",
+         "tdma_z_gpu",  "tdma_y_gpu",  "tdma_x_gpu"};
     const int n_events = (int)event_names.size();
     if (do_timing)
         timing_csv::timing_init(n_events, n_timing, MPI_COMM_WORLD);
@@ -520,6 +548,8 @@ void SolveTheta::profile(std::vector<double>& theta) {
             solver_z.solve_cyclic(d_A, d_B, d_C, d_D);
         else
             solver_z.solve(d_A, d_B, d_C, d_D);
+        local_times[6] = solver_z.last_comm_ms() * 1e-3;
+        local_times[9] = solver_z.last_gpu_ms()  * 1e-3;
         {
             const int block_lin = 256;
             const int grid_lin  = (int)((inner_n + block_lin - 1) / block_lin);
@@ -539,6 +569,8 @@ void SolveTheta::profile(std::vector<double>& theta) {
             solver_y.solve_cyclic(d_A, d_B, d_C, d_D);
         else
             solver_y.solve(d_A, d_B, d_C, d_D);
+        local_times[7] = solver_y.last_comm_ms() * 1e-3;
+        local_times[10] = solver_y.last_gpu_ms() * 1e-3;
         copy_y_to_rhs<<<g3, b3>>>(d_rhs, d_D, ix, iy, iz);
         CUDA_CHECK(cudaDeviceSynchronize());
         t1 = MPI_Wtime();
@@ -554,6 +586,8 @@ void SolveTheta::profile(std::vector<double>& theta) {
             solver_x.solve_cyclic(d_A, d_B, d_C, d_D);
         else
             solver_x.solve(d_A, d_B, d_C, d_D);
+        local_times[8] = solver_x.last_comm_ms() * 1e-3;
+        local_times[11] = solver_x.last_gpu_ms() * 1e-3;
         update_theta_kernel<<<g3, b3>>>(d_theta, d_D, ix, iy, iz, nx_full, ny_full);
         CUDA_CHECK(cudaDeviceSynchronize());
         t1 = MPI_Wtime();

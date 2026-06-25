@@ -122,6 +122,64 @@ __global__ void unpack_recv2rd_kernel(double* __restrict__ rd,
         = recvbuf[recv_displs_bwd[p] + r * ns_p + c];
 }
 
+// ---------------------------------------------------------------------------
+//  Merged forward pack: A_rd + C_rd + D_rd → single 3× send buffer.
+//  For destination rank p the layout is:
+//    [A_block_p | C_block_p | D_block_p]
+//  where each block is N_ROW_RD × ns_rt[p] doubles.
+//  Displacement into the 3× buffer = 3 × send_displs_fwd[p]  (same formula as
+//  PaScaL_TDMA_cuda.f90 BIGbufstart_A = 3*bufstart_A).
+// ---------------------------------------------------------------------------
+__global__ void pack3_rd2send_kernel(double* __restrict__ send3,
+                                     const double* __restrict__ A_rd,
+                                     const double* __restrict__ C_rd,
+                                     const double* __restrict__ D_rd,
+                                     int n_sys,
+                                     const int* __restrict__ col_offset,
+                                     const int* __restrict__ ns_rt,
+                                     const int* __restrict__ send_displs,
+                                     int nprocs) {
+    int c = blockIdx.x * blockDim.x + threadIdx.x;
+    int r = blockIdx.y;
+    int p = blockIdx.z;
+    if (p >= nprocs || r >= N_ROW_RD) return;
+    int ns_p = ns_rt[p];
+    if (c >= ns_p) return;
+    int src = col_offset[p] + c;
+    int base = 3 * send_displs[p];   // start of rank p's triple block in send3
+    int cnt  = N_ROW_RD * ns_p;      // = 2*ns_p: size of one-array slice for rank p
+    int off  = r * ns_p + c;
+    send3[base + off]           = A_rd[r * n_sys + src];
+    send3[base + cnt   + off]   = C_rd[r * n_sys + src];
+    send3[base + 2*cnt + off]   = D_rd[r * n_sys + src];
+}
+
+// ---------------------------------------------------------------------------
+//  Merged forward unpack: 3× recv buffer → A_rt + C_rt + D_rt.
+//  Mirrors pack3: for sender rank p layout in recv3 is
+//    [A_block | C_block | D_block], each N_ROW_RD × n_sys_rt_ doubles.
+// ---------------------------------------------------------------------------
+__global__ void unpack3_recv2rt_kernel(double* __restrict__ A_rt,
+                                       double* __restrict__ C_rt,
+                                       double* __restrict__ D_rt,
+                                       const double* __restrict__ recv3,
+                                       int n_sys_rt, int n_row_rt,
+                                       const int* __restrict__ recv_displs,
+                                       int nprocs) {
+    int c = blockIdx.x * blockDim.x + threadIdx.x;
+    int r = blockIdx.y;
+    int p = blockIdx.z;
+    if (p >= nprocs || r >= N_ROW_RD || c >= n_sys_rt) return;
+    int dst_row = N_ROW_RD * p + r;
+    int base = 3 * recv_displs[p];
+    int cnt  = N_ROW_RD * n_sys_rt;
+    int off  = r * n_sys_rt + c;
+    std::size_t dst = (std::size_t)dst_row * n_sys_rt + c;
+    A_rt[dst] = recv3[base + off];
+    C_rt[dst] = recv3[base + cnt   + off];
+    D_rt[dst] = recv3[base + 2*cnt + off];
+}
+
 } // namespace
 
 // ===========================================================================
@@ -197,14 +255,26 @@ PaScaLTDMAManyCUDA::PaScaLTDMAManyCUDA(int n_sys, int myrank, int nprocs, MPI_Co
     cuda_fill(d_B_rt_, 1.0, rt_sz);
     CUDA_CHECK(cudaDeviceSynchronize());
 
-    // Pack/unpack scratch buffers. Forward sendbuf size = 2*n_sys; forward recvbuf
-    // size = rt_sz. Same totals in reverse direction → reuse single pair sized to
-    // the max of both (typically nearly equal).
+    // Pack/unpack scratch buffers for backward alltoall (D only).
     std::size_t fwd_send = (std::size_t)N_ROW_RD * n_sys;
     std::size_t fwd_recv = rt_sz;
     buf_capacity_ = std::max(fwd_send, fwd_recv);
     CUDA_CHECK(cudaMalloc(&d_sendbuf_, sizeof(double) * buf_capacity_));
     CUDA_CHECK(cudaMalloc(&d_recvbuf_, sizeof(double) * buf_capacity_));
+
+    // Merged 3x buffers for alltoall_forward_3 (A+C+D in one Alltoallv).
+    // Mirrors PaScaL_TDMA_cuda.f90: BIGbuf size = 3 x normal buf.
+    buf3_capacity_ = 3 * buf_capacity_;
+    CUDA_CHECK(cudaMalloc(&d_sendbuf3_, sizeof(double) * buf3_capacity_));
+    CUDA_CHECK(cudaMalloc(&d_recvbuf3_, sizeof(double) * buf3_capacity_));
+    send_counts_3x_.resize(nprocs); send_displs_3x_.resize(nprocs);
+    recv_counts_3x_.resize(nprocs); recv_displs_3x_.resize(nprocs);
+    for (int p = 0; p < nprocs; ++p) {
+        send_counts_3x_[p] = 3 * send_counts_fwd_[p];
+        send_displs_3x_[p] = 3 * send_displs_fwd_[p];
+        recv_counts_3x_[p] = 3 * recv_counts_fwd_[p];
+        recv_displs_3x_[p] = 3 * recv_displs_fwd_[p];
+    }
 
     // Cache max ns_rt for kernel grid sizing
     max_ns_rt_ = 0;
@@ -244,6 +314,7 @@ PaScaLTDMAManyCUDA::~PaScaLTDMAManyCUDA() {
     safe_free(d_A_rt_); safe_free(d_B_rt_); safe_free(d_C_rt_); safe_free(d_D_rt_);
     safe_free(d_E_rt_); safe_free(d_E_loc_);
     safe_free(d_sendbuf_); safe_free(d_recvbuf_);
+    safe_free(d_sendbuf3_); safe_free(d_recvbuf3_);
     auto free_int = [](int*& p) { if (p) { cudaFree(p); p = nullptr; } };
     free_int(d_ns_rt_);
     free_int(d_col_offset_);
@@ -269,39 +340,41 @@ void PaScaLTDMAManyCUDA::ensure_E_loc(int n_sys, int n_row) {
 }
 
 // ===========================================================================
-//  Forward all-to-all: [2 × n_sys] rd  →  [n_row_rt × n_sys_rt] rt
+//  Merged forward: A_rd + C_rd + D_rd → A_rt + C_rt + D_rt (1 Alltoallv)
+//  Fortran equivalent: pascal_a2av(BIGbuf_A, 3×size, BIGbufsubsize_A, ...)
 // ===========================================================================
-void PaScaLTDMAManyCUDA::alltoall_forward(const double* d_rd, double* d_rt) {
-    NVTX_SCOPE("alltoall_fwd");
-    // Pack: rd → sendbuf
+void PaScaLTDMAManyCUDA::alltoall_forward_3(
+    const double* d_A_rd, const double* d_C_rd, const double* d_D_rd,
+    double* d_A_rt, double* d_C_rt, double* d_D_rt)
+{
+    NVTX_SCOPE("alltoall_fwd3");
     {
-        NVTX_SCOPE("pack_fwd");
+        NVTX_SCOPE("pack3_fwd");
         dim3 block(128, 1, 1);
         dim3 grid((max_ns_rt_ + block.x - 1) / block.x, N_ROW_RD, nprocs_);
-        pack_rd2send_kernel<<<grid, block>>>(d_sendbuf_, d_rd, n_sys_,
-                                             d_col_offset_, d_ns_rt_,
-                                             d_send_displs_fwd_, nprocs_);
+        pack3_rd2send_kernel<<<grid, block>>>(d_sendbuf3_,
+                                              d_A_rd, d_C_rd, d_D_rd,
+                                              n_sys_,
+                                              d_col_offset_, d_ns_rt_,
+                                              d_send_displs_fwd_, nprocs_);
     }
-
-    // Make pack visible to MPI before alltoall.  cudaStreamSynchronize on the
-    // default stream is sufficient — matches PaScaL_TDMA_F.
     {
-        NVTX_SCOPE("mpi_alltoallv_fwd");
+        NVTX_SCOPE("mpi_alltoallv_fwd3");
         CUDA_CHECK(cudaStreamSynchronize(0));
-        MPI_Alltoallv(d_sendbuf_, send_counts_fwd_.data(), send_displs_fwd_.data(),
+        double t0 = MPI_Wtime();
+        MPI_Alltoallv(d_sendbuf3_, send_counts_3x_.data(), send_displs_3x_.data(),
                       MPI_DOUBLE,
-                      d_recvbuf_, recv_counts_fwd_.data(), recv_displs_fwd_.data(),
+                      d_recvbuf3_, recv_counts_3x_.data(), recv_displs_3x_.data(),
                       MPI_DOUBLE, comm_);
+        last_comm_ms_ += (MPI_Wtime() - t0) * 1e3;
     }
-
-    // Unpack: recvbuf → rt
     {
-        NVTX_SCOPE("unpack_fwd");
+        NVTX_SCOPE("unpack3_fwd");
         dim3 block(128, 1, 1);
         dim3 grid((n_sys_rt_ + block.x - 1) / block.x, N_ROW_RD, nprocs_);
-        unpack_recv2rt_kernel<<<grid, block>>>(d_rt, d_recvbuf_,
-                                               n_sys_rt_, n_row_rt_,
-                                               d_recv_displs_fwd_, nprocs_);
+        unpack3_recv2rt_kernel<<<grid, block>>>(d_A_rt, d_C_rt, d_D_rt,
+                                                d_recvbuf3_, n_sys_rt_, n_row_rt_,
+                                                d_recv_displs_fwd_, nprocs_);
     }
 }
 
@@ -322,10 +395,12 @@ void PaScaLTDMAManyCUDA::alltoall_backward(const double* d_rt, double* d_rd) {
     {
         NVTX_SCOPE("mpi_alltoallv_bwd");
         CUDA_CHECK(cudaStreamSynchronize(0));
+        double t0 = MPI_Wtime();
         MPI_Alltoallv(d_sendbuf_, send_counts_bwd_.data(), send_displs_bwd_.data(),
                       MPI_DOUBLE,
                       d_recvbuf_, recv_counts_bwd_.data(), recv_displs_bwd_.data(),
                       MPI_DOUBLE, comm_);
+        last_comm_ms_ += (MPI_Wtime() - t0) * 1e3;
     }
 
     // Unpack: recvbuf → rd
@@ -344,6 +419,7 @@ void PaScaLTDMAManyCUDA::alltoall_backward(const double* d_rt, double* d_rd) {
 // ===========================================================================
 void PaScaLTDMAManyCUDA::solve(double* d_A, double* d_B, double* d_C, double* d_D,
                                int n_sys, int n_row) {
+    last_comm_ms_ = 0.0;
     if (nprocs_ == 1) {
         NVTX_SCOPE("tdma_local");
         tdma_many_cuda(d_A, d_B, d_C, d_D, n_sys, n_row, block_x_, block_y_);
@@ -365,10 +441,8 @@ void PaScaLTDMAManyCUDA::solve(double* d_A, double* d_B, double* d_C, double* d_
     }
     cudaEventRecord(e_[1]);
     {
-        NVTX_SCOPE("alltoall_fwd_x3");   // a,c,d (b is reduced locally, not sent)
-        alltoall_forward(d_A_rd_, d_A_rt_);
-        alltoall_forward(d_C_rd_, d_C_rt_);
-        alltoall_forward(d_D_rd_, d_D_rt_);
+        NVTX_SCOPE("alltoall_fwd_merged");  // A+C+D in one Alltoallv (Fortran BIGbuf approach)
+        alltoall_forward_3(d_A_rd_, d_C_rd_, d_D_rd_, d_A_rt_, d_C_rt_, d_D_rt_);
     }
     cudaEventRecord(e_[2]);
     {
@@ -414,9 +488,7 @@ void PaScaLTDMAManyCUDA::solve_cyclic(double* d_A, double* d_B, double* d_C, dou
                                      d_A_rd_, d_B_rd_, d_C_rd_, d_D_rd_,
                                      n_sys, n_row, block_x_, block_y_);
 
-    alltoall_forward(d_A_rd_, d_A_rt_);
-    alltoall_forward(d_C_rd_, d_C_rt_);
-    alltoall_forward(d_D_rd_, d_D_rt_);
+    alltoall_forward_3(d_A_rd_, d_C_rd_, d_D_rd_, d_A_rt_, d_C_rt_, d_D_rt_);
 
     tdma_cyclic_many_cuda(d_A_rt_, d_B_rt_, d_C_rt_, d_D_rt_, d_E_rt_,
                           n_sys_rt_, n_row_rt_, block_x_, block_y_);

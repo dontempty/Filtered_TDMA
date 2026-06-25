@@ -221,6 +221,7 @@ Located in `../scaling_1comm(image)/h200/`:
 | `weak_256cube_z.png`        | Weak scaling, 256³/GPU |
 | `weak_512cube_z.png`        | Weak scaling, 512³/GPU |
 | `strong_zratio.png`         | PaScaL/Filtered speed ratio (strong) |
+| `refine_all_z.png`          | Refinement, all 3 families in one figure |
 | `refine_64x64_z.png`        | Refinement, 64×64×nz family |
 | `refine_128x128_z.png`      | Refinement, 128×128×nz family |
 | `refine_256x256_z.png`      | Refinement, 256×256×nz family |

@@ -47,13 +47,24 @@ public:
     /// When nprocs==1 (no comm path) all entries are 0.
     const double* last_step_times_ms() const { return last_ms_; }
 
+    /// Pure MPI wall-clock time (ms) for the most recent solve call.
+    /// Measured AFTER cudaStreamSynchronize — excludes GPU sync wait.
+    /// Sum of MPI_Alltoallv time for forward + backward passes. 0 when nprocs==1.
+    double last_comm_ms() const { return last_comm_ms_; }
+
+    /// GPU kernel execution time (ms) for the most recent solve call.
+    /// Sum of modified_thomas + reduced_tdma + update_solution phases
+    /// (indices [0]+[2]+[4] from the CUDA event sub-phase array).
+    double last_gpu_ms()  const { return last_ms_[0] + last_ms_[2] + last_ms_[4]; }
+
 private:
     void ensure_E_loc(int n_sys, int n_row);
 
-    // One direction of the all-to-all: pack [n_row_rd × n_sys] reduced buffer
-    // into the contiguous sendbuf, exchange, unpack into the [n_row_rt × n_sys_rt]
-    // transposed buffer.
-    void alltoall_forward(const double* d_rd, double* d_rt);
+    // Merged forward all-to-all: pack A_rd, C_rd, D_rd into a single 3× buffer
+    // and perform ONE MPI_Alltoallv (vs the original 3 separate calls).
+    // Mirrors the PaScaL_TDMA_cuda Fortran BIGbuf_A approach.
+    void alltoall_forward_3(const double* d_A_rd, const double* d_C_rd, const double* d_D_rd,
+                            double* d_A_rt, double* d_C_rt, double* d_D_rt);
     // Reverse: pack [n_row_rt × n_sys_rt], exchange, unpack into [n_row_rd × n_sys].
     void alltoall_backward(const double* d_rt, double* d_rd);
 
@@ -101,10 +112,19 @@ private:
     double* d_D_rt_ = nullptr;
     double* d_E_rt_ = nullptr;  // workspace for cyclic local solve on reduced system
 
-    // Pack / unpack scratch (device).  Sized to max(2*n_sys, n_row_rt*n_sys_rt).
+    // Pack / unpack scratch for the individual (legacy) alltoall_forward path.
+    // (kept in dtor for safe free; not used by alltoall_forward_3)
     double* d_sendbuf_ = nullptr;
     double* d_recvbuf_ = nullptr;
     std::size_t buf_capacity_ = 0;
+
+    // Merged 3× buffers for alltoall_forward_3 (A+C+D in one shot).
+    // Mirrors PaScaL_TDMA_cuda.f90 BIGbuf_A / BIGbuf_B.
+    double* d_sendbuf3_ = nullptr;
+    double* d_recvbuf3_ = nullptr;
+    std::size_t buf3_capacity_ = 0;
+    std::vector<int> send_counts_3x_, send_displs_3x_;
+    std::vector<int> recv_counts_3x_, recv_displs_3x_;
 
     // Workspace for nprocs==1 cyclic path (allocated lazily on first cyclic call).
     double* d_E_loc_ = nullptr;
@@ -126,6 +146,7 @@ private:
     // Indices: [0]=mod_thomas, [1]=alltoall_fwd_total, [2]=reduced_tdma,
     //          [3]=alltoall_bwd, [4]=update_sol.
     double      last_ms_[5] = {0.0, 0.0, 0.0, 0.0, 0.0};
+    double      last_comm_ms_ = 0.0;
 };
 
 #endif // PASCAL_TDMA_MANY_CUDA_HPP

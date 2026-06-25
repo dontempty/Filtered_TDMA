@@ -1,0 +1,12 @@
+nx = 128
+ny = 128
+nz = 128
+npx = 2
+npy = 2
+npz = 2
+rho = 0.25
+eps = 0.005
+Nt = 1
+warmup = 0
+option = order
+tdma_backend = filtered_v1
