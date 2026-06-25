@@ -110,22 +110,32 @@ void MPISubdomain::ghostcellUpdate(std::vector<double>& theta,
     MPI_Waitall(r, reqs, MPI_STATUSES_IGNORE);
 }
 
-void MPISubdomain::indices(const GlobalParams&,
+void MPISubdomain::indices(const GlobalParams& params,
                            int rankx, int npx, int ranky, int npy, int rankz, int npz) {
+    // Physical-boundary indicator = 1 only at a Dirichlet wall owned by this rank.
+    // Periodic directions own no wall, so their flags stay 0 → boundary() skips the
+    // Dirichlet ghost fill and SolveTheta skips the implicit Dirichlet correction;
+    // the periodic ghosts come from ghostcellUpdate's wrap instead.
     std::fill(theta_x_left_index.begin(),  theta_x_left_index.end(),  0);
     std::fill(theta_x_right_index.begin(), theta_x_right_index.end(), 0);
-    if (rankx == 0)     theta_x_left_index[1]        = 1;
-    if (rankx == npx-1) theta_x_right_index[nx_sub-1] = 1;
+    if (!params.periodic[0]) {
+        if (rankx == 0)     theta_x_left_index[1]         = 1;
+        if (rankx == npx-1) theta_x_right_index[nx_sub-1] = 1;
+    }
 
     std::fill(theta_y_left_index.begin(),  theta_y_left_index.end(),  0);
     std::fill(theta_y_right_index.begin(), theta_y_right_index.end(), 0);
-    if (ranky == 0)     theta_y_left_index[1]        = 1;
-    if (ranky == npy-1) theta_y_right_index[ny_sub-1] = 1;
+    if (!params.periodic[1]) {
+        if (ranky == 0)     theta_y_left_index[1]         = 1;
+        if (ranky == npy-1) theta_y_right_index[ny_sub-1] = 1;
+    }
 
     std::fill(theta_z_left_index.begin(),  theta_z_left_index.end(),  0);
     std::fill(theta_z_right_index.begin(), theta_z_right_index.end(), 0);
-    if (rankz == 0)     theta_z_left_index[1]        = 1;
-    if (rankz == npz-1) theta_z_right_index[nz_sub-1] = 1;
+    if (!params.periodic[2]) {
+        if (rankz == 0)     theta_z_left_index[1]         = 1;
+        if (rankz == npz-1) theta_z_right_index[nz_sub-1] = 1;
+    }
 }
 
 void MPISubdomain::mesh(const GlobalParams& params,

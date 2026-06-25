@@ -39,6 +39,9 @@ public:
     /// FILTERED: solve_filtered_v1; PASCAL: PaScaLTDMAManyCUDA::solve.
     void solve(double* d_A, double* d_B, double* d_C, double* d_D);
 
+    // Periodic (cyclic) variant: row 0 couples to row n_row-1.
+    void solve_cyclic(double* d_A, double* d_B, double* d_C, double* d_D);
+
     // FILTERED only — refresh per-row spectral bounds. No-op for PASCAL.
     void set_rho_device(const double* d_A, const double* d_B, const double* d_C);
 

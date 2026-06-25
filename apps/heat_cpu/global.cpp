@@ -53,6 +53,17 @@ void GlobalParams::load(const std::string& filename) {
         tdma_backend = it->second;
     }
 
+    // Boundary type: `periodic = 1` makes all three directions periodic;
+    // `periodic_x/y/z = 1` toggles individual directions. Default: Dirichlet.
+    auto getflag = [&](const char* k) -> bool {
+        auto it = param.find(k);
+        return it != param.end() && std::stoi(it->second) != 0;
+    };
+    bool per_all = getflag("periodic");
+    periodic[0] = per_all || getflag("periodic_x");
+    periodic[1] = per_all || getflag("periodic_y");
+    periodic[2] = per_all || getflag("periodic_z");
+
     // Grid dimensions (add 1 for node-centered)
     nx++; ny++; nz++;
     nxm = nx - 1; nym = ny - 1; nzm = nz - 1;

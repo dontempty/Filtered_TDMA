@@ -28,7 +28,16 @@ BIN="${PROJ}/build/bin/heat_gpu.out"
 INP="${PROJ}/apps/heat_gpu/inputs/scaling"
 LOG="${PROJ}/apps/heat_gpu/log"
 
-mkdir -p "${LOG}"
+# Output dir = scaling_gpu/<hardware>  (auto-detected; fallback a100 for this script)
+GPU_RAW=$(nvidia-smi --query-gpu=name --format=csv,noheader -i 0 2>/dev/null | head -1)
+case "${GPU_RAW}" in
+    *V100*) GPU_TAG=v100 ;; *A100*) GPU_TAG=a100 ;;
+    *GH200*) GPU_TAG=gh200 ;; *H200*) GPU_TAG=h200 ;; *H100*) GPU_TAG=h100 ;;
+    *) GPU_TAG=$(printf '%s' "${GPU_RAW}" | tr -cs 'A-Za-z0-9' '_' | sed 's/^_//;s/_$//') ;;
+esac
+RES="${PROJ}/apps/heat_gpu/results/scaling_gpu/${GPU_TAG:-a100}"
+
+mkdir -p "${LOG}" "${RES}"
 
 echo "================================================================"
 echo " host       : $(hostname)"
@@ -61,9 +70,11 @@ ls -lh "${BIN}"
 # ── Runner ────────────────────────────────────────────────────────────────────
 run_case() {
     local label=$1 np=$2 inp_file=$3
+    local tag; tag=$(basename "${inp_file}" .txt)
     echo ""
     echo "---- ${label}  np=${np}  [$(date +%H:%M:%S)] ----"
-    mpirun ${MPI_FLAGS} -np ${np} "${BIN}" "${inp_file}" 2>&1
+    TIMING_CSV="${RES}/timing_${tag}.csv" \
+        mpirun ${MPI_FLAGS} -np ${np} "${BIN}" "${inp_file}" 2>&1
     local rc=$?
     [ ${rc} -ne 0 ] && echo "[ERROR] exit code ${rc} (OOM or crash) — skipping"
     return 0
@@ -130,4 +141,5 @@ done
 
 echo ""
 echo "==== ALL DONE [$(date '+%F %T')] ===="
+echo " results: ${RES}/"
 echo " log: ${LOG}/scaling_a100_${SLURM_JOB_ID:-?}.out"

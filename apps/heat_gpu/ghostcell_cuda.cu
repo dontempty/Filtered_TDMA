@@ -139,7 +139,11 @@ void MPISubdomain::ghostcellUpdateDevice(double* d_theta,
     MPI_Request req[4];
 
     // ============ X direction ============
-    if (cx.nprocs > 1) {
+    // Exchange whenever a neighbor exists. For a PERIODIC direction with
+    // nprocs==1, west==east==self (not MPI_PROC_NULL), so the self-send wraps
+    // ghost 0 <- interior(nx_sub-1) and ghost nx_sub <- interior(1). For a
+    // non-periodic single rank both are MPI_PROC_NULL → skipped (Dirichlet).
+    if (cx.west_rank != MPI_PROC_NULL || cx.east_rank != MPI_PROC_NULL) {
         if (cx.west_rank != MPI_PROC_NULL) {
             pack_x<<<g2(ny1, nz1, blk), blk>>>(d_sbuf_x0, d_theta,
                                                /*i_src=*/1, nx1, ny1, nz1);
@@ -167,7 +171,7 @@ void MPISubdomain::ghostcellUpdateDevice(double* d_theta,
     }
 
     // ============ Y direction ============
-    if (cy.nprocs > 1) {
+    if (cy.west_rank != MPI_PROC_NULL || cy.east_rank != MPI_PROC_NULL) {
         if (cy.west_rank != MPI_PROC_NULL) {
             pack_y<<<g2(nx1, nz1, blk), blk>>>(d_sbuf_y0, d_theta,
                                                /*j_src=*/1, nx1, ny1, nz1);
@@ -195,7 +199,7 @@ void MPISubdomain::ghostcellUpdateDevice(double* d_theta,
     }
 
     // ============ Z direction ============
-    if (cz.nprocs > 1) {
+    if (cz.west_rank != MPI_PROC_NULL || cz.east_rank != MPI_PROC_NULL) {
         if (cz.west_rank != MPI_PROC_NULL) {
             pack_z<<<g2(nx1, ny1, blk), blk>>>(d_sbuf_z0, d_theta,
                                                /*k_src=*/1, nx1, ny1, nz1);

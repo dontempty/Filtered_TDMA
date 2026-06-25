@@ -473,6 +473,7 @@ FilteredTDMACUDA::~FilteredTDMACUDA() {
     if (d_A_rho_)          cudaFree(d_A_rho_);
     if (d_C_rho_)          cudaFree(d_C_rho_);
     if (d_J_)              cudaFree(d_J_);
+    if (d_E_)              cudaFree(d_E_);
 }
 
 // =============================================================================
@@ -524,11 +525,22 @@ int FilteredTDMACUDA::cal_J_rhs_bound(const double* d_D) {
 // =============================================================================
 
 void FilteredTDMACUDA::solve_filtered_v1(double* d_A, double* d_B, double* d_C, double* d_D) {
+    if (nprocs_ == 1) { tdma_many_cuda(d_A, d_B, d_C, d_D, n_sys_, n_row_); return; }
+    v1_multirank(d_A, d_B, d_C, d_D);
+}
+
+void FilteredTDMACUDA::solve_cycl_filtered_v1(double* d_A, double* d_B, double* d_C, double* d_D) {
+    // Periodic comm makes both interfaces (incl. the wrap-around) real; the
+    // multi-rank body is identical to the non-cyclic solve.
     if (nprocs_ == 1) {
-        tdma_many_cuda(d_A, d_B, d_C, d_D, n_sys_, n_row_);
+        if (!d_E_) CUDA_CHECK(cudaMalloc(&d_E_, sizeof(double) * (std::size_t)n_sys_ * n_row_));
+        tdma_cyclic_many_cuda(d_A, d_B, d_C, d_D, d_E_, n_sys_, n_row_);
         return;
     }
+    v1_multirank(d_A, d_B, d_C, d_D);
+}
 
+void FilteredTDMACUDA::v1_multirank(double* d_A, double* d_B, double* d_C, double* d_D) {
     const dim3 block(BLOCK_SYS);
     const dim3 grid = grid1D(n_sys_);
 
@@ -585,11 +597,20 @@ void FilteredTDMACUDA::solve_filtered_v1(double* d_A, double* d_B, double* d_C, 
 // =============================================================================
 
 void FilteredTDMACUDA::solve_filtered_v2(double* d_A, double* d_B, double* d_C, double* d_D) {
+    if (nprocs_ == 1) { tdma_many_cuda(d_A, d_B, d_C, d_D, n_sys_, n_row_); return; }
+    v2_multirank(d_A, d_B, d_C, d_D);
+}
+
+void FilteredTDMACUDA::solve_cycl_filtered_v2(double* d_A, double* d_B, double* d_C, double* d_D) {
     if (nprocs_ == 1) {
-        tdma_many_cuda(d_A, d_B, d_C, d_D, n_sys_, n_row_);
+        if (!d_E_) CUDA_CHECK(cudaMalloc(&d_E_, sizeof(double) * (std::size_t)n_sys_ * n_row_));
+        tdma_cyclic_many_cuda(d_A, d_B, d_C, d_D, d_E_, n_sys_, n_row_);
         return;
     }
+    v2_multirank(d_A, d_B, d_C, d_D);
+}
 
+void FilteredTDMACUDA::v2_multirank(double* d_A, double* d_B, double* d_C, double* d_D) {
     const dim3 block(BLOCK_SYS);
     const dim3 grid = grid1D(n_sys_);
 

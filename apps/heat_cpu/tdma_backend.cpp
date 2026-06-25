@@ -58,6 +58,16 @@ void TdmaBackend::solve(double* A, double* B, double* C, double* D) {
     }
 }
 
+void TdmaBackend::solve_cyclic(double* A, double* B, double* C, double* D) {
+    if (kind_ == Kind::FILTERED) {
+        filt_->solve_cycl_filtered_v1(A, B, C, D);
+    } else if (kind_ == Kind::FILTERED_V2) {
+        filt_->solve_cycl_filtered_v2(A, B, C, D);
+    } else {
+        pasc_->solve_cyclic(A, B, C, D, n_sys_, n_row_);
+    }
+}
+
 void TdmaBackend::solve_profile(double* A, double* B, double* C, double* D,
                                 std::vector<double>& time_list) {
     if (kind_ == Kind::FILTERED) {

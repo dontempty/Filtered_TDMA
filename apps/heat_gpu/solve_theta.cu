@@ -516,7 +516,10 @@ void SolveTheta::profile(std::vector<double>& theta) {
         build_lhs_z_kernel<<<g3, b3>>>(d_A, d_B, d_C, d_D, d_rhs, d_theta,
                                        d_dmz, d_z_lb, d_z_rb, ix, iy, iz, dt);
         solver_z.set_rho_device(d_A, d_B, d_C);
-        solver_z.solve(d_A, d_B, d_C, d_D);
+        if (params_.periodic[2])
+            solver_z.solve_cyclic(d_A, d_B, d_C, d_D);
+        else
+            solver_z.solve(d_A, d_B, d_C, d_D);
         {
             const int block_lin = 256;
             const int grid_lin  = (int)((inner_n + block_lin - 1) / block_lin);
@@ -532,7 +535,10 @@ void SolveTheta::profile(std::vector<double>& theta) {
         build_lhs_y_kernel<<<g3, b3>>>(d_A, d_B, d_C, d_D, d_rhs, d_theta,
                                        d_dmy, d_y_lb, d_y_rb, ix, iy, iz, dt);
         solver_y.set_rho_device(d_A, d_B, d_C);
-        solver_y.solve(d_A, d_B, d_C, d_D);
+        if (params_.periodic[1])
+            solver_y.solve_cyclic(d_A, d_B, d_C, d_D);
+        else
+            solver_y.solve(d_A, d_B, d_C, d_D);
         copy_y_to_rhs<<<g3, b3>>>(d_rhs, d_D, ix, iy, iz);
         CUDA_CHECK(cudaDeviceSynchronize());
         t1 = MPI_Wtime();
@@ -544,7 +550,10 @@ void SolveTheta::profile(std::vector<double>& theta) {
         build_lhs_x_kernel<<<g3_lhs_x, b3_lhs_x>>>(d_A, d_B, d_C, d_D, d_rhs, d_theta,
                                        d_dmx, d_x_lb, d_x_rb, ix, iy, iz, dt);
         solver_x.set_rho_device(d_A, d_B, d_C);
-        solver_x.solve(d_A, d_B, d_C, d_D);
+        if (params_.periodic[0])
+            solver_x.solve_cyclic(d_A, d_B, d_C, d_D);
+        else
+            solver_x.solve(d_A, d_B, d_C, d_D);
         update_theta_kernel<<<g3, b3>>>(d_theta, d_D, ix, iy, iz, nx_full, ny_full);
         CUDA_CHECK(cudaDeviceSynchronize());
         t1 = MPI_Wtime();

@@ -115,22 +115,32 @@ void MPISubdomain::ghostcellUpdate(std::vector<double>& theta,
 // `ghostcellUpdateDevice`, `allocGhostBufsDevice`, `freeGhostBufsDevice`
 // are defined in `ghostcell_cuda.cu` to keep CUDA out of this translation unit.
 
-void MPISubdomain::indices(const GlobalParams&,
+void MPISubdomain::indices(const GlobalParams& params,
                            int rankx, int npx, int ranky, int npy, int rankz, int npz) {
+    // Dirichlet-wall indicator = 1 only at a wall owned by this rank. Periodic
+    // directions own no wall (flags stay 0) → the ghost_*_kernel Dirichlet fill
+    // and build_lhs Dirichlet correction self-skip; ghostcellUpdateDevice fills
+    // those ghosts by periodic wrap instead.
     std::fill(theta_x_left_index.begin(),  theta_x_left_index.end(),  0);
     std::fill(theta_x_right_index.begin(), theta_x_right_index.end(), 0);
-    if (rankx == 0)     theta_x_left_index[1]        = 1;
-    if (rankx == npx-1) theta_x_right_index[nx_sub-1] = 1;
+    if (!params.periodic[0]) {
+        if (rankx == 0)     theta_x_left_index[1]         = 1;
+        if (rankx == npx-1) theta_x_right_index[nx_sub-1] = 1;
+    }
 
     std::fill(theta_y_left_index.begin(),  theta_y_left_index.end(),  0);
     std::fill(theta_y_right_index.begin(), theta_y_right_index.end(), 0);
-    if (ranky == 0)     theta_y_left_index[1]        = 1;
-    if (ranky == npy-1) theta_y_right_index[ny_sub-1] = 1;
+    if (!params.periodic[1]) {
+        if (ranky == 0)     theta_y_left_index[1]         = 1;
+        if (ranky == npy-1) theta_y_right_index[ny_sub-1] = 1;
+    }
 
     std::fill(theta_z_left_index.begin(),  theta_z_left_index.end(),  0);
     std::fill(theta_z_right_index.begin(), theta_z_right_index.end(), 0);
-    if (rankz == 0)     theta_z_left_index[1]        = 1;
-    if (rankz == npz-1) theta_z_right_index[nz_sub-1] = 1;
+    if (!params.periodic[2]) {
+        if (rankz == 0)     theta_z_left_index[1]         = 1;
+        if (rankz == npz-1) theta_z_right_index[nz_sub-1] = 1;
+    }
 }
 
 void MPISubdomain::mesh(const GlobalParams& params,

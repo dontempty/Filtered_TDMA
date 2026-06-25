@@ -37,8 +37,9 @@ int main(int argc, char** argv) {
 
     // 2) Create 3D Cartesian topology
     MPITopology topo;
+    // Per-direction boundary from input: false = Dirichlet wall, true = periodic.
     topo.init({params.np_dim[0], params.np_dim[1], params.np_dim[2]},
-              {false, false, false});
+              {params.periodic[0], params.periodic[1], params.periodic[2]});
     topo.make();
 
     auto cx = topo.commX();

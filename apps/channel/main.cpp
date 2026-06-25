@@ -34,9 +34,11 @@ namespace {
 void laminar_init(channel::Field<double>& U, channel::Field<double>& V,
                   channel::Field<double>& W, channel::Field<double>& P,
                   const channel::Subdomain& sub, const channel::Grid& grid,
-                  double Lz, double Ub, double pert, MPI_Comm comm)
+                  double Ly, double Lz, double Ub, double pert, int init_mode,
+                  MPI_Comm comm)
 {
     const int nx = sub.nx(), ny = sub.ny(), nz = sub.nz();
+    const auto& yc = grid.x(1);
     const auto& zc = grid.x(2);
     const auto& dx = grid.dx(0);
     const auto& dy = grid.dx(1);
@@ -54,22 +56,9 @@ void laminar_init(channel::Field<double>& U, channel::Field<double>& V,
                               ^ (static_cast<std::uint64_t>(my_rank) * 0x9E3779B97F4A7C15ULL);
     std::mt19937 rng(seed);
     std::uniform_real_distribution<double> rnd(-0.5, 0.5);   // matches MPM-STD: uniform[0,1]-0.5
-    if (my_rank == 0)
-        std::printf("[laminar_init] non-deterministic seed (rank0=%llu)\n",
-                    (unsigned long long)seed);
-
     P.fill(0.0);
 
-    // Step 1: fill all three components with raw random[-0.5, 0.5]
-    for (int k = 1; k <= nz; ++k)
-        for (int j = 1; j <= ny; ++j)
-            for (int i = 1; i <= nx; ++i) {
-                U(i, j, k) = rnd(rng);
-                V(i, j, k) = rnd(rng);
-                W(i, j, k) = rnd(rng);
-            }
-
-    // Step 2: subtract volume-weighted spatial mean of each perturbation field
+    // Volume-weighted global mean of a field (mean-zero + bulk renorm).
     auto bulk = [&](const channel::Field<double>& F) {
         double s = 0.0, v = 0.0;
         for (int k = 1; k <= nz; ++k)
@@ -79,35 +68,82 @@ void laminar_init(channel::Field<double>& U, channel::Field<double>& V,
                     s += F(i, j, k) * dV;
                     v += dV;
                 }
-        double pkt[2] = {s, v};
-        double tot[2] = {0.0, 0.0};
+        double pkt[2] = {s, v}, tot[2] = {0.0, 0.0};
         MPI_Allreduce(pkt, tot, 2, MPI_DOUBLE, MPI_SUM, comm);
         return (tot[1] > 0.0) ? tot[0] / tot[1] : 0.0;
     };
 
-    double Um = bulk(U), Vm = bulk(V), Wm = bulk(W);
-    for (int k = 1; k <= nz; ++k)
-        for (int j = 1; j <= ny; ++j)
-            for (int i = 1; i <= nx; ++i) {
-                U(i, j, k) -= Um;
-                V(i, j, k) -= Vm;
-                W(i, j, k) -= Wm;
-            }
-
-    // Step 3: superpose laminar Poiseuille on U; scale all perturbations by pert*Umax
-    for (int k = 1; k <= nz; ++k) {
-        double zr = (zc[k] - half) / half;
-        double Up = Umax * std::max(0.0, 1.0 - zr * zr);
-        for (int j = 1; j <= ny; ++j)
-            for (int i = 1; i <= nx; ++i) {
-                U(i, j, k) = Up + pert * Umax * U(i, j, k);
-                V(i, j, k) =      pert * Umax * V(i, j, k);
-                W(i, j, k) =      pert * Umax * W(i, j, k);
-            }
+    if (init_mode == 1) {
+        // ----- sin/cos streamwise vortices (divergence-free) + small 3D noise -----
+        // psi(y,z) = A cos(beta*y) sin^2(pi*z/Lz):
+        //   V =  d psi/dz = A cos(beta*y)(pi/Lz) sin(2 pi z/Lz)
+        //   W = -d psi/dy = A beta sin(beta*y) sin^2(pi z/Lz)
+        // => divergence-free in (y,z); V=W=0 at z=0,Lz (no-slip). Counter-rotating
+        //    rolls pump wall-normal momentum -> streaks by lift-up = far more
+        //    effective bypass-transition trigger than broadband white noise.
+        const double nbeta = std::max(1.0, std::round(Ly / Lz));  // ~channel-height rolls
+        const double beta  = 2.0 * M_PI * nbeta / Ly;
+        const double kz    = M_PI / Lz;
+        double locmax = 0.0;
+        for (int k = 1; k <= nz; ++k)
+            for (int j = 1; j <= ny; ++j)
+                for (int i = 1; i <= nx; ++i) {
+                    double s1 = std::sin(kz * zc[k]);
+                    double sV = std::cos(beta * yc[j]) * kz * std::sin(2.0 * kz * zc[k]);
+                    double sW = beta * std::sin(beta * yc[j]) * s1 * s1;
+                    V(i, j, k) = sV;
+                    W(i, j, k) = sW;
+                    locmax = std::max(locmax, std::max(std::fabs(sV), std::fabs(sW)));
+                }
+        double gmax = locmax;
+        MPI_Allreduce(MPI_IN_PLACE, &gmax, 1, MPI_DOUBLE, MPI_MAX, comm);
+        const double scale = (gmax > 0.0) ? (pert * Umax) / gmax : 0.0;
+        const double noise = 0.1 * pert * Umax;
+        for (int k = 1; k <= nz; ++k) {
+            double zr = (zc[k] - half) / half;
+            double Up = Umax * std::max(0.0, 1.0 - zr * zr);
+            for (int j = 1; j <= ny; ++j)
+                for (int i = 1; i <= nx; ++i) {
+                    U(i, j, k) = Up                 + noise * rnd(rng);
+                    V(i, j, k) = scale * V(i, j, k) + noise * rnd(rng);
+                    W(i, j, k) = scale * W(i, j, k) + noise * rnd(rng);
+                }
+        }
+        if (my_rank == 0)
+            std::printf("[laminar_init] mode=VORTEX  nbeta=%.0f  roll_amp=%.3g*Umax (+0.1x noise)\n",
+                        nbeta, pert);
+    } else {
+        // ----- random uniform[-0.5,0.5] noise on all 3 components (default) -----
+        if (my_rank == 0)
+            std::printf("[laminar_init] mode=RANDOM  seed(rank0=%llu)\n",
+                        (unsigned long long)seed);
+        for (int k = 1; k <= nz; ++k)
+            for (int j = 1; j <= ny; ++j)
+                for (int i = 1; i <= nx; ++i) {
+                    U(i, j, k) = rnd(rng);
+                    V(i, j, k) = rnd(rng);
+                    W(i, j, k) = rnd(rng);
+                }
+        double Um0 = bulk(U), Vm0 = bulk(V), Wm0 = bulk(W);
+        for (int k = 1; k <= nz; ++k)
+            for (int j = 1; j <= ny; ++j)
+                for (int i = 1; i <= nx; ++i) {
+                    U(i, j, k) -= Um0; V(i, j, k) -= Vm0; W(i, j, k) -= Wm0;
+                }
+        for (int k = 1; k <= nz; ++k) {
+            double zr = (zc[k] - half) / half;
+            double Up = Umax * std::max(0.0, 1.0 - zr * zr);
+            for (int j = 1; j <= ny; ++j)
+                for (int i = 1; i <= nx; ++i) {
+                    U(i, j, k) = Up + pert * Umax * U(i, j, k);
+                    V(i, j, k) =      pert * Umax * V(i, j, k);
+                    W(i, j, k) =      pert * Umax * W(i, j, k);
+                }
+        }
     }
 
-    // Step 4: re-normalize bulk velocity to exactly (Ub, 0, 0)
-    Um = bulk(U); Vm = bulk(V); Wm = bulk(W);
+    // ----- re-normalize bulk velocity to exactly (Ub, 0, 0) (shared) -----
+    double Um = bulk(U), Vm = bulk(V), Wm = bulk(W);
     const double dU = Ub - Um;
     for (int k = 1; k <= nz; ++k)
         for (int j = 1; j <= ny; ++j)
@@ -116,9 +152,8 @@ void laminar_init(channel::Field<double>& U, channel::Field<double>& V,
                 V(i, j, k) -= Vm;
                 W(i, j, k) -= Wm;
             }
-
     if (my_rank == 0)
-        std::printf("[laminar_init] pert=%.3g  bulk(U,V,W)_pre=(%.3e,%.3e,%.3e) -> (%.3e,0,0)\n",
+        std::printf("[laminar_init] pert=%.3g  bulk_pre=(%.3e,%.3e,%.3e) -> (%.3e,0,0)\n",
                     pert, Um, Vm, Wm, Ub);
 }
 
@@ -188,8 +223,8 @@ int main(int argc, char** argv)
             forcing.set_mean_dPdx(state.dPdx);
         } else {
             laminar_init(U, V, W, P, sub, grid,
-                         cfg.Lz, cfg.target_bulk_velocity, cfg.pert_amp,
-                         topo.cart());
+                         cfg.Ly, cfg.Lz, cfg.target_bulk_velocity, cfg.pert_amp,
+                         cfg.init_mode, topo.cart());
         }
 
         halo.exchange(U); halo.exchange(V); halo.exchange(W);

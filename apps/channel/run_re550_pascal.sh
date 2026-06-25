@@ -22,12 +22,12 @@ PROJ="$(realpath ../..)"
 EXE="${PROJ}/build/bin/channel.out"
 [ -x "${EXE}" ] || { echo "[ERROR] missing ${EXE}" >&2; exit 1; }
 
-mkdir -p log statistics/re590_f instant/re590_f \
-         restart_out/re590_f restart_in/re590_f
+mkdir -p log statistics/re550_p instant/re550_p \
+         restart_out/re550_p restart_in/re550_p
 
 t0=$(date +%s)
-mpirun --bind-to none -np 64 "${EXE}" PARA_INPUT_re550_pascal.dat 2>&1
+mpirun --bind-to none -np 64 "${EXE}" input/PARA_INPUT_re550_pascal.dat 2>&1
 t1=$(date +%s)
 echo
 echo "[done]  pascal wall-time (mpirun only) = $((t1 - t0)) s"
-ls -la statistics/re590_f/tdma_timing_rank*.csv 2>&1 | head
+ls -la statistics/re550_p/tdma_timing_rank*.csv 2>&1 | head

@@ -42,6 +42,16 @@ void TdmaBackendGPU::solve(double* d_A, double* d_B, double* d_C, double* d_D) {
     }
 }
 
+void TdmaBackendGPU::solve_cyclic(double* d_A, double* d_B, double* d_C, double* d_D) {
+    if (kind_ == Kind::FILTERED) {
+        filt_->solve_cycl_filtered_v1(d_A, d_B, d_C, d_D);
+    } else if (kind_ == Kind::FILTERED_V2) {
+        filt_->solve_cycl_filtered_v2(d_A, d_B, d_C, d_D);
+    } else {
+        pasc_->solve_cyclic(d_A, d_B, d_C, d_D, n_sys_, n_row_);
+    }
+}
+
 void TdmaBackendGPU::set_rho_device(const double* d_A,
                                     const double* d_B,
                                     const double* d_C) {

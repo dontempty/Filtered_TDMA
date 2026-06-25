@@ -33,6 +33,8 @@ public:
                 double eps_constant);
 
     void solve(double* A, double* B, double* C, double* D);
+    // Periodic (cyclic) variant: row 0 couples to row n_row-1 via A[0]/C[n_row-1].
+    void solve_cyclic(double* A, double* B, double* C, double* D);
     void solve_profile(double* A, double* B, double* C, double* D,
                        std::vector<double>& time_list);
 

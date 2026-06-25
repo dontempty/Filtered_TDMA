@@ -1,351 +1,423 @@
-# Filtered_TDMA — Parallel TDMA Libraries + ADI Heat / Channel Solvers (CPU + GPU)
+# Filtered_TDMA — 분산 TDMA 라이브러리 2종 + ADI Heat / Channel 솔버 (CPU + GPU)
 
-이 저장소는 분산-메모리 환경에서 동작하는 두 종류의 TDMA(Tridiagonal Matrix
-Algorithm) 라이브러리와, 그 라이브러리들을 같은 인터페이스로 호출하는 ADI
-heat / channel 솔버를 함께 담은 모놀레포입니다. **CPU(MPI)** 와 **GPU(CUDA +
-CUDA-aware MPI)** 두 가지 빌드를 모두 지원하며, 두 알고리즘(`FilteredTDMA`,
-`PaScaLTDMAMany`)의 결과가 같은 실행 파일 안에서 `tdma_backend` 입력값으로
-즉시 교체 가능합니다.
+> 이 문서는 사람과 **다른 AI 에이전트**가 이 저장소 전체를 빠르게 파악하도록 쓴
+> 오리엔테이션 문서입니다. "무엇을/왜/어떻게"를 위에서 아래로, 핵심 아이디어 →
+> 구조 → 알고리즘 → 빌드/실행 → 결과 → 함정 → 파일 지도 순으로 정리합니다.
 
 ---
 
-## 1. 빠른 시작
+## 0. 한 문단 요약
 
-```bash
-# CPU 빌드
-make             # libfiltered_tdma.a + libpascal_tdma.a + channel.out
-make heat        # + Heat ADI 솔버 (build/bin/heat.out)
+분산-메모리(MPI) 환경에서 **많은 삼중대각(tridiagonal) 시스템을 동시에 푸는** 두
+가지 라이브러리 — `PaScaLTDMAMany`(정확해)와 `FilteredTDMA`(절단 근사) — 와, 이
+둘을 **같은 인터페이스로 런타임 교체**하며 호출하는 ADI 응용 솔버(3D heat,
+turbulent channel)를 한 곳에 담은 모놀레포입니다. **CPU(MPI)** 와 **GPU(CUDA +
+CUDA-aware MPI)** 빌드를 모두 지원하며, 입력 파일의 `tdma_backend` 한 줄로
+두 알고리즘을 바꿔 성능·정확도를 직접 비교할 수 있습니다.
 
-# GPU 빌드 (CUDA-aware MPI 필요)
-module load nvhpc/25.11_cuda12          # KISTI Neuron
-USE_CUDA=1 CUDA_ARCH=80 make heat_gpu   # A100=80, V100=70, H100=90
-```
-
-실행 예시 (Heat, CPU, np=8):
-```bash
-mpirun -np 8 build/bin/heat.out apps/heat_cpu/inputs/PARA_INPUT_256.txt
-```
-
-Heat 입력에서 `tdma_backend = pascal` 또는 `tdma_backend = filtered` 로
-백엔드 선택. 같은 옵션이 GPU 바이너리(`heat_gpu.out`)에도 그대로 적용됨.
+핵심 질문은 하나입니다: **"병렬 삼중대각 풀이의 전역 통신을, 정확도를 거의
+잃지 않으면서 근접-이웃 통신 + 국소 절단으로 바꿀 수 있는가?"** — `FilteredTDMA`
+가 그 시도이고, `PaScaLTDMAMany`가 정확해 기준선입니다.
 
 ---
 
-## 2. 저장소 레이아웃
+## 1. 핵심 아이디어 (왜 이 프로젝트가 존재하나)
+
+### 1.1 병렬 TDMA의 본질적 어려움
+
+삼중대각 풀이(Thomas 알고리즘)는 **행 방향으로 순차 의존성**이 있어 본질적으로
+직렬입니다. N개의 행을 P개의 rank에 분할(z-slab)하면 각 rank는 자기 블록을
+국소적으로 소거(**modified Thomas**)할 수 있지만, 그 결과 **인접 rank의 경계
+행(row 0, row N-1)들끼리만 결합된 "reduced system"**(크기 2P)이 남습니다. 이
+reduced system을 어떻게 푸느냐가 두 라이브러리를 가릅니다.
+
+### 1.2 두 가지 전략
+
+```
+        분할(z-slab) + 국소 modified-Thomas  →  2P개 경계 미지수의 reduced system
+                                                 │
+              ┌──────────────────────────────────┴───────────────────────────────┐
+   PaScaL: reduced system을 정확히 풀이                Filtered: reduced system을 근사
+   - 전역 all-to-all(transpose)로 2P행을 모음          - 결합이 기하급수적으로 감쇠함을 이용
+   - 2P 크기 Thomas로 정확해                            - 근접-이웃 교환 + J행 절단
+   - 직렬 Thomas와 bit-identical                        - 통신/연산 ↓, 오차 ≤ eps
+```
+
+### 1.3 Filtered의 통찰 — 기하급수적 감쇠 → 절단
+
+대각우세(diagonally-dominant) 삼중대각에서는, 한 경계 미지수가 이웃 블록 **안쪽
+깊은 행에 미치는 영향이 비율 `q = rho/λ₊` (q<1) 로 기하급수적으로 감쇠**합니다.
+(`rho` = 정규화 비대각 = 대각우세도, `λ₊ = (1+√(1−4·rho²))/2`.) 여기서 두 가지가
+따라옵니다:
+
+1. **reduced system이 인접 2×2 블록으로 사실상 분리** → 전역 all-to-all 대신
+   **근접-이웃 1회 교환**이면 충분 (각 rank가 자기 양쪽 인터페이스를 국소적으로
+   풀이). → `filtered_tdma.cpp`의 "single bidirectional exchange" (2라운드 통신을
+   1라운드로 병합).
+2. **경계 보정이 tolerance `eps` 아래로 떨어지기까지 `J`행만 전파하면 됨**
+   → 보정(그리고 v2에서는 소거까지)을 `O(N)`이 아니라 `O(J)`로 절단.
+
+   ```
+   J = ⌊ log(eps_ / B) / log(q) ⌋ + 1      (상한 n_row−1)
+   eps_ = eps_constant / N_global²          (heat에서 매 step eps_constant = dt)
+   B    = 경계 데이터(D0, DN, 또는 max|D|)에서 만든 보수적 상한
+   ```
+
+   `J`는 격자 크기와 (거의) 무관한 작은 상수(보통 한 자리~십몇)이며 `N_global`에
+   대해 **로그적으로만** 증가합니다. `rho ≥ 0.5`(대각우세 깨짐)면 절단을 끄고
+   full solve로 폴백합니다.
+
+**트레이드오프**: Filtered는 *전역 all-to-all*을 *근접-이웃 통신 + 절단 국소
+연산*으로 바꾸되, ≤ `eps`의 통제된 절단 오차를 감수합니다. 암시적 확산처럼
+대각우세가 강한 문제에서는 `J`가 매우 작아 오차가 무시 가능 — 실제로 heat
+manufactured solution에서 **PaScaL과 자릿수까지 동일**합니다(§6).
+
+---
+
+## 2. 3계층 아키텍처
+
+```
+  [응용 계층]   apps/heat_cpu  apps/heat_gpu  apps/channel
+                     │  ADI Z→Y→X sweep, 매 방향마다 "한 방향 = 많은 삼중대각계"
+                     ▼
+  [디스패치]    tdma_backend(.cpp/.hpp)  ·  tdma_backend_gpu(.cu/.hpp)
+                     │  "pascal" | "filtered"(=v1) | "filtered_v2"  ← 런타임 문자열
+                     ▼
+  [솔버 계층]   libfiltered_tdma.a        libpascal_tdma.a
+                FilteredTDMA(CUDA)        PaScaLTDMAMany(CUDA)
+                     └──── 공통: tdma_local(Thomas), para_range(분할) ────┘
+```
+
+- **솔버 계층**은 응용을 모릅니다 — `solve(A,B,C,D, n_sys, n_row)` 한 인터페이스로
+  "`n_row` 길이의 삼중대각계 `n_sys`개"를 풉니다.
+- **응용 계층**은 알고리즘을 모릅니다 — `TdmaBackend`/`TdmaBackendGPU`가 enum으로
+  실제 솔버를 골라줍니다. 그래서 **재컴파일 없이** 입력 한 줄로 백엔드 교체.
+- 같은 소스가 `USE_CUDA=1`이면 `.cu`까지 묶어 GPU 바이너리를, 아니면 CPU
+  바이너리를 만듭니다.
+
+---
+
+## 3. 저장소 레이아웃
 
 ```
 Filtered_TDMA/
 ├── Makefile, Makefile.inc                # 최상위 오케스트레이션 + 컴파일러/CUDA 플래그
+├── README.md                             # (이 문서)
 ├── libs/
-│   ├── filtered_tdma/                    # libfiltered_tdma.a
-│   │   ├── filtered_tdma.{cpp,hpp}       #   CPU FilteredTDMA (DistD2 + truncation)
-│   │   ├── filtered_tdma_cycl.cpp        #   CPU cyclic variant
-│   │   ├── filtered_tdma_profile.cpp     #   per-phase timing variant
-│   │   └── filtered_tdma_cuda.{cu,hpp}   #   GPU FilteredTDMACUDA (USE_CUDA=1)
-│   └── pascal_tdma/                      # libpascal_tdma.a
-│       ├── pascal_tdma_many.{cpp,hpp}    #   CPU PaScaLTDMAMany (alltoall transpose)
-│       ├── pascal_tdma_single.{cpp,hpp}  #   CPU single-system variant
-│       ├── tdma_local.{cpp,hpp}          #   CPU sequential Thomas (used at nprocs==1)
-│       ├── para_range.{cpp,hpp}          #   Block range partitioning
-│       ├── pascal_tdma_many_cuda.{cu,hpp}#   GPU PaScaLTDMAManyCUDA (USE_CUDA=1)
-│       └── tdma_local_cuda.{cu,cuh}      #   GPU Thomas + modified-Thomas kernels
+│   ├── filtered_tdma/                     → build/lib/libfiltered_tdma.a
+│   │   ├── filtered_tdma.{cpp,hpp}        #   CPU: solve_filtered_v1 / _v2, cal_J_*
+│   │   ├── filtered_tdma_cycl.cpp         #   주기(cyclic) 경계 변형
+│   │   ├── filtered_tdma_profile.cpp      #   per-phase 타이밍 변형
+│   │   └── filtered_tdma_cuda.{cu,hpp}    #   GPU FilteredTDMACUDA (USE_CUDA=1)
+│   └── pascal_tdma/                       → build/lib/libpascal_tdma.a
+│       ├── pascal_tdma_many.{cpp,hpp}     #   CPU: reduced system + alltoall(w) transpose
+│       ├── pascal_tdma_single.{cpp,hpp}   #   단일 시스템 변형
+│       ├── tdma_local.{cpp,hpp}           #   직렬 Thomas (nprocs==1 폴백, 공통)
+│       ├── para_range.{cpp,hpp}           #   블록 인덱스 분할 (공통)
+│       ├── pascal_tdma_many_cuda.{cu,hpp} #   GPU PaScaLTDMAManyCUDA
+│       ├── tdma_local_cuda.{cu,cuh}       #   GPU Thomas / modified-Thomas 커널
+│       └── nvtx_util.hpp                  #   NVTX 프로파일 매크로
 ├── apps/
-│   ├── heat_cpu/                         # CPU heat ADI example
-│   │   ├── main.cpp                      #   Driver (topology=non-periodic walls)
-│   │   ├── solve_theta.cpp               #   ADI Z→Y→X sweep loop
-│   │   ├── tdma_backend.{cpp,hpp}        #   "filtered" | "pascal" dispatcher (host)
-│   │   └── inputs/PARA_INPUT_{64..512}.txt
-│   ├── heat_gpu/                         # GPU heat ADI example (mirrors heat_cpu/)
-│   │   ├── solve_theta.cu                #   GPU kernels (RHS, boundary, build_LHS, …)
-│   │   ├── tdma_backend_gpu.{cu,hpp}     #   "filtered" | "pascal" dispatcher (device)
-│   │   ├── inputs/PARA_INPUT_{1,2,4,8}gpu_{64..512}.txt
-│   │   ├── run_one_np.sh                 #   sbatch (NP=1|2|4|8 env switch)
-│   │   └── run_convergence_a100.sh       #   Full sweep on amd_a100nv_8
-│   └── channel/                          # Channel flow solver (CPU, FFTW + TDMA)
-├── scripts/                              # Utility scripts (check_kisti.sh, etc.)
-├── results/                              # Timing CSV results
-└── build/                                # All artifacts: lib/, bin/, include/, obj/
+│   ├── heat_cpu/                          → build/bin/heat.out   (참조 벤치마크)
+│   │   ├── main.cpp                       #   드라이버 + L2 error (vs manufactured)
+│   │   ├── solve_theta.cpp                #   ADI Z→Y→X sweep 루프
+│   │   ├── tdma_backend.{cpp,hpp}         #   "filtered"|"pascal" 디스패처(host)
+│   │   ├── global.{cpp,hpp}               #   입력 파싱 + option(dt/Tmax/Nt) 정책
+│   │   ├── mpi_topology / mpi_subdomain   #   3D Cartesian + z-slab + ghost-cell
+│   │   └── inputs/{PARA_INPUT_*,scaling/,spatial/}
+│   ├── heat_gpu/                          → build/bin/heat_gpu.out  (heat_cpu의 CUDA 미러)
+│   │   ├── solve_theta.cu                 #   커널: rhs/ghost/build_lhs/update_theta
+│   │   ├── ghostcell_cuda.cu              #   ghost-cell pack/unpack 커널
+│   │   ├── tdma_backend_gpu.{cu,hpp}      #   디스패처(device)
+│   │   ├── timing_csv.hpp                 #   per-rank, per-event 타이밍 CSV
+│   │   └── inputs/{PARA_INPUT_*gpu_*,scaling/}
+│   └── channel/                          → build/bin/channel.out  (난류 채널, 검증 테스트베드)
+│       ├── main.cpp, MomentumSolver, PressureSolver, TdmaSolver, …
+│       ├── HaloExchanger, MpiTopology, Subdomain, Grid, Field, …
+│       ├── PARA_INPUT*.dat
+│       └── tests/test_halo.cpp            #   halo 교환 왕복 검증 (make tests)
+├── scripts/                              # check_kisti.sh(노드 가용량), run_heat_order.sh
+├── results/                             # 타이밍 CSV + scaling_cpu/ scaling_gpu/ + 플롯 .py
+├── Report/                              # performance_analysis.md, ghost_boundary_report.md
+└── build/                              # 생성물: lib/ bin/ include/ obj/{ftdma,pascal}/
 ```
 
 ---
 
-## 3. 두 알고리즘 한눈에
+## 4. 두 TDMA 알고리즘
 
-| 항목                  | **FilteredTDMA**                              | **PaScaLTDMAMany**                                    |
-|-----------------------|----------------------------------------------------------|-------------------------------------------------------|
-| 분산 통신 패턴        | 인접 rank와 boundary 행 2회 교환 (Isend/Irecv)           | 모든 rank가 boundary 행을 alltoallv로 교환            |
-| reduced-system 풀이   | 양 끝점 J행만 truncated 전파 (`eps` cutoff 기반)         | `2·nprocs` 행의 reduced system을 정확히 풀이          |
-| 추가 입력             | `eps_constant` (보통 dt), `A_rho`/`C_rho` per row        | 없음                                                  |
-| 비용                  | O(n_row + 2J) per axis, 통신 = 2 face exchanges          | O(n_row) per axis, 통신 = 1 alltoallv                 |
-| 정확도                | truncation 한계 안에서 정확; multi-rank 시 작은 오차 누적 가능 | 모든 rank 수에서 직렬 Thomas와 bit-identical          |
-| 적합한 곳             | 통신 latency 큰 환경, channel flow의 ADI sweep          | 정확도 우선, smooth manufactured solution 검증 등     |
+두 솔버 모두 시그니처가 동일합니다 — `solve(A,B,C,D, n_sys, n_row)`. `A,B,C`는
+하·주·상 대각, `D`는 RHS이자 출력. 메모리 레이아웃은 **row-major(행이 느리게,
+n_sys 시스템이 빠르게)** 라 안쪽 루프가 `#pragma omp simd`(CPU)/coalesced(GPU)로
+벡터화됩니다. `nprocs == 1`이면 둘 다 즉시 직렬 `tdma_many`로 폴백합니다.
 
-Heat 예제에서 두 백엔드가 결과적으로 동일한 L2 error를 만들어내는 게 검증
-완료(아래 §5). 알고리즘 차이는 통신 패턴과 reduced-system 처리에 있고,
-**Heat 같은 smooth solution + 작은 격자에서는 동일 결과로 수렴**합니다.
+### 4.1 비교표
 
-**Filtered backend 두 가지 변형** (GPU 빌드 한정):
-- `filtered` (=`filtered_v1`): full forward+backward sweep 후 실제 D0/DN에서
-  J를 계산해 부분 final correction.
-- `filtered_v2`: 보수적 D0/DN bound로 J를 미리 계산 → forward/backward를 J까지만
-  full update, 그 너머는 skip-A 또는 D-only로 처리. J가 작을 때(빠른 감쇠) 빠름.
+| 항목 | **PaScaLTDMAMany** (정확해) | **FilteredTDMA** (절단 근사) |
+|---|---|---|
+| reduced system 풀이 | 2·nprocs 전역계를 **정확히** 풀이 | 인접 2×2로 분리 + **J행 절단 전파** |
+| 통신 패턴 | 전역 **MPI_Alltoall(w/v)** (transpose) | **근접-이웃 1회** (Isend/Irecv) |
+| 추가 입력 | 없음 | `eps_constant`(보통 dt), per-row `A_rho/C_rho` |
+| 비용 (분할 방향) | `O(n_row)` + 전역 all-to-all | `O(n_row + 2J)` + 근접-이웃 교환 |
+| 정확도 | 직렬 Thomas와 **bit-identical** | 절단 한계(≤eps) 내 정확; 대각우세 시 사실상 동일 |
+| 강점 영역 | 정확도 최우선, 검증 기준선 | 통신 latency가 큰 환경, 많은 rank |
 
----
+### 4.2 PaScaLTDMAMany — 정확한 reduced solve
 
-## 4. Heat manufactured solution
+1. 각 rank가 자기 z-slab을 **modified-Thomas**로 전방 소거 → 경계 2행 추출
+2. 경계 2행을 reduced 버퍼 `[2 × n_sys]`로 pack
+3. **Alltoallw(transpose)** → 각 rank가 `[2·nprocs × n_sys_rt]`의 열 일부 소유
+   (CPU는 A/C/D 3회 alltoallw; GPU는 device 연속버퍼에 pack 후 **Alltoallv**)
+4. 국소 reduced 시스템을 Thomas로 풀이
+5. 역방향 Alltoall(w/v)로 D 회수 → 6) 국소 후방 대입으로 내부 행 갱신
 
-PDE: ∂t θ = ∇²θ + f,  `f = 3π²·cos(πx)cos(πy)cos(πz)`
+GPU(`PaScaLTDMAManyCUDA`)는 `modified_thomas`/`tdma_many`/pack·unpack 커널 +
+`cudaEvent` 5단계 타이밍(`last_step_times_ms()`)을 제공.
+> **GPU 통신 주의**: device 포인터에 *derived datatype*을 직접 거는 대신, 명시적
+> pack/unpack 커널로 **연속 버퍼**를 만들어 alltoallv — strided DDT는 OpenMPI/UCX의
+> 느린 D2H 폴백을 강제하기 때문(§7과 동일 원리).
 
-Exact: `θ(x,y,z,t) = sin(πx)sin(πy)sin(πz)·exp(-3π²t) + cos(πx)cos(πy)cos(πz)`
+### 4.3 FilteredTDMA — 절단 근사
 
-도메인 `[-1,1]³`, 모든 면에서 Dirichlet 벽 (`topo.init({...}, {false,false,false})`).
-**x를 periodic으로 켜면 ghost cell이 우측 끝 값을 wrap-around해 좌측 BC를
-덮어쓰므로 반드시 `false`로 둘 것.**
-
-시간 적분: factored Crank-Nicolson ADI (Z → Y → X 순). `rho = 0.25`로 두면
-`dt = rho/(1-2ρ)·2·dx² = dx²`이고, `Tmax = dt_N · 128` (reference grid
-N=512)을 고정해 `Nt = Tmax/dt ∝ 1/dx²`. 따라서 모든 N에서 **T_final이 동일**
-→ 격자 정제만의 spatial order를 측정 가능 (`option = order`).
-
-| N    | dt (=dx²)  | Nt   | T_final = 1.953e-3 |
-|------|-----------:|-----:|--------------------|
-|  64  | 9.77e-04   |   2  | ✓                  |
-| 128  | 2.44e-04   |   8  | ✓                  |
-| 256  | 6.10e-05   |  32  | ✓                  |
-| 512  | 1.53e-05   | 128  | ✓                  |
-
----
-
-## 5. Convergence 검증 결과
-
-L2 error vs exact, 모든 결과 bit-identical (round-off 안에서 일치).
-
-### CPU 기준값 (`apps/heat_cpu/`, np=2×2×2)
-
-| Backend     | nx=64       | nx=128      | nx=256      | nx=512      | order |
-|-------------|------------:|------------:|------------:|------------:|------:|
-| `pascal`    | 4.21191e-05 | 1.03721e-05 | 2.58574e-06 | 6.46409e-07 | 2.00  |
-| `filtered`  | 4.21241e-05 | 1.03733e-05 | 2.58592e-06 | 6.46432e-07 | 2.00  |
-
-asymptotic ratio E(h)/E(h/2) = 4.000, order = **+2.000**.
-
-### GPU 결과 (`apps/heat_gpu/`, KISTI Neuron cas_v100nv_8)
-
-3개 backend × NP=1,2,4 × 4 grid sizes = **36 케이스 모두 bit-identical**:
-
-| Backend       | NP | nx=64       | nx=128      | nx=256      | nx=512      |
-|---------------|---:|------------:|------------:|------------:|------------:|
-| `pascal`      |  1 | 4.21191e-05 | 1.03721e-05 | 2.58574e-06 | 6.46409e-07 |
-| `pascal`      |  2 | 4.21191e-05 | 1.03721e-05 | 2.58574e-06 | 6.46409e-07 |
-| `pascal`      |  4 | 4.21191e-05 | 1.03721e-05 | 2.58574e-06 | 6.46409e-07 |
-| `filtered`    |  1 | 4.21191e-05 | 1.03721e-05 | 2.58574e-06 | 6.46409e-07 |
-| `filtered`    |  2 | 4.21191e-05 | 1.03721e-05 | 2.58574e-06 | 6.46409e-07 |
-| `filtered`    |  4 | 4.21191e-05 | 1.03721e-05 | 2.58574e-06 | 6.46409e-07 |
-| `filtered_v2` |  1 | 4.21191e-05 | 1.03721e-05 | 2.58574e-06 | 6.46409e-07 |
-| `filtered_v2` |  2 | 4.21191e-05 | 1.03721e-05 | 2.58574e-06 | 6.46409e-07 |
-| `filtered_v2` |  4 | 4.21191e-05 | 1.03721e-05 | 2.58574e-06 | 6.46409e-07 |
-
-Asymptotic ratio E(h)/E(h/2) ≈ 4.06 → 4.01 → 4.00 → **2차 정확도 확인**.
-
-**검증 환경**: cas_v100nv_8 (V100 ×4, sm_70 빌드), nvhpc/25.11_cuda12,
-CUDA-aware HPC-X OpenMPI. job 723253. A100 (`amd_a100nv_8`)에서도 동일
-결과 확인됨.
-
-### GPU 코드에 적용된 주요 변경
-
-1. **`cudaSetDevice(local_rank)` 추가** (`apps/heat_gpu/main.cpp`): MPI rank를 GPU에
-   1:1 매핑. 이전엔 모든 rank가 GPU 0에 몰려 NP=4에서 ~4× 오버서브스크립션.
-2. **PaScaL_TDMA solver를 PaScaL_TDMA_F 최신과 동기화**: shared-memory
-   pipeline (`tdma_many_kernel`, `modified_thomas_kernel`) + bank-conflict
-   padding, MPI_Alltoallv on contiguous device buffer.
-3. **Filtered backend 멀티-rank 경로를 PaScaL-스타일로 재작성**:
-   - 단일-launch 통합 커널 (`k_fwd_pass`, `k_bwd_pass`, `k_final_pass`) — row마다
-     별도 kernel 호출하던 loop 제거.
-   - v2 전용 통합 커널 (`k_fwd_pass_v2`, `k_bwd_pass_v2`).
-   - 마지막 row를 dedicated contiguous send buffer로 pack 후
-     `MPI_Isend/Irecv` (plain `MPI_DOUBLE`, CUDA-aware fast path).
-   - **`cal_J_v1`/`cal_J_v2`를 GPU 커널로 이전** — reduction과 `sqrt/log`까지
-     디바이스에서 처리, host는 결과 int 1개만 받음. (host libm 호출이
-     NVHPC nvc++ 환경에서 MPI 후 SIGILL을 유발하던 문제 해결.)
-4. **build_lhs_x tile-transpose** (`apps/heat_gpu/solve_theta.cu`): 32×32 shared
-   memory tile로 d_rhs(ii-fastest) read와 d_X(jj-fastest) write 양쪽 모두
-   coalesced 만듦.
-
-> 참고: PaScaL_TDMA GPU의 별도 sweep 보고서 — [/scratch/x3319a05/PaScaL_TDMA/run/CONVERGENCE_GPU.md](../PaScaL_TDMA/run/CONVERGENCE_GPU.md)
+- **`solve_filtered_v1`** (백엔드명 `filtered`/`filtered_v1`): **전체** modified-Thomas
+  전·후방 소거 → 경계 2×2 인터페이스를 **근접-이웃 1회 교환**으로 풀이 → **최종
+  보정만 J행으로 절단** (`J = cal_J_v1(D0,DN)`, 해(solution) 기반 상한).
+- **`solve_filtered_v2`** (백엔드명 `filtered_v2`): `J = cal_J_rhs_bound(D)`(RHS 기반)
+  를 **미리** 계산 → 전방 소거를 **Phase 1: 2..J 전체 갱신 / Phase 2: J+1.. A-갱신
+  생략**으로 절단, 후방·보정도 J 기준 절단. J가 작을수록(빠른 감쇠) 더 빠름.
+- **`filtered_tdma_cycl.cpp`**: 주기 경계 변형. **`_profile`**: 단계별 타이밍.
+- `cal_J_*` (cpp:56–141): `q = rho/λ₊`, `λ₊=(1+√(1−4·rho²))/2`, `eps_=eps_constant/N²`.
+  `rho`(per-row `A_rho/C_rho`의 최대 절댓값)가 `≥0.5`거나 `0`이면 절단 없이 full.
+- **경계 rank 처리**: `left_rank_/right_rank_ == MPI_PROC_NULL`이면 해당 인터페이스
+  보정 루프를 `if (has_left/has_right)`로 건너뜀 — `MPI_PROC_NULL` recv가 버퍼를
+  채우지 않으므로 **정확성 장치**이자 일 절약(루프 밖 1회 분기, 비용 무시).
 
 ---
 
-## 6. 빌드 매트릭스
+## 5. Heat ADI 응용 (heat_cpu / heat_gpu)
 
-### CPU only
+### 5.1 무엇을 푸나 — manufactured solution
+
+```
+PDE   :  ∂θ/∂t = ∇²θ + f ,   f = 3π²·cos(πx)cos(πy)cos(πz)
+정확해:  θ(x,y,z,t) = sin(πx)sin(πy)sin(πz)·exp(−3π²t) + cos(πx)cos(πy)cos(πz)
+도메인:  [−1,1]³ ,  모든 면 Dirichlet (정확해로 BC 부여)
+```
+
+`main.cpp`가 솔브 후 정확해와의 **L2 error**를 계산(`option=order`). 시간 감쇠항
+(sin·exp)과 정상항(cos)의 합이라, 정상항이 공간 이산화 오차를 노출시켜 **2차
+정확도**를 측정하게 합니다.
+
+### 5.2 수치 기법
+
+- **factored Crank–Nicolson ADI**, 방향 순서 **Z → Y → X**. 각 방향이 "많은
+  삼중대각계"가 되어 위 TDMA 백엔드로 풀림.
+- 방향마다: 명시적 7점 스텐실로 RHS 구성 → 삼중대각 LHS 계수 build → TDMA solve
+  → 해를 다음 방향으로 전치/복사. Dirichlet 경계는 ghost-cell 보정으로 RHS에 흡수.
+
+### 5.3 `option` 모드 — dt/Tmax/Nt 정책 (`global.cpp`)
+
+| option | dt | Tmax / Nt | 용도 |
+|---|---|---|---|
+| `order` | `dt = ρ/(1−2ρ)·2dx²` (ρ=0.25 ⇒ dt=dx²) | `Tmax = dt_512·128` 고정, `Nt=round(Tmax/dt)` ⇒ 64/128/256/512 → Nt 2/8/32/128 | 공간 수렴(모든 N에서 T_final 동일) |
+| `strong` | `dt = ρ/(1−2ρ)·2dz²` (ρ_z 고정) | `Nt`(+warmup) 입력, `Tmax=Nt·dt` | 고정-스텝 타이밍/스케일링 |
+| (그 외) | order와 동일 | — | 폴백 |
+
+> **strong/weak/refine "연구"**는 별도 코드 분기가 아니라, `inputs/scaling/`의
+> **입력 파일 패밀리 + 드라이버 스크립트**로 구성되며 내부적으로 위 정책(주로
+> strong, Nt=30·warmup=10)을 씁니다.
+
+### 5.4 분해 · 통신
+
+- **1D z-slab 분해** `(npx,npy,npz)=(1,1,np)` (스케일링 기본). → **x·y 방향은
+  nprocs=1이라 두 백엔드가 동일한 직렬 Thomas로 폴백; 차이는 분해 방향 `solve_z`
+  에서만 발생** (§6.2의 결론으로 직결).
+- ghost-cell 교환: CPU는 MPI subarray datatype, **GPU는 면(slab)을 연속 버퍼로
+  `pack_{x,y,z}` → Isend/Irecv → `unpack_{x,y,z}`** (`ghostcell_cuda.cu`).
+
+### 5.5 GPU 특이사항 (heat_gpu)
+
+- **rank↔GPU 1:1**: `cudaSetDevice(local_rank % nDevices)` (`main.cpp`) — 안 하면
+  모든 rank가 GPU 0에 몰림.
+- 커널(`solve_theta.cu`): `rhs_kernel`, `ghost_{x,y,z}_kernel`,
+  `build_lhs_{z,y,x}_kernel`, `update_theta_kernel`, 방향 전치 copy 커널.
+  `build_lhs_x`는 32×32 shared-memory tile-transpose로 read/write 모두 coalesced.
+- **타이밍 CSV**(`timing_csv.hpp`): `rank,t_step,event,time_sec` long-format, event =
+  `rhs,solve_x,solve_y,solve_z,comm`. 경로는 `TIMING_CSV` 환경변수 또는 기본
+  `results/timing_<nx>_<npxnpynpz>_<backend>.csv`.
+
+---
+
+## 6. 검증 · 핵심 결과
+
+### 6.1 정확도 — 2차, 백엔드 무관 동일
+
+heat manufactured solution, `pascal`, np=2×2×2 (CPU; nx=64/128/256/512). 세 백엔드
+× NP × 격자 전 조합에서 결과가 자릿수까지 일치(filtered 절단 오차 ≤ round-off),
+CPU↔GPU bit-identical, V100(sm_70)·A100(sm_80) 동일.
+
+**Dirichlet** (`periodic` 미설정):
+
+| nx | 64 | 128 | 256 | 512 | order |
+|---|---:|---:|---:|---:|---:|
+| L2 | 1.24416e-04 | 3.43421e-05 | 8.61189e-06 | 2.16478e-06 | → **2.0** (1.86→2.00→1.99) |
+
+**Periodic** (`periodic = 1`):
+
+| nx | 64 | 128 | 256 | 512 | order |
+|---|---:|---:|---:|---:|---:|
+| L2 | 4.39360e-05 | 1.10226e-05 | 2.76621e-06 | 6.93228e-07 | → **2.0** (1.99→1.99→2.00) |
+
+> 과거 표의 Dirichlet `4.21191e-05`(N=64)는 cell-center 격자에 경계를 노드로
+> 포함시키던 반-셀 방식의 값. 현재는 ghost-cell 경계(전 영역 ρ<1/2,
+> [`Report/ghost_boundary_report.md`](Report/ghost_boundary_report.md))로 바뀌어
+> `1.24416e-04`이며, 둘 다 공간 2차.
+
+### 6.2 스케일링 — Filtered 이득은 어디서, 언제 나오나 (CPU 데이터)
+
+한 스텝 비용 분해: **rhs ~68% (백엔드 무관) · solve_x+y ~17–20% (분해 안 됨 → 동일)
+· solve_z ~13–15% (유일한 차이) · comm ~0.05%**. 따라서:
+
+- 두 방법 **전체 시간 차이는 ~0–3%**. Amdahl상 솔버 교체가 건드릴 수 있는 건
+  solve_z(~14%)뿐이고, 그 안에서 Filtered가 ~20–30% 빠르지만 전체로는 희석됨.
+- **이득은 분해 방향 프로세스 수에 비례** (solve_z 가속 np=8에서 PaScaL ~2.5×
+  vs Filtered ~3.1×). **격자만 키우는 refine(np=2 고정)에서는 거의 안 보임**
+  (J가 상수 → solve_z 비 ~1.2배에서 평평).
+
+플롯/원자료: `apps/heat_cpu/results/scaling_cpu/` + `plot_scaling_cpu.py`,
+`plot_scaling_z.py`(solve_z 단독), GPU는 `scaling_gpu/<hardware>/` (§아래 주의).
+
+> **scaling_gpu 출력은 하드웨어별 하위폴더**(`scaling_gpu/v100`, `/a100`, …)로
+> 자동 분리됨 — run/sbatch 스크립트가 `nvidia-smi`로 GPU명을 감지. V100/A100을
+> 같이 돌려도 덮어쓰지 않음.
+
+### 6.3 GPU ghost-cell 최적화
+
+면을 연속 버퍼로 pack/unpack(↔ device 포인터 + derived datatype)로 바꿔
+N=256에서 **~111×**, N=512에서 **>50×** 가속(V100 PCIe). 원리: CUDA-aware
+OpenMPI/UCX는 연속 버퍼만 빠르게 처리하고 strided DDT+device포인터는 느린
+폴백으로 빠짐. (PaScaL GPU alltoall도 같은 이유로 명시 pack 사용.)
+
+---
+
+## 7. 빌드 & 실행
+
+### 7.1 빌드 타깃 (최상위 `Makefile`)
+
+| 타깃 | 산출물 | 비고 |
+|---|---|---|
+| `make` (=`all`) | libs + `channel.out` | CPU, FFTW 필요 |
+| `make heat` | `build/bin/heat.out` | CPU ADI 참조 |
+| `make heat_gpu` | `build/bin/heat_gpu.out` | `USE_CUDA=1 CUDA_ARCH=…` 필수 |
+| `make channel` | `build/bin/channel.out` | 난류 채널(FFT+TDMA) |
+| `make tests` | `build/bin/test_halo.out` | halo 교환 검증 |
+| `make clean` / `rm` | — | 산출물 / 런타임 출력 제거 |
+
+`Makefile.inc` 핵심: `CXX:=mpicxx`, `CXXFLAGS:=-O3 -std=c++17 -fPIC -march=x86-64-v3`,
+`FFTW_DIR`, `USE_CUDA?=0`, `CUDA_ARCH?=80`, `NVCC:=nvcc`,
+`NVCCFLAGS:=… -arch=sm_$(CUDA_ARCH) -ccbin $(CXX)`, `CUDA_LIBDIR:=$(NVHPC_ROOT)/cuda/lib64`.
+`USE_CUDA=1`일 때만 `.cu`가 컴파일되어 `.a`에 함께 archive됨.
+
+### 7.2 CPU (KISTI Neuron)
 
 ```bash
-module load gcc/15.2.0 mpi/openmpi-4.1.8 fftw3/3.3.10   # channel은 FFTW 필요
-make            # 라이브러리 + channel
-make heat       # + Heat (CPU)
-make clean
+module load gcc/15.2.0 mpi/openmpi-4.1.8 fftw3/3.3.10
+make            # libs + channel
+make heat       # + heat.out
+mpirun -np 8 build/bin/heat.out apps/heat_cpu/inputs/PARA_INPUT_256.txt
 ```
 
-### GPU (CUDA-aware MPI)
+### 7.3 GPU (CUDA-aware MPI, KISTI Neuron)
 
-KISTI Neuron 환경 (CUDA 12 / HPC-X OpenMPI 4):
 ```bash
 module purge
-module load nvhpc/25.11_cuda12          # nvcc + HPC-X + mpicxx 모두 제공
-export CUDA_LIBDIR=$NVHPC_ROOT/cuda/lib64
-
-# 라이브러리(.cu 포함) + Heat_gpu 빌드
-USE_CUDA=1 CUDA_ARCH=80 make heat_gpu   # A100=80, V100=70, H100=90
-
-# V100 노드(cas_v100nv_8)에서 실행하려면 sm_70로 재빌드:
-USE_CUDA=1 CUDA_ARCH=70 make heat_gpu
+module load gcc/15.2.0 mpi/openmpi-4.1.8 nvhpc/25.11_cuda12  # mpicxx는 nvhpc 번들 hpcx
+USE_CUDA=1 CUDA_ARCH=70 make heat_gpu        # V100=70, A100=80, H100=90
+# 할당 노드에서:
+srun --jobid=<JID> --gres=gpu:1 -n1 \
+  bash -c 'mpirun -np 1 build/bin/heat_gpu.out apps/heat_gpu/inputs/PARA_INPUT_1gpu_256.txt'
 ```
+> `.cu` 규칙엔 `-MMD` 의존성 추적이 없음 — 헤더만 고쳤으면 `make clean` 후 재빌드.
 
-`USE_CUDA=1` 일 때만 `Filtered_TDMA/filtered_tdma_cuda.cu`,
-`PaScaL_TDMA/pascal_tdma_many_cuda.cu`, `PaScaL_TDMA/tdma_local_cuda.cu` 가
-컴파일되어 라이브러리 `.a` 안에 함께 archived됨. CPU만 빌드(`USE_CUDA=0`,
-기본값)일 땐 CUDA 의존성 없음.
-
-### sbatch (KISTI Neuron, A100 노드)
-
-```bash
-# 단일 NP × 4 grid 시리즈 (~1분):
-NP=1 sbatch -p amd_a100nv_8 --gres=gpu:1 -J pascal_1g apps/heat_gpu/run_one_np.sh
-NP=2 sbatch -p amd_a100nv_8 --gres=gpu:2 -J pascal_2g apps/heat_gpu/run_one_np.sh
-
-# 또는 전체 스윕(3 backends × 3 분할 × 4 grid = 36 runs):
-sbatch apps/heat_gpu/run_convergence_a100.sh
-```
-
-V100 노드(`cas_v100nv_8`)에서도 동작하지만 PCIe 토폴로지라 GPU↔GPU 통신이
-NVLink 노드보다 훨씬 느림. 알고리즘 정확도는 동일 (multi-rank 결과
-bit-identical 확인됨).
-
----
-
-## 7. 동작 가능한 주요 입력 옵션
-
-`apps/heat_cpu/inputs/PARA_INPUT_*.txt`, `apps/heat_gpu/inputs/PARA_INPUT_*.txt`:
+### 7.4 입력 형식
 
 ```ini
-nx = 256                # 격자 점 수 (입력); 코드 내부에서 nx++ 후 cell 개수로 사용
-ny = 256
-nz = 256
-
-npx = 2                 # MPI 분할 (총 NP = npx · npy · npz)
-npy = 2
-npz = 2
-
-rho   = 0.25            # dt = rho/(1-2ρ)·2·dx² 안정성·정확도 조절
-eps   = 0.005           # FilteredTDMA 초기 cutoff (매 step solve_eps=dt로 덮어씀)
-Tmax  = 0.003           # option=order에서는 코드가 dt_N·128로 덮어씀
-dt    = 0.001           # (마찬가지로 코드가 덮어씀)
-
-option = order          # "order"=convergence sweep, "strong"=Nt=3 fixed for scaling
-tdma_backend = pascal   # "pascal" | "filtered" (=filtered_v1) | "filtered_v2"
+nx, ny, nz            # 격자 점 수(코드에서 +1 후 node-centered cell로 사용)
+npx, npy, npz         # MPI 분할 (NP = npx·npy·npz; 스케일링은 1,1,np)
+rho   = 0.25          # dt = rho/(1−2ρ)·2dx² 안정성/정확도
+eps   = 0.005         # FilteredTDMA 초기 cutoff (heat는 매 step set_eps_constant(dt)로 덮어씀)
+Tmax, dt  또는  Nt+warmup   # option에 따라 코드가 정함
+option = order        # order | strong (그 외 = order 폴백)
+tdma_backend = pascal # pascal | filtered(=filtered_v1) | filtered_v2
+periodic = 0          # 0=Dirichlet 벽(기본) | 1=전 3방향 주기
+                      #   방향별 지정: periodic_x / periodic_y / periodic_z = 0|1
 ```
 
----
-
-## 8. 알려진 버그 / 주의 사항
-
-1. **Heat main.cpp의 topology**는 **`{false, false, false}`** 이어야 합니다.
-   `{true, …}` (x periodic)로 두면 ghost-cell update가 우측 cell 값을
-   좌측 boundary로 wrap-around하여 Dirichlet BC가 한 step 만에 깨집니다 —
-   convergence 실패의 과거 원인이었음. 현재 코드는 수정됨.
-2. **`set_eps_constant(dt)`** 는 Heat의 시간 step마다 호출해 매번 lib의 `eps_`
-   를 `dt`로 갱신해야 channel과 같은 패턴. 입력 파일의 `eps = 0.005`는
-   초기값일 뿐 실행 중 덮어쓰입니다.
-3. **Filtered backend의 multi-rank 경로**는 cutoff J에 의존해 매우 작은
-   truncation을 적용. smooth manufactured solution에서는 결과가 PaScaL과
-   거의 동일하지만, 매우 가파른 RHS가 등장하는 케이스에서는 양쪽 결과를
-   별도로 검증할 것.
-4. **`heat_gpu`의 mpirun-2-GPU 성능**은 V100 PCIe 노드에서 통신 latency가
-   dominant. A100 NVLink 노드 (`amd_a100nv_8`)에서 훨씬 빠르며 알고리즘
-   정확도는 동일.
-5. **GPU 빌드 시 `CUDA_LIBDIR`** 명시 필요 (KISTI Neuron의 nvhpc는
-   libcudart를 `$NVHPC_ROOT/cuda/lib64`에 둠 — 기본 `/usr/local/cuda/lib64`에
-   없음). sbatch 스크립트에서 자동 설정.
+**경계 조건** — 기본은 전면 Dirichlet 벽. `periodic = 1`이면 x·y·z 모두 주기,
+또는 `periodic_x/y/z`로 방향별 선택(mixed BC 가능). 주기 방향은 해당 TDMA가
+**cyclic 솔버**(`solve_cyclic`)로 전환되고 ghost는 wrap으로 채워짐. CPU·GPU 모두,
+세 백엔드 모두 지원하며 manufactured solution으로 2차 검증됨(§6.1). 멀티-GPU 주기
+실행은 **런타임에 nvhpc만** 로드할 것(openmpi 동시 로드 시 hpcx mpirun 충돌).
 
 ---
 
-## 9. Channel solver
+## 8. Channel 솔버 (검증 테스트베드)
 
-`apps/channel/` 디렉터리는 PaScaL_TCS 자연대류 Fortran 코드를 C++17 + FFTW3 +
-Filtered_TDMA로 재구성한 별도 솔버입니다. wall-normal 방향 TDMA에
-`FilteredTDMA`를 사용하며, x/y는 FFT, z는 TDMA. Build target: `make channel`.
-
-PaScaL_TCS와의 모듈 대응 + 좌표 규약 + 빌드 패턴은 이 파일의 이전 버전
-(channel 중심 README)에 정리되어 있고, 채널-specific 내용은 별도
-`channel/README.md` 로 분리 예정.
+`apps/channel/`은 **난류 채널 유동**(아임계 Re_b≈2857) 솔버입니다. 좌표 규약:
+**x(주류)·y(스팬)은 주기 → FFTW로, z(벽수직)는 무활주 벽 → TDMA**(가장 비싼
+1D 풀이). Arakawa C-grid 스태거링, projection형 모멘텀 적분, z 격자 stretching.
+TDMA는 `TdmaSolver::parse_backend()`로 Filtered/PaScaL 선택 — heat와 동일한
+백엔드 교체 구조. 주요 모듈: `MomentumSolver`, `PressureSolver`, `TdmaSolver`,
+`HaloExchanger`, `MpiTopology`/`Subdomain`, `Grid`/`Field`, `ChannelForcing`,
+`Statistics`/`FieldOutput`/`RestartIO`, `Config`. `tests/test_halo.cpp`가 halo
+교환 왕복 정합성을 검증(`make tests`). 채널-specific 세부는 추후 `channel/README.md`로
+분리 예정.
 
 ---
 
-## 10. 성능 최적화 로그 — ghost-cell pack/unpack
+## 9. 함정 / 설계 메모
 
-### 배경
+1. **경계는 입력 `periodic`으로 선택** (기본 Dirichlet). 주기 방향은 Dirichlet 인덱스
+   플래그가 꺼지고 `solve_cyclic`로 전환되며 ghost가 wrap으로 채워짐 — 두 처리가
+   짝이어야 함(한쪽만 켜면 깨짐). 과거엔 토폴로지가 `{false,false,false}` 하드코딩이라
+   periodic을 켜면 Dirichlet ghost fill이 wrap을 덮어써 BC가 한 스텝에 깨졌음(현재 해결).
+   GPU는 `ghostcellUpdateDevice`가 `nprocs>1`이 아니라 이웃 존재(`west/east != PROC_NULL`)
+   기준으로 교환해야 단일-rank 주기 wrap이 동작(§Report/progress_2026-06-24).
+2. **`set_eps_constant(dt)`** 를 매 시간 스텝 호출 → lib 내부 `eps_ = dt/N²`. 입력의
+   `eps`는 초기값일 뿐 실행 중 덮어쓰임.
+3. **`if (has_left/has_right)` 분기는 제거 대상이 아님** — `MPI_PROC_NULL` recv의
+   미초기화 버퍼 사용을 막는 정확성 장치이며, 루프 밖 상수 분기라 비용 무시.
+4. **GPU에서 derived-datatype + device 포인터 금지** — 연속 버퍼 pack/unpack으로
+   (heat ghost-cell, PaScaL alltoall 모두 이 패턴).
+5. **GPU 빌드 시 `CUDA_LIBDIR`** = `$NVHPC_ROOT/cuda/lib64` (nvhpc는 libcudart를
+   기본 경로에 두지 않음).
+6. **stale object 주의** — `mpi_subdomain.*` 등 헤더에 device 버퍼 멤버를 더했으면
+   `make` 전 `rm build/obj/exgpu_*.o` (구조체 레이아웃 어긋나면 illegal memory access).
 
-초기 GPU 포팅은 `MPI_Type_create_subarray` 로 만든 **derived datatype**
-을 **device pointer** 에 적용해서 `MPI_Isend/Irecv` 를 호출하는
-방식이었음. HPC-X (OpenMPI) 의 CUDA-aware 경로는 **연속 device 버퍼**
-에 대해서는 UCX `cuda_ipc` / `cuda_copy` 로 빠르게 처리하지만,
-**strided derived type + device pointer** 조합에서는 폴백 (셀 단위
-`cudaMemcpy` 또는 전체 배열 D2H/H2D 스테이징) 으로 빠지면서 연속
-전송 대비 100×–300× 까지 느려짐.
+---
 
-### 변경 사항 (`apps/heat_gpu/ghostcell_cuda.cu`)
+## 10. AI를 위한 "무엇을 보려면 어디" 지도
 
-각 면의 slab 을 2D CUDA kernel (`pack_x/y/z`) 로 **연속 device buffer**
-에 packing → 연속 포인터로 `MPI_Isend/Irecv` → 받은 buffer 를 `unpack_x/y/z`
-kernel 로 ghost slot 에 scatter. 12 개의 device buffer (각 면당 send/recv
-1 쌍 × 6 면) 는 time loop 시작에서 `MPISubdomain::allocGhostBufsDevice()`
-가 한 번 할당, 끝에서 해제.
-
-### 측정 결과 (V100 PCIe, 2-GPU NP=2,1,1, backend=pascal)
-
-| N    | Before (DDT, job 721173) | After (pack/unpack, job 721218) | Speedup  |
-|------|-------------------------:|--------------------------------:|---------:|
-|  64  |         3 s              |        2 s                      |  1.5×    |
-| 128  |        22 s              |        2 s                      |   11×    |
-| 256  |       332 s              |        3 s                      | **111×** |
-| 512  |    > 1800 s (안 끝남)    |       36 s                      | **>50×** |
-
-`backend=filtered` 도 동일 ghost-cell 경로를 쓰므로 같은 정도의 가속.
-전체 8-run sweep (2 backends × 4 grid) 이 이전엔 1시간 안에 끝나지
-않았는데 최적화 후 **약 80 초** 안에 완료.
-
-### 시도했지만 도움 안 된 환경 변수
-
-다음 UCX / OpenMPI 옵션은 시도했지만 V100 PCIe 노드에서는 의미 있는
-차이가 없었음 (UCX 가 `gdr_copy is not available` 경고를 띄움 — V100
-PCIe 에는 GPUDirect RDMA 없음; `cuda_copy`/`cuda_ipc` 는 이미 활성화):
-```bash
-export OMPI_MCA_pml=ucx
-export OMPI_MCA_btl=^openib,uct
-export OMPI_MCA_pml_ucx_opal_cuda=1
-export OMPI_MCA_opal_cuda_support=true
-export UCX_TLS=rc,sm,cuda_copy,cuda_ipc,gdr_copy
-export UCX_MEMTYPE_CACHE=n
-export UCX_RNDV_THRESH=8192
-```
-**병목은 transport 가 아니라**, `MPI_Isend/Irecv` 안에서 derived-datatype
-+ device-pointer 조합이 OpenMPI 를 느린 fallback 으로 강제하는 것이
-었음. 동일 패턴이 `PaScaL_TDMA_F examples/solve_theta.f90` 의
-`ghostcell_update_cuda` 에서도 사용됨.
-
-### 빌드 캐시 주의
-
-`mpi_subdomain.{hpp,cpp}` 에 device-buffer 멤버를 추가했다면 반드시
-**`make` 전에 `rm build/obj/exgpu_*.o`** — 헤더만 바뀌고 `.cpp`
-의 object 가 stale 한 채로 남으면 struct layout 이 어긋나서 packing
-kernel 이 host pointer 를 dereferencing → `illegal memory access` 로
-실패함. 디버깅 중 PaScaL_TDMA repo 에서 같은 증상으로 한 차례 겪음.
+| 알고 싶은 것 | 볼 파일 |
+|---|---|
+| Filtered 핵심 알고리즘 / J 절단 | `libs/filtered_tdma/filtered_tdma.cpp` (`solve_filtered_v1/_v2`, `cal_J_*`) |
+| PaScaL reduced solve / alltoall | `libs/pascal_tdma/pascal_tdma_many.cpp` |
+| GPU TDMA 커널 / 통신 | `*_cuda.cu`, `tdma_local_cuda.cu` |
+| 백엔드가 어떻게 선택되나 | `apps/*/tdma_backend*.{cpp,cu,hpp}` (`Kind` enum, `parse()`) |
+| ADI 시간적분 루프 | `apps/heat_cpu/solve_theta.cpp`, `apps/heat_gpu/solve_theta.cu` |
+| dt/Tmax/Nt 정책(option) | `apps/heat_*/global.cpp` |
+| 무엇을 푸나(정확해/L2) | `apps/heat_*/main.cpp` |
+| 분해/ghost-cell | `apps/heat_*/mpi_subdomain.*`, `ghostcell_cuda.cu` |
+| 채널 유동 구조 | `apps/channel/` (`MomentumSolver`, `TdmaSolver`, …) |
+| 빌드 규칙 | `Makefile`, `Makefile.inc`, `libs/*/Makefile`, `apps/*/Makefile` |
+| 스케일링/수렴 결과·플롯 | `apps/heat_*/results/`, `*/plot_scaling_*.py` |
 
 ---
 
 ## 11. 참고 자료
 
-- PaScaL_TDMA GPU convergence 보고서: [`/scratch/x3319a05/PaScaL_TDMA/run/CONVERGENCE_GPU.md`](../PaScaL_TDMA/run/CONVERGENCE_GPU.md)
-- 원본 PaScaL_TDMA Fortran (`PaScaL_TDMA_F`): NVHPC + cuSPARSE 비교 — `/scratch/x3319a05/PaScaL_TDMA_F`
-- 모멘텀 ρ<1/2 분석: [`claude/PaScaL_TCS_momentum_analysis.md`](claude/PaScaL_TCS_momentum_analysis.md)
-- KISTI Neuron 모듈 가이드: [`/home01/x3319a05/.claude/projects/-scratch-x3319a05/memory/pascal_tdma_f_kisti_neuron.md`](file:///home01/x3319a05/.claude/projects/-scratch-x3319a05/memory/pascal_tdma_f_kisti_neuron.md)
+- 성능 분석: [`Report/performance_analysis.md`](Report/performance_analysis.md),
+  ghost 경계: [`Report/ghost_boundary_report.md`](Report/ghost_boundary_report.md)
+- 원본 PaScaL_TDMA Fortran(NVHPC+cuSPARSE 비교): `/scratch/x3319a05/PaScaL_TDMA_F`
+- KISTI Neuron 빌드/실행 메모: `~/.claude/projects/-scratch-x3319a05/memory/` 의
+  `pascal_tdma_f_kisti_neuron.md`, `filtered_tdma_*` 항목들

@@ -22,9 +22,11 @@ int main(int argc, char** argv) {
 
     // 2) Create 3D Cartesian topology
     MPITopology topo;
-    // Dirichlet walls in all three directions (matches reference setup).
+    // Per-direction boundary from input: false = Dirichlet wall, true = periodic.
+    // Periodic dirs get wrap-around neighbors (west of rank 0 = last rank / self),
+    // so ghostcellUpdate fills ghosts by periodic wrap instead of Dirichlet.
     topo.init({params.np_dim[0], params.np_dim[1], params.np_dim[2]},
-              {false, false, false});
+              {params.periodic[0], params.periodic[1], params.periodic[2]});
     topo.make();
 
     auto cx = topo.commX();

@@ -50,10 +50,10 @@ Timestepmax = 30000
 # === group: sim_continue ===
 ContinueFilein = 0
 ContinueFileout  = 1
-dir_cont_filein = ./restart_in/f/
-dir_cont_fileout = ./restart_out/f/
-dir_instantfield = ./instant/f/
-dir_statistics   = ./statistics/f/
+dir_cont_filein = ./restart_in/re180_f/
+dir_cont_fileout = ./restart_out/re180_f/
+dir_instantfield = ./instant/re180_f/
+dir_statistics   = ./statistics/re180_f/
 
 # === group: channel_forcing ===
 forcing_mode         = MASS_FLOW
@@ -65,6 +65,7 @@ target_dPdx          = 0.0
 # expressed as a fraction of Umax = 1.5·Ub.
 #   0.0 = pure Poiseuille,  0.05 = 5% noise, etc.
 pert_amp = 0.5
+init_mode = vortex
 
 # === group: output (v2 convention) ===
 # nmonitor    : monitor print interval (steps)
@@ -74,11 +75,11 @@ pert_amp = 0.5
 # nout        : instant 3-D field output interval (steps)
 # out_stats   : 1 = write stats files, 0 = skip
 # out_field   : 1 = write instant field files, 0 = skip
-nmonitor    = 1
-nstat_start = 20000
+nmonitor    = 10
+nstat_start = 10000
 nstat       = 1
 nout_stats  = 10000
-nout        = 30000
+nout        = 10000
 out_stats   = 1
 out_field   = 1
 

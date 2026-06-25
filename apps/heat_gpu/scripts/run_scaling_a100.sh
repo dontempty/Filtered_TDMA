@@ -12,7 +12,14 @@ fi
 PROJ=/scratch/x3319a05/Filtered_TDMA
 BIN="${PROJ}/build/bin/heat_gpu.out"
 INP="${PROJ}/apps/heat_gpu/inputs/scaling"
-RES="${PROJ}/apps/heat_gpu/results/scaling_gpu"
+# Output dir = scaling_gpu/<hardware>  (auto-detected; fallback a100 for this script)
+GPU_RAW=$(nvidia-smi --query-gpu=name --format=csv,noheader -i 0 2>/dev/null | head -1)
+case "${GPU_RAW}" in
+    *V100*) GPU_TAG=v100 ;; *A100*) GPU_TAG=a100 ;;
+    *GH200*) GPU_TAG=gh200 ;; *H200*) GPU_TAG=h200 ;; *H100*) GPU_TAG=h100 ;;
+    *) GPU_TAG=$(printf '%s' "${GPU_RAW}" | tr -cs 'A-Za-z0-9' '_' | sed 's/^_//;s/_$//') ;;
+esac
+RES="${PROJ}/apps/heat_gpu/results/scaling_gpu/${GPU_TAG:-a100}"
 LOG="${PROJ}/apps/heat_gpu/log/scaling_a100.out"
 
 mkdir -p "${RES}" "$(dirname ${LOG})"

@@ -1,19 +1,31 @@
 #!/usr/bin/env python3
 """
 GPU scaling plots — z-solve only (PaScaL vs Filtered_v2).
-Reads: scaling_gpu/timing_*.csv
-Writes: image_gpu/
+Reads: scaling_gpu/<gpu>/timing_*.csv   (<gpu> = v100|a100|... hardware subfolder)
+Writes: image_gpu/<gpu>/
+
+Usage:
+    python3 plot_scaling_gpu.py [gpu]     # e.g. v100, a100 (default: v100)
+Outputs go to image_gpu/<gpu>/. Pass the bare results root (legacy backup files
+in scaling_gpu/ root) with `python3 plot_scaling_gpu.py .`.
 """
-import os, re, glob, csv
+import os, re, glob, csv, sys
 from collections import defaultdict
 import numpy as np
 import matplotlib
 matplotlib.use("Agg")
 import matplotlib.pyplot as plt
 
-SRC = "/scratch/x3319a05/Filtered_TDMA/apps/heat_gpu/results/scaling_gpu"
-OUT = "/scratch/x3319a05/Filtered_TDMA/apps/heat_gpu/results/image_gpu"
+GPU  = sys.argv[1] if len(sys.argv) > 1 else "v100"
+ROOT = "/scratch/x3319a05/Filtered_TDMA/apps/heat_gpu/results"
+# prefer scaling_1comm/<gpu>/ if it exists, fall back to scaling_gpu/<gpu>/
+_src1 = os.path.join(ROOT, "scaling_1comm", GPU)
+_src0 = os.path.join(ROOT, "scaling_gpu", GPU)
+SRC  = _src1 if (GPU != "." and os.path.isdir(_src1)) else (
+       os.path.join(ROOT, "scaling_gpu") if GPU == "." else _src0)
+OUT  = os.path.join(ROOT, "image_gpu") if GPU == "." else os.path.join(ROOT, "image_gpu", GPU)
 os.makedirs(OUT, exist_ok=True)
+print(f"[plot] GPU={GPU}  SRC={SRC}  OUT={OUT}")
 
 EVENTS   = ["rhs", "solve_x", "solve_y", "solve_z", "comm"]
 FNAME_RE = re.compile(r"timing_(strong|weak|refine)_(.+)_np(\d+)_(pascal|filtered_v2)_rho(\d+)\.csv$")

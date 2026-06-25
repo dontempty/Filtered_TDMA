@@ -30,6 +30,10 @@ public:
 
     // TDMA backend: "filtered" (default) or "pascal"
     std::string tdma_backend = "filtered";
+
+    // Per-direction boundary: false = Dirichlet wall, true = periodic.
+    // Set via input keys `periodic` (all three) or `periodic_x/y/z`.
+    std::array<bool, 3> periodic = {false, false, false};
 };
 
 #endif // GLOBAL_PARAMS_HPP

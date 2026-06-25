@@ -90,6 +90,7 @@ void serialize(const Config& c, std::string& out)
       << static_cast<int>(c.forcing_mode) << ' '
       << c.target_bulk_velocity << ' ' << c.target_dPdx << ' '
       << c.pert_amp << ' '
+      << c.init_mode << ' '
       << c.nmonitor << ' '
       << c.nstat_start << ' ' << c.nstat << ' '
       << c.nout_stats << ' '
@@ -121,6 +122,7 @@ void deserialize(const std::string& in, Config& c)
       >> fmode
       >> c.target_bulk_velocity >> c.target_dPdx
       >> c.pert_amp
+      >> c.init_mode
       >> c.nmonitor
       >> c.nstat_start >> c.nstat
       >> c.nout_stats
@@ -201,6 +203,10 @@ Config Config::load(const std::string& path, MPI_Comm comm)
             c.target_dPdx          = get<double>(m, "target_dPdx", 0.0);
 
             c.pert_amp = get<double>(m, "pert_amp", 0.01);
+            {
+                std::string im = get<std::string>(m, "init_mode", "random");
+                c.init_mode = (im == "vortex" || im == "1") ? 1 : 0;
+            }
 
             c.nmonitor     = get<int>(m, "nmonitor",     1);
             c.nstat_start  = get<int>(m, "nstat_start",  0);
@@ -264,8 +270,9 @@ void Config::print() const
                 dtStart, tStart, Timestepmax);
     const char* fm = (forcing_mode == ForcingMode::MASS_FLOW)
         ? "MASS_FLOW" : "PRESSURE_GRADIENT";
-    std::printf("  forcing:   %s  Ub_target=%g  dPdx_target=%g  pert_amp=%g\n",
-                fm, target_bulk_velocity, target_dPdx, pert_amp);
+    std::printf("  forcing:   %s  Ub_target=%g  dPdx_target=%g  pert_amp=%g  init_mode=%s\n",
+                fm, target_bulk_velocity, target_dPdx, pert_amp,
+                (init_mode == 1 ? "vortex" : "random"));
     std::printf("  restart:   in=%d out=%d  '%s' '%s'\n",
                 ContinueFilein, ContinueFileout,
                 dir_cont_filein.c_str(), dir_cont_fileout.c_str());

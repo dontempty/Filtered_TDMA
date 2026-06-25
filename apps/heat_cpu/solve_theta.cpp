@@ -150,7 +150,10 @@ void SolveTheta::run(std::vector<double>& theta) {
                         sz0.c * theta[idx_ijk(i, j, nz1-1, nx1, ny1)];
             }
             solver_z.set_rho(Azz.data(), Bzz.data(), Czz.data());
-            solver_z.solve(Azz.data(), Bzz.data(), Czz.data(), Dzz.data());
+            if (params_.periodic[2])
+                solver_z.solve_cyclic(Azz.data(), Bzz.data(), Czz.data(), Dzz.data());
+            else
+                solver_z.solve(Azz.data(), Bzz.data(), Czz.data(), Dzz.data());
             for (k = 1; k < nz1-1; ++k)
                 for (i = 1; i < nx1-1; ++i)
                     rhs[idx_ijk(i, j, k, nx1, ny1)] = Dzz[idx_ik(i-1, k-1, nx1-2)];
@@ -183,7 +186,10 @@ void SolveTheta::run(std::vector<double>& theta) {
                         sy0.c * theta[idx_ijk(i, ny1-1, k, nx1, ny1)];
             }
             solver_y.set_rho(Ayy.data(), Byy.data(), Cyy.data());
-            solver_y.solve(Ayy.data(), Byy.data(), Cyy.data(), Dyy.data());
+            if (params_.periodic[1])
+                solver_y.solve_cyclic(Ayy.data(), Byy.data(), Cyy.data(), Dyy.data());
+            else
+                solver_y.solve(Ayy.data(), Byy.data(), Cyy.data(), Dyy.data());
             for (j = 1; j < ny1-1; ++j)
                 for (i = 1; i < nx1-1; ++i)
                     rhs[idx_ijk(i, j, k, nx1, ny1)] = Dyy[idx_ij(i-1, j-1, nx1-2)];
@@ -216,7 +222,10 @@ void SolveTheta::run(std::vector<double>& theta) {
                         sx0.c * theta[idx_ijk(nx1-1, j, k, nx1, ny1)];
             }
             solver_x.set_rho(Axx.data(), Bxx.data(), Cxx.data());
-            solver_x.solve(Axx.data(), Bxx.data(), Cxx.data(), Dxx.data());
+            if (params_.periodic[0])
+                solver_x.solve_cyclic(Axx.data(), Bxx.data(), Cxx.data(), Dxx.data());
+            else
+                solver_x.solve(Axx.data(), Bxx.data(), Cxx.data(), Dxx.data());
             for (i = 1; i < nx1-1; ++i)
                 for (j = 1; j < ny1-1; ++j)
                     theta[idx_ijk(i, j, k, nx1, ny1)] = Dxx[idx_ji(j-1, i-1, ny1-2)];
