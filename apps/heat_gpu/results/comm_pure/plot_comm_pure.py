@@ -18,7 +18,7 @@ matplotlib.use("Agg")
 import matplotlib.pyplot as plt
 import matplotlib.patches as mpatches
 
-DATA_DIR = "/scratch/x3319a05/Filtered_TDMA/apps/heat_gpu/results/comm_pure/h200"
+DATA_DIR = "/scratch/x3319a05/Filtered_TDMA/apps/heat_gpu/results/scaling_1comm/h200"
 OUT_DIR  = "/scratch/x3319a05/Filtered_TDMA/apps/heat_gpu/results/comm_pure/image"
 os.makedirs(OUT_DIR, exist_ok=True)
 

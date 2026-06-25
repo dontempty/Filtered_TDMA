@@ -32,7 +32,7 @@ OUT_DIR  = "/scratch/x3319a05/Filtered_TDMA/apps/heat_gpu/results/scaling_1comm/
 os.makedirs(OUT_DIR, exist_ok=True)
 
 EVENTS      = ["rhs", "solve_x", "solve_y", "solve_z", "comm", "etc"]
-COMM_DIR    = "/scratch/x3319a05/Filtered_TDMA/apps/heat_gpu/results/comm_breakdown/h200"
+COMM_DIR    = "/scratch/x3319a05/Filtered_TDMA/apps/heat_gpu/results/scaling_1comm/h200"
 COMM_EVENTS = ["rhs", "solve_x", "solve_y", "solve_z", "comm", "etc",
                "tdma_x_comm", "tdma_y_comm", "tdma_z_comm"]
 
