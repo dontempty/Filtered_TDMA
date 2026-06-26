@@ -9,7 +9,7 @@ BUILDDIR := build
 #    libs/filtered_tdma/  → build/lib/libfiltered_tdma.a
 #    libs/pascal_tdma/    → build/lib/libpascal_tdma.a
 #  Apps (pick one with `make channel`, `make heat`, `make heat_gpu`):
-#    apps/channel/        → build/bin/channel.out
+#    apps/channel_cpu/        → build/bin/channel.out
 #    apps/heat_cpu/       → build/bin/heat.out
 #    apps/heat_gpu/       → build/bin/heat_gpu.out
 # ============================================================
@@ -17,8 +17,8 @@ BUILDDIR := build
 .PHONY: all FilteredTDMA PaScaL channel heat heat_gpu tests clean rm
 
 # Output directories produced by a run (stats/, instant/, restart_out/).
-# Paths match the defaults in apps/channel/PARA_INPUT.dat.
-RUNDIR := apps/channel
+# Paths match the defaults in apps/channel_cpu/PARA_INPUT.dat.
+RUNDIR := apps/channel_cpu
 OUTDIRS := $(RUNDIR)/statistics $(RUNDIR)/instant $(RUNDIR)/restart_out $(RUNDIR)/restart_in
 
 all: FilteredTDMA PaScaL channel
@@ -33,7 +33,7 @@ PaScaL:
 
 channel: FilteredTDMA PaScaL
 	mkdir -p $(BUILDDIR)/obj $(BUILDDIR)/bin
-	$(MAKE) -C apps/channel all BUILDDIR=../../$(BUILDDIR)
+	$(MAKE) -C apps/channel_cpu all BUILDDIR=../../$(BUILDDIR)
 
 heat: FilteredTDMA PaScaL
 	mkdir -p $(BUILDDIR)/obj $(BUILDDIR)/bin
@@ -46,18 +46,18 @@ heat_gpu: FilteredTDMA PaScaL
 
 tests: channel
 	mkdir -p $(BUILDDIR)/obj $(BUILDDIR)/bin
-	$(MAKE) -C apps/channel/tests all BUILDDIR=../../../$(BUILDDIR)
+	$(MAKE) -C apps/channel_cpu/tests all BUILDDIR=../../../$(BUILDDIR)
 
 clean:
 	-$(MAKE) -C libs/filtered_tdma  clean BUILDDIR=../../$(BUILDDIR)
 	-$(MAKE) -C libs/pascal_tdma    clean BUILDDIR=../../$(BUILDDIR)
-	-$(MAKE) -C apps/channel        clean BUILDDIR=../../$(BUILDDIR)
+	-$(MAKE) -C apps/channel_cpu        clean BUILDDIR=../../$(BUILDDIR)
 	-$(MAKE) -C apps/heat_cpu       clean BUILDDIR=../../$(BUILDDIR)
 	-$(MAKE) -C apps/heat_gpu       clean BUILDDIR=../../$(BUILDDIR) 2>/dev/null
-	-$(MAKE) -C apps/channel/tests  clean BUILDDIR=../../../$(BUILDDIR)
+	-$(MAKE) -C apps/channel_cpu/tests  clean BUILDDIR=../../../$(BUILDDIR)
 	rm -rf $(BUILDDIR)
 
-# Remove all run-time output (stats/, instant/, restart_out/ under apps/channel/)
+# Remove all run-time output (stats/, instant/, restart_out/ under apps/channel_cpu/)
 rm:
 	@echo "Removing run-time output directories:"
 	@for d in $(OUTDIRS); do \

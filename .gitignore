@@ -7,10 +7,10 @@ build/
 *.out
 
 # Solver runtime output
-apps/channel/instant/
-apps/channel/statistics/
-apps/channel/restart_in/
-apps/channel/restart_out/
+apps/channel_cpu/instant/
+apps/channel_cpu/statistics/
+apps/channel_cpu/restart_in/
+apps/channel_cpu/restart_out/
 
 # Profiling artifacts
 apps/heat_gpu/profile_results/
@@ -21,7 +21,7 @@ apps/heat_gpu/profile_results/
 
 # SLURM logs
 log/
-apps/channel/log/
+apps/channel_cpu/log/
 apps/heat_gpu/log/
 *.err
 

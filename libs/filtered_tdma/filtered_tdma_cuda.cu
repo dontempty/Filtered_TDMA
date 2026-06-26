@@ -199,11 +199,13 @@ void k_fwd_pass_v2(double* A, double* B, double* C, double* D,
     }
 }
 
-// v2 backward substitution + row-0 pack in one kernel. Three sequential loops:
-//   Loop 1: D back-substitute (all rows).
-//   Loop 2: A back-substitute (rows 1..J).
-//   Loop 3: C multiply (rows lo+1..n_row-3, lo = n_row-2-J).
-// Row-0 decoupling appended after the loops using A[1]/D[1] already in cache.
+// v2 backward substitution + row-0 pack in one kernel. Single merged pass:
+//   For j = n_row-3 down to 1, read C[j] once, then:
+//     - D back-substitute (all rows):  D[j] -= C[j]*d_next
+//     - A back-substitute (j < J):     A[j] -= C[j]*a_next
+//     - C multiply       (j > lo):     C[j]  = -C[j]*c_next  (written last)
+//   Row-0 decoupling appended after the loop.
+// lo = (n_row-2) - J.  C[j] is read once vs. 3x in the original 3-pass version.
 __global__ __launch_bounds__(BLOCK_SYS)
 void k_bwd_pass_v2(double* A, double* C, double* D,
                    int n_sys, int n_row, const int* __restrict__ d_J) {
@@ -212,37 +214,36 @@ void k_bwd_pass_v2(double* A, double* C, double* D,
     const int J  = __ldg(d_J);
     const int lo = (n_row - 2) - J;
 
-    {
-        std::size_t off_nm2 = (std::size_t)(n_row - 2) * n_sys + i;
-        double d_next = D[off_nm2];
-        for (int j = n_row - 3; j >= 1; --j) {
-            std::size_t off_j = (std::size_t)j * n_sys + i;
-            double d_new = D[off_j] - C[off_j] * d_next;
-            D[off_j] = d_new;
-            d_next   = d_new;
-        }
-    }
-    if (J >= 2) {
-        std::size_t off_J = (std::size_t)J * n_sys + i;
-        double a_next = A[off_J];
-        for (int j = J - 1; j >= 1; --j) {
-            std::size_t off_j = (std::size_t)j * n_sys + i;
-            double a_new = A[off_j] - C[off_j] * a_next;
+    std::size_t off_nm2 = (std::size_t)(n_row - 2) * n_sys + i;
+    double d_next = D[off_nm2];
+    double c_next = C[off_nm2];
+    double a_next = (J >= 2) ? A[(std::size_t)J * n_sys + i] : 0.0;
+
+    for (int j = n_row - 3; j >= 1; --j) {
+        std::size_t off_j = (std::size_t)j * n_sys + i;
+        double Cj = C[off_j];   // read original C[j] once before any write
+
+        // D back-substitute (all rows)
+        double d_new = D[off_j] - Cj * d_next;
+        D[off_j] = d_new;
+        d_next = d_new;
+
+        // A back-substitute (rows j < J)
+        if (J >= 2 && j < J) {
+            double a_new = A[off_j] - Cj * a_next;
             A[off_j] = a_new;
-            a_next   = a_new;
+            a_next = a_new;
         }
-    }
-    {
-        std::size_t off_nm2 = (std::size_t)(n_row - 2) * n_sys + i;
-        double c_next = C[off_nm2];
-        for (int j = n_row - 3; j >= lo + 1; --j) {
-            std::size_t off_j = (std::size_t)j * n_sys + i;
-            double c_new = -C[off_j] * c_next;
+
+        // C multiply (rows j > lo) — overwrites C[j] after Cj already consumed
+        if (j > lo) {
+            double c_new = -Cj * c_next;
             C[off_j] = c_new;
-            c_next   = c_new;
+            c_next = c_new;
         }
     }
-    // Pack row 0: A[1] and D[1] updated by the loops above.
+
+    // Pack row 0: A[1] and D[1] updated by the loop above.
     double A1    = A[(std::size_t)1 * n_sys + i];
     double C0    = C[i];
     double D0_val = D[i];

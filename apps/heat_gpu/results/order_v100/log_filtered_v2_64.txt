@@ -1,6 +1,0 @@
-[Tmax] = 0.00195312 | [max_iter] = 2
-[nx] = 64 | [ny] = 64 | [nz] = 64
-[rho] = 0.25
-[backend] = filtered_v2
- [Timing] CSV saved to results/timing_65_111_filtered_v2.csv
-Global L2 error = 4.21191e-05
