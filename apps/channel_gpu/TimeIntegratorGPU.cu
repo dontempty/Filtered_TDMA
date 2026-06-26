@@ -14,6 +14,7 @@
 #include <cmath>
 #include <cstdio>
 #include <cstdlib>
+#include <utility>
 #include <mpi.h>
 
 namespace channel {
@@ -35,6 +36,30 @@ __global__ void k_maxdiv_blocks(const double* U, const double* V, const double* 
                       + (V[df_idx(i,j+1,k,nxt,nyt)] - V[df_idx(i,j,k,nxt,nyt)]) / dy[j]
                       + (W[df_idx(i,j,k+1,nxt,nyt)] - W[df_idx(i,j,k,nxt,nyt)]) / dz[k]);
         m = fmax(m, d);
+    }
+    sh[tid] = m; __syncthreads();
+    for (int s = blockDim.x/2; s > 0; s >>= 1) {
+        if (tid < s) sh[tid] = fmax(sh[tid], sh[tid+s]);
+        __syncthreads();
+    }
+    if (tid == 0) part[blockIdx.x] = sh[0];
+}
+
+__global__ void k_cfl_blocks(const double* U, const double* V, const double* W,
+                             const double* dx, const double* dy, const double* dz,
+                             double* part, int nx, int ny, int nz)
+{
+    extern __shared__ double sh[];
+    int tid = threadIdx.x;
+    int n = nx * ny * nz;
+    int nxt = nx + 2, nyt = ny + 2;
+    double m = 0.0;
+    for (int p = blockIdx.x * blockDim.x + tid; p < n; p += blockDim.x * gridDim.x) {
+        int i = p % nx + 1, j = (p / nx) % ny + 1, k = p / (nx * ny) + 1;
+        double r = fabs(U[df_idx(i,j,k,nxt,nyt)]) / dx[i]
+                 + fabs(V[df_idx(i,j,k,nxt,nyt)]) / dy[j]
+                 + fabs(W[df_idx(i,j,k,nxt,nyt)]) / dz[k];
+        m = fmax(m, isfinite(r) ? r : INFINITY);
     }
     sh[tid] = m; __syncthreads();
     for (int s = blockDim.x/2; s > 0; s >>= 1) {
@@ -134,13 +159,40 @@ double TimeIntegratorGPU::max_div_host_(const DeviceField& U, const DeviceField&
     k_maxdiv_blocks<<<256,256,256*sizeof(double)>>>(U.data(), V.data(), W.data(),
                                                     dx.data(), dy.data(), dz.data(), part.data(),
                                                     sub_.nx(), sub_.ny(), sub_.nz());
-    k_reduce_sum<<<1,256,256*sizeof(double)>>>(part.data(), out.data(), 256);
+    // k_maxdiv_blocks yields per-block MAX -> reduce with MAX (not SUM).
+    k_reduce_max<<<1,256,256*sizeof(double)>>>(part.data(), out.data(), 256);
     CHANNEL_CUDA_CHECK(cudaGetLastError());
     CHANNEL_CUDA_CHECK(cudaDeviceSynchronize());
     MPI_Allreduce(out.data(), global.data(), 1, MPI_DOUBLE, MPI_MAX, topo_.cart());
     double v = 0.0;
     CHANNEL_CUDA_CHECK(cudaMemcpy(&v, global.data(), sizeof(double), cudaMemcpyDeviceToHost));
     return v;
+}
+
+double TimeIntegratorGPU::cfl_dt_host_(const DeviceField& U, const DeviceField& V,
+                                       const DeviceField& W) const
+{
+    static DeviceBuffer<double> dx, dy, dz, part, out, global;
+    static bool inited = false;
+    if (!inited) {
+        auto cp = [](DeviceBuffer<double>& d, const std::vector<double>& h) {
+            d.reset(h.size());
+            CHANNEL_CUDA_CHECK(cudaMemcpy(d.data(), h.data(), h.size()*sizeof(double), cudaMemcpyHostToDevice));
+        };
+        cp(dx, grid_.dx(0)); cp(dy, grid_.dx(1)); cp(dz, grid_.dx(2));
+        part.reset(256); out.reset(1); global.reset(1); inited = true;
+    }
+    k_cfl_blocks<<<256,256,256*sizeof(double)>>>(U.data(), V.data(), W.data(),
+                                                 dx.data(), dy.data(), dz.data(),
+                                                 part.data(), sub_.nx(), sub_.ny(), sub_.nz());
+    k_reduce_max<<<1,256,256*sizeof(double)>>>(part.data(), out.data(), 256);
+    CHANNEL_CUDA_CHECK(cudaGetLastError());
+    CHANNEL_CUDA_CHECK(cudaDeviceSynchronize());
+    MPI_Allreduce(out.data(), global.data(), 1, MPI_DOUBLE, MPI_MAX, topo_.cart());
+    double global_max = 0.0;
+    CHANNEL_CUDA_CHECK(cudaMemcpy(&global_max, global.data(), sizeof(double), cudaMemcpyDeviceToHost));
+    if (global_max < 1.0e-30) return cfg_.dtStart;
+    return cfg_.MaxCFL / global_max;
 }
 
 double TimeIntegratorGPU::wss_host_(const DeviceField& U) const
@@ -157,7 +209,8 @@ double TimeIntegratorGPU::wss_host_(const DeviceField& U) const
     k_wss_blocks<<<256,256,256*sizeof(double)>>>(U.data(), dz.data(), part.data(),
                                                  sub_.nx(), sub_.ny(), sub_.nz(),
                                                  low ? 1 : 0, high ? 1 : 0, 1.0 / cfg_.Re_b);
-    k_reduce_max<<<1,256,256*sizeof(double)>>>(part.data(), out.data(), 256);
+    // k_wss_blocks yields per-block SUM -> reduce with SUM (not MAX).
+    k_reduce_sum<<<1,256,256*sizeof(double)>>>(part.data(), out.data(), 256);
     CHANNEL_CUDA_CHECK(cudaGetLastError());
     CHANNEL_CUDA_CHECK(cudaDeviceSynchronize());
     MPI_Allreduce(out.data(), global.data(), 1, MPI_DOUBLE, MPI_SUM, topo_.cart());
@@ -165,6 +218,34 @@ double TimeIntegratorGPU::wss_host_(const DeviceField& U) const
     CHANNEL_CUDA_CHECK(cudaMemcpy(&v, global.data(), sizeof(double), cudaMemcpyDeviceToHost));
     int nxy = sub_.global_n(0) * sub_.global_n(1);
     return std::fabs(v / (2.0 * nxy));
+}
+
+std::pair<double,double> TimeIntegratorGPU::rho_diagnostic_(double dt) const
+{
+    const auto& dz  = grid_.dx(2);
+    const auto& dmz = grid_.dmx(2);
+    const double nu_h  = 0.5 / cfg_.Re_b;
+    const int nz       = sub_.nz();
+    const int ista_z   = sub_.ista(2);
+    const int n3m      = sub_.global_n(2);
+    const int skip     = 2;
+
+    double rho_max_loc = 0.0, rho_min_loc = 1.0;
+    for (int k = 1; k <= nz; ++k) {
+        int gk = ista_z + k - 1;
+        if (gk < skip + 1 || gk > n3m - skip) continue;
+
+        double am = nu_h * dt / (dz[k] * dmz[k]);
+        double ap = nu_h * dt / (dz[k] * dmz[k+1]);
+        double rk = std::max(am, ap) / (am + ap + 1.0);
+        if (rk > rho_max_loc) rho_max_loc = rk;
+        if (rk < rho_min_loc) rho_min_loc = rk;
+    }
+
+    double rho_max = 0.0, rho_min = 1.0;
+    MPI_Allreduce(&rho_max_loc, &rho_max, 1, MPI_DOUBLE, MPI_MAX, topo_.cart());
+    MPI_Allreduce(&rho_min_loc, &rho_min, 1, MPI_DOUBLE, MPI_MIN, topo_.cart());
+    return { rho_max, rho_min };
 }
 
 void TimeIntegratorGPU::run(DeviceField& U, DeviceField& V, DeviceField& W,
@@ -189,11 +270,29 @@ void TimeIntegratorGPU::run(DeviceField& U, DeviceField& V, DeviceField& W,
         const double ub = forcing_.bulk_velocity_host(U);
         if (root) std::printf("[dbg] step=%ld %-15s maxDiv=%.9e Ub=%.9e\n", s, label, v, ub);
     };
+    std::FILE* wss_fp = nullptr;
     if (root) {
         std::string p = cfg_.dir_instantfield + "Monitor_Channel.plt";
         mon_fp = std::fopen(p.c_str(), "a");
         if (mon_fp && std::ftell(mon_fp) == 0)
-            std::fprintf(mon_fp, "VARIABLES=\"Timestep\" \"Time\" \"dt\" \"maxDivU\" \"WSS\" \"u_tau\" \"U_b\"\n");
+            std::fprintf(mon_fp,
+                "VARIABLES=\"Timestep\" \"Time\" \"dt\""
+                " \"CFL\" \"maxDivU\" \"WSS\" \"u_tau\" \"U_b\"\n"
+                "  %12s %12s %12s %12s %12s %12s %12s %12s %12s\n",
+                "Timestep", "Time", "dt",
+                "maxDivU","WSS","u_tau","U_b","rho_max","rho_min");
+        // WSS history file (like CPU reference stats/wss_history.dat)
+        std::string wss_path = cfg_.dir_statistics + "/wss_history.dat";
+        wss_fp = std::fopen(wss_path.c_str(), "a");
+        if (wss_fp && std::ftell(wss_fp) == 0)
+            std::fprintf(wss_fp,
+                "%12s %12s %12s %12s %12s %12s %12s %12s %12s\n",
+                "step", "time", "dt", "wss", "u_tau", "div_max", "U_b",
+                "rho_max", "rho_min");
+        std::printf("\n%12s %12s %12s %12s %12s %12s %12s %12s %12s\n",
+                    "Timestep","Time","dt",
+                    "maxDivU","WSS","u_tau","U_b","rho_max","rho_min");
+        std::fflush(stdout);
     }
 
     halo_.exchange(U); halo_.exchange(V); halo_.exchange(W); halo_.exchange(P);
@@ -205,6 +304,8 @@ void TimeIntegratorGPU::run(DeviceField& U, DeviceField& V, DeviceField& W,
     Field<double> hP(sub_.nx(), sub_.ny(), sub_.nz());
 
     while (step < step_end) {
+        double dt_cfl = cfl_dt_host_(U, V, W);
+        dt = std::min(dt_cfl, cfg_.dtStart);
         momentum_.advance(U, V, W, P, dt, forcing_.device_mean_dPdx());
         debug_div("after_momentum", step + 1);
         forcing_.correct(U, dt);
@@ -227,16 +328,36 @@ void TimeIntegratorGPU::run(DeviceField& U, DeviceField& V, DeviceField& W,
         t += dt;
 
         if (step % mstr == 0) {
+            auto [rho_max, rho_min] = rho_diagnostic_(dt);
             double max_div = max_div_host_(U, V, W);
             double wss = wss_host_(U);
+            double u_tau = std::sqrt(wss);
             double ub = forcing_.bulk_velocity_host(U);
             if (root) {
-                std::printf("%12ld %12.5e %12.5e %12.5e %12.5e %12.5e %12.5e\n",
-                            step, t, dt, max_div, wss, std::sqrt(wss), ub);
+                if (((step / mstr) % 10) == 1) {
+                    std::printf("\n");
+                    std::printf("%12s %12s %12s %12s %12s %12s %12s %12s %12s\n",
+                                "Timestep","Time","dt",
+                                "maxDivU","WSS","u_tau","U_b","rho_max","rho_min");
+                }
+                std::printf(
+                    "%12ld %12.5e %12.5e %12.5e %12.5e %12.5e %12.5e %12.5e %12.5e\n",
+                    step, t, dt,
+                    max_div, wss, u_tau, ub, rho_max, rho_min);
+                std::fflush(stdout);
+
                 if (mon_fp) {
-                    std::fprintf(mon_fp, "%ld %.6e %.6e %.6e %.6e %.6e %.6e\n",
-                                 step, t, dt, max_div, wss, std::sqrt(wss), ub);
+                    std::fprintf(mon_fp,
+                        "%d %.6e %.6e %.6e %.6e %.6e %.6e %.6e %.6e\n",
+                        (int)step, t, dt,
+                        max_div, wss, u_tau, ub, rho_max, rho_min);
                     std::fflush(mon_fp);
+                }
+                if (wss_fp) {
+                    std::fprintf(wss_fp,
+                        "  %10d %12.6e %12.4e %12.6e %12.6e %12.4e %12.6e %12.6e %12.6e\n",
+                        (int)step, t, dt, wss, u_tau, max_div, ub, rho_max, rho_min);
+                    std::fflush(wss_fp);
                 }
             }
         }
@@ -280,6 +401,7 @@ void TimeIntegratorGPU::run(DeviceField& U, DeviceField& V, DeviceField& W,
                   cfg_.dir_statistics.c_str(), my_rank);
     momentum_.write_timing_csv(timing_path);
     if (root && mon_fp) std::fclose(mon_fp);
+    if (root && wss_fp) std::fclose(wss_fp);
 }
 
 } // namespace channel

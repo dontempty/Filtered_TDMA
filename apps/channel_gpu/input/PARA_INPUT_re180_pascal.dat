@@ -14,8 +14,8 @@ n2m = 256
 n3m = 256
 
 # === group: MPI_procs ===
-np1 = 4
-np2 = 4
+np1 = 1
+np2 = 1
 np3 = 2
 
 # === group: periodic_boundary ===

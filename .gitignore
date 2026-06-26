@@ -1,5 +1,5 @@
 # Build artifacts
-build/
+build*/
 *.o
 *.d
 *.a
@@ -11,6 +11,11 @@ apps/channel_cpu/instant/
 apps/channel_cpu/statistics/
 apps/channel_cpu/restart_in/
 apps/channel_cpu/restart_out/
+apps/channel_gpu/instant/
+apps/channel_gpu/statistics/
+apps/channel_gpu/restart_in/
+apps/channel_gpu/restart_out/
+apps/channel_gpu/instant_backup/
 
 # Profiling artifacts
 apps/heat_gpu/profile_results/

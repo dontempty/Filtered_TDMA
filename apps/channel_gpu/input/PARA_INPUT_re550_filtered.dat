@@ -19,9 +19,9 @@ n2m = 512
 n3m = 384
 
 # === group: MPI_procs ===   ( 4 x 4 x 2 = 32 ranks, CPU only )
-np1 = 4
-np2 = 4
-np3 = 4
+np1 = 1
+np2 = 1
+np3 = 2
 
 # === group: periodic_boundary ===
 pbc1 = true

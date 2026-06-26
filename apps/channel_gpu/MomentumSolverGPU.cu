@@ -373,13 +373,26 @@ void MomentumSolverGPU::write_timing_csv(const std::string& path) const
 {
     std::FILE* fp = std::fopen(path.c_str(), "w");
     if (!fp) return;
-    std::fprintf(fp, "step,tdma_z_sec_cum,tdma_y_sec_cum,tdma_x_sec_cum,momentum_sec_cum\n");
-    for (std::size_t i = 0; i < timing_step_.size(); ++i)
-        std::fprintf(fp, "%ld,%.9e,%.9e,%.9e,%.9e\n",
-                     timing_step_[i], timing_z_[i], timing_y_[i], timing_x_[i], timing_mom_[i]);
-    if (step_count_ > cfg_.nstat_start)
-        std::fprintf(fp, "%ld,%.9e,%.9e,%.9e,%.9e\n",
-                     step_count_, tdma_z_time_, tdma_y_time_, tdma_x_time_, momentum_time_);
+    std::fprintf(fp, "# cumulative timings start when step > nstat_start (%d)\n", cfg_.nstat_start);
+    std::fprintf(fp, "# tdma_* columns include coefficient/RHS build, TDMA solve, scatter, and device synchronization for that ADI direction\n");
+    std::fprintf(fp, "step,timed_steps,tdma_z_sec_cum,tdma_y_sec_cum,tdma_x_sec_cum,tdma_total_sec_cum,momentum_sec_cum,tdma_over_momentum\n");
+    for (std::size_t i = 0; i < timing_step_.size(); ++i) {
+        double tdma_total = timing_z_[i] + timing_y_[i] + timing_x_[i];
+        double ratio = timing_mom_[i] > 0.0 ? tdma_total / timing_mom_[i] : 0.0;
+        std::fprintf(fp, "%ld,%ld,%.9e,%.9e,%.9e,%.9e,%.9e,%.9e\n",
+                     timing_step_[i], timing_step_[i] - cfg_.nstat_start,
+                     timing_z_[i], timing_y_[i], timing_x_[i],
+                     tdma_total, timing_mom_[i], ratio);
+    }
+    const bool aligned = !timing_step_.empty() && timing_step_.back() == step_count_;
+    if (step_count_ > cfg_.nstat_start && !aligned) {
+        double tdma_total = tdma_z_time_ + tdma_y_time_ + tdma_x_time_;
+        double ratio = momentum_time_ > 0.0 ? tdma_total / momentum_time_ : 0.0;
+        std::fprintf(fp, "%ld,%ld,%.9e,%.9e,%.9e,%.9e,%.9e,%.9e\n",
+                     step_count_, step_count_ - cfg_.nstat_start,
+                     tdma_z_time_, tdma_y_time_, tdma_x_time_,
+                     tdma_total, momentum_time_, ratio);
+    }
     std::fclose(fp);
 }
 

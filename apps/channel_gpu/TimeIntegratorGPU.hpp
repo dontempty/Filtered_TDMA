@@ -30,8 +30,10 @@ public:
              RestartState& state);
 
 private:
+    double cfl_dt_host_(const DeviceField& U, const DeviceField& V, const DeviceField& W) const;
     double max_div_host_(const DeviceField& U, const DeviceField& V, const DeviceField& W) const;
     double wss_host_(const DeviceField& U) const;
+    std::pair<double,double> rho_diagnostic_(double dt) const;
     void copy_fields_to_host_(const DeviceField& U, const DeviceField& V,
                               const DeviceField& W, const DeviceField& P,
                               Field<double>& hU, Field<double>& hV,
