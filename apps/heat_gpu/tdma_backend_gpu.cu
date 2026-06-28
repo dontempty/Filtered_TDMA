@@ -33,22 +33,25 @@ TdmaBackendGPU::TdmaBackendGPU(Kind kind, int n_sys, int n_row,
 }
 
 void TdmaBackendGPU::solve(double* d_A, double* d_B, double* d_C, double* d_D) {
+    // heat_gpu is a benchmark: route all backends through their *_profile variants
+    // so last_comm_ms()/last_gpu_ms() timers are populated for CSV export.
+    // Numerics are identical; profiling adds cudaStreamSynchronize + cudaEvent brackets.
     if (kind_ == Kind::FILTERED) {
-        filt_->solve_filtered_v1(d_A, d_B, d_C, d_D);
+        filt_->solve_filtered_v1_profile(d_A, d_B, d_C, d_D);
     } else if (kind_ == Kind::FILTERED_V2) {
-        filt_->solve_filtered_v2(d_A, d_B, d_C, d_D);
+        filt_->solve_filtered_v2_profile(d_A, d_B, d_C, d_D);
     } else {
-        pasc_->solve(d_A, d_B, d_C, d_D, n_sys_, n_row_);
+        pasc_->solve_profile(d_A, d_B, d_C, d_D, n_sys_, n_row_);
     }
 }
 
 void TdmaBackendGPU::solve_cyclic(double* d_A, double* d_B, double* d_C, double* d_D) {
     if (kind_ == Kind::FILTERED) {
-        filt_->solve_cycl_filtered_v1(d_A, d_B, d_C, d_D);
+        filt_->solve_cycl_filtered_v1_profile(d_A, d_B, d_C, d_D);
     } else if (kind_ == Kind::FILTERED_V2) {
-        filt_->solve_cycl_filtered_v2(d_A, d_B, d_C, d_D);
+        filt_->solve_cycl_filtered_v2_profile(d_A, d_B, d_C, d_D);
     } else {
-        pasc_->solve_cyclic(d_A, d_B, d_C, d_D, n_sys_, n_row_);
+        pasc_->solve_cyclic_profile(d_A, d_B, d_C, d_D, n_sys_, n_row_);
     }
 }
 

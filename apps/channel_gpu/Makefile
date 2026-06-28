@@ -9,7 +9,7 @@ IDIR     := $(BUILDDIR)/include
 LDIR     := $(BUILDDIR)/lib
 BINDIR   := $(BUILDDIR)/bin
 
-CPP_SOURCES := Config.cpp FieldOutput.cpp Grid.cpp MpiTopology.cpp RestartIO.cpp Subdomain.cpp TdmaSolverGPU.cpp main.cpp
+CPP_SOURCES := Config.cpp para_range.cpp FieldOutput.cpp Grid.cpp MpiTopology.cpp RestartIO.cpp Subdomain.cpp TdmaSolverGPU.cpp main.cpp
 CU_SOURCES  := BoundaryConditionGPU.cu ChannelForcingGPU.cu DeviceField.cu HaloExchangerGPU.cu MomentumSolverGPU.cu PressureSolverGPU.cu StatisticsGPU.cu TimeIntegratorGPU.cu
 CPP_OBJS    := $(patsubst %.cpp,$(OBJDIR)/chgpu_%.o,$(CPP_SOURCES))
 CU_OBJS     := $(patsubst %.cu,$(OBJDIR)/chgpu_%.o,$(CU_SOURCES))

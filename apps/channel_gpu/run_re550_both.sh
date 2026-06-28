@@ -1,8 +1,9 @@
 #!/bin/bash
-# Run channel_gpu Re550 — filtered (GPU 0,1) and pascal (GPU 2,3) simultaneously.
+# Run channel_gpu Re550 (np3=4, z-split) — filtered (GPU 0-3) and pascal (GPU 4-7)
+# simultaneously on one 8-GPU node.
 # Launch from login node (with nvhpc already loaded):
 #   source env_gpu.sh
-#   srun --jobid=<JID> --gres=gpu:4 -n1 --overlap bash apps/channel_gpu/run_re550_both.sh
+#   srun --jobid=<JID> --overlap -n1 -c 64 bash apps/channel_gpu/run_re550_both.sh
 set -u
 
 PROJ=/scratch/x3319a05/Filtered_TDMA
@@ -11,9 +12,8 @@ BIN="${BD}/bin/channel_gpu.out"
 WDIR="${PROJ}/apps/channel_gpu"
 NODE=$(hostname)
 
-echo "=== channel_gpu Re550 on ${NODE}  [$(date '+%F %T')] ==="
+echo "=== channel_gpu Re550 (np3=4) on ${NODE}  [$(date '+%F %T')] ==="
 echo "  nvcc:   $(which nvcc 2>&1)"
-echo "  mpicxx: $(which mpicxx 2>&1)"
 echo "  mpirun: $(which mpirun 2>&1)"
 [ -x "${BIN}" ] || { echo "ERROR: ${BIN} missing"; exit 1; }
 
@@ -31,17 +31,17 @@ mkdir -p log statistics/re550_f statistics/re550_p \
          restart_in/re550_f restart_in/re550_p
 
 echo ""
-echo "=== [1] Filtered  (GPU 0,1, np=2) ==="
+echo "=== [1] Filtered  (GPU 0-3, np=4) ==="
 t0=$(date +%s)
-CUDA_VISIBLE_DEVICES=0,1 \
-  mpirun ${MPI_FLAGS} --host "${NODE}:2" -np 2 \
+CUDA_VISIBLE_DEVICES=0,1,2,3 \
+  mpirun ${MPI_FLAGS} --host "${NODE}:4" -np 4 \
   "${BIN}" input/PARA_INPUT_re550_filtered.dat \
   > log/re550_filtered.log 2>&1 &
 PID_F=$!
 
-echo "=== [2] Pascal    (GPU 2,3, np=2) ==="
-CUDA_VISIBLE_DEVICES=2,3 \
-  mpirun ${MPI_FLAGS} --host "${NODE}:2" -np 2 \
+echo "=== [2] Pascal    (GPU 4-7, np=4) ==="
+CUDA_VISIBLE_DEVICES=4,5,6,7 \
+  mpirun ${MPI_FLAGS} --host "${NODE}:4" -np 4 \
   "${BIN}" input/PARA_INPUT_re550_pascal.dat \
   > log/re550_pascal.log 2>&1 &
 PID_P=$!

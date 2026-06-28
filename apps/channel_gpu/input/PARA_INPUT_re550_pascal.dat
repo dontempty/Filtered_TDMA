@@ -18,10 +18,10 @@ n1m = 768
 n2m = 512
 n3m = 384
 
-# === group: MPI_procs ===   ( 4 x 4 x 2 = 32 ranks, CPU only )
+# === group: MPI_procs ===   ( GPU: 1 x 1 x 4 = 4 ranks, z-split )
 np1 = 1
 np2 = 1
-np3 = 2
+np3 = 4
 
 # === group: periodic_boundary ===
 pbc1 = true

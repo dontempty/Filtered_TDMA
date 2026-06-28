@@ -212,7 +212,10 @@ double FieldOutput::compute_lambda2_(double M11, double M22, double M33,
 }
 
 // ---------------------------------------------------------------------------
-// write_field_3d — full 3-D Tecplot ASCII, rank-ordered sequential write
+// write_field_3d — 3-D field dump: 3-line ASCII header (TITLE/VARIABLES/ZONE)
+//   followed by a BINARY float64 data block (9 vars/point, POINT order,
+//   rank-ordered z-slabs). NOT a Tecplot-readable .plt anymore — read with
+//   read_field.py. Switched from ASCII %.8e to cut size ~2x and write time.
 //
 // Variables: X Y Z U V W P Q Lambda2
 // U,V,W are interpolated to cell centres.
@@ -256,7 +259,7 @@ void FieldOutput::write_field_3d(const Field<double>& U,
             fprintf(stderr, "[FieldOutput::write_field_3d] Cannot open %s\n", fname);
             MPI_Abort(topo_.cart(), 1);
         }
-        fprintf(fp, "TITLE = \"Channel Flow Field (step=%d)\"\n", step);
+        fprintf(fp, "TITLE = \"Channel Flow Field (step=%d) [binary float64, 9 vars, POINT; data after 3 header lines]\"\n", step);
         fprintf(fp,
             "VARIABLES = \"X\" \"Y\" \"Z\" \"U\" \"V\" \"W\" \"P\" \"Q\" \"Lambda2\"\n");
         fprintf(fp, "ZONE T=\"Field\", I=%d, J=%d, K=%d, DATAPACKING=POINT\n",
@@ -268,7 +271,7 @@ void FieldOutput::write_field_3d(const Field<double>& U,
     // Each rank appends its z-slab in rank order
     for (int r = 0; r < nranks; ++r) {
         if (myrank == r) {
-            FILE* fp = fopen(fname, "a");
+            FILE* fp = fopen(fname, "ab");   // binary append (data section is float64)
             if (!fp) {
                 fprintf(stderr,
                     "[FieldOutput::write_field_3d] Cannot open %s (rank %d)\n",
@@ -360,14 +363,16 @@ void FieldOutput::write_field_3d(const Field<double>& U,
 
                         const double lam2 = compute_lambda2_(M11,M22,M33,M12,M13,M23);
 
-                        // Use global xc_[i], yc_[j] for output coordinates
-                        fprintf(fp,
-                            "%.8e %.8e %.8e %.8e %.8e %.8e %.8e %.8e %.8e\n",
+                        // Binary float64, 9 vars per point, POINT order (i fast,
+                        // then j, then k across z-ranks) — matches the ASCII
+                        // header's VARIABLES / I,J,K. Reader: see read_field.py.
+                        const double rec[9] = {
                             xc_[sub_.ista(0) + i - 1],
                             yc_[sub_.ista(1) + j - 1],
                             zc_[k],
-                            ui, vi, wi, P(i,j,k),
-                            Q, lam2);
+                            ui, vi, wi, P(i, j, k),
+                            Q, lam2 };
+                        fwrite(rec, sizeof(double), 9, fp);
                     }
                 }
             }

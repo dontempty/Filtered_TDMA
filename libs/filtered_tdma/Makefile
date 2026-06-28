@@ -3,20 +3,18 @@ include ../../Makefile.inc
 BUILDDIR ?= ../../build
 
 LIB    = libfiltered_tdma.a
-SRCDIR = .
 OBJDIR = $(BUILDDIR)/obj/ftdma
 LIBDIR = $(BUILDDIR)/lib
 INCDIR = $(BUILDDIR)/include
 
-# Exclude tdma_local and para_range — provided by libpascal_tdma (superset version)
-CPP_SOURCES = $(filter-out $(SRCDIR)/tdma_local.cpp $(SRCDIR)/para_range.cpp, \
-              $(wildcard $(SRCDIR)/*.cpp))
-CPP_OBJS    = $(patsubst $(SRCDIR)/%.cpp, $(OBJDIR)/%.o, $(CPP_SOURCES))
+# CPU sources (cpu/*.cpp)
+CPP_SOURCES = $(wildcard cpu/*.cpp)
+CPP_OBJS    = $(patsubst cpu/%.cpp, $(OBJDIR)/%.o, $(CPP_SOURCES))
 
-# Add CUDA sources only when USE_CUDA=1
+# GPU sources (gpu/*.cu) — only when USE_CUDA=1
 ifeq ($(USE_CUDA),1)
-    CU_SOURCES = $(wildcard $(SRCDIR)/*.cu)
-    CU_OBJS    = $(patsubst $(SRCDIR)/%.cu, $(OBJDIR)/%.o, $(CU_SOURCES))
+    CU_SOURCES = $(wildcard gpu/*.cu)
+    CU_OBJS    = $(patsubst gpu/%.cu, $(OBJDIR)/%.o, $(CU_SOURCES))
 endif
 
 OBJS = $(CPP_OBJS) $(CU_OBJS)
@@ -28,14 +26,14 @@ $(LIBDIR)/$(LIB): $(OBJS)
 	ar qc $@ $^
 
 inc:
-	@echo "Copying header files to $(INCDIR)/"
-	cp *.hpp $(INCDIR)/
+	@echo "Copying public headers to $(INCDIR)/"
+	cp include/*.hpp $(INCDIR)/
 
-$(OBJDIR)/%.o: $(SRCDIR)/%.cpp | $(OBJDIR)
+$(OBJDIR)/%.o: cpu/%.cpp | $(OBJDIR)
 	@echo "Compiling $< -> $@"
 	$(CXX) $(CXXFLAGS) -c $< -o $@ -MMD
 
-$(OBJDIR)/%.o: $(SRCDIR)/%.cu | $(OBJDIR)
+$(OBJDIR)/%.o: gpu/%.cu | $(OBJDIR)
 	@echo "Compiling $< -> $@"
 	$(NVCC) $(NVCCFLAGS) -I$(INCDIR) -c $< -o $@
 
@@ -43,8 +41,8 @@ $(OBJDIR):
 	mkdir -p $(OBJDIR) $(LIBDIR) $(INCDIR)
 
 clean:
-	@echo "Cleaning src..."
+	@echo "Cleaning..."
 	rm -f $(OBJS) $(CPP_OBJS:.o=.d) $(LIBDIR)/$(LIB)
-	rm -f $(INCDIR)/*.hpp
+	rm -f $(INCDIR)/filtered_tdma.hpp $(INCDIR)/filtered_tdma_cuda.hpp
 
 -include $(CPP_OBJS:.o=.d)

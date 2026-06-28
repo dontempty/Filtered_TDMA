@@ -3,18 +3,18 @@ include ../../Makefile.inc
 BUILDDIR ?= ../../build
 
 LIB    = libpascal_tdma.a
-SRCDIR = .
 OBJDIR = $(BUILDDIR)/obj/pascal
 LIBDIR = $(BUILDDIR)/lib
 INCDIR = $(BUILDDIR)/include
 
-CPP_SOURCES = $(wildcard $(SRCDIR)/*.cpp)
-CPP_OBJS    = $(patsubst $(SRCDIR)/%.cpp, $(OBJDIR)/%.o, $(CPP_SOURCES))
+# CPU sources (cpu/*.cpp)
+CPP_SOURCES = $(wildcard cpu/*.cpp)
+CPP_OBJS    = $(patsubst cpu/%.cpp, $(OBJDIR)/%.o, $(CPP_SOURCES))
 
-# Add CUDA sources only when USE_CUDA=1
+# GPU sources (gpu/*.cu) — only when USE_CUDA=1
 ifeq ($(USE_CUDA),1)
-    CU_SOURCES = $(wildcard $(SRCDIR)/*.cu)
-    CU_OBJS    = $(patsubst $(SRCDIR)/%.cu, $(OBJDIR)/%.o, $(CU_SOURCES))
+    CU_SOURCES = $(wildcard gpu/*.cu)
+    CU_OBJS    = $(patsubst gpu/%.cu, $(OBJDIR)/%.o, $(CU_SOURCES))
 endif
 
 OBJS = $(CPP_OBJS) $(CU_OBJS)
@@ -26,17 +26,14 @@ $(LIBDIR)/$(LIB): $(OBJS)
 	ar qc $@ $^
 
 inc:
-	@echo "Copying header files to $(INCDIR)/"
-	cp *.hpp $(INCDIR)/
-ifeq ($(USE_CUDA),1)
-	cp *.cuh $(INCDIR)/
-endif
+	@echo "Copying public headers to $(INCDIR)/"
+	cp include/*.hpp $(INCDIR)/
 
-$(OBJDIR)/%.o: $(SRCDIR)/%.cpp | $(OBJDIR)
+$(OBJDIR)/%.o: cpu/%.cpp | $(OBJDIR)
 	@echo "Compiling $< -> $@"
 	$(CXX) $(CXXFLAGS) -c $< -o $@ -MMD
 
-$(OBJDIR)/%.o: $(SRCDIR)/%.cu | $(OBJDIR)
+$(OBJDIR)/%.o: gpu/%.cu | $(OBJDIR)
 	@echo "Compiling $< -> $@"
 	$(NVCC) $(NVCCFLAGS) -c $< -o $@
 
@@ -44,8 +41,8 @@ $(OBJDIR):
 	mkdir -p $(OBJDIR) $(LIBDIR) $(INCDIR)
 
 clean:
-	@echo "Cleaning src..."
+	@echo "Cleaning..."
 	rm -f $(OBJS) $(CPP_OBJS:.o=.d) $(LIBDIR)/$(LIB)
-	rm -f $(INCDIR)/*.hpp $(INCDIR)/*.cuh
+	rm -f $(INCDIR)/pascal_tdma_many.hpp $(INCDIR)/pascal_tdma_many_cuda.hpp
 
 -include $(CPP_OBJS:.o=.d)
