@@ -25,7 +25,7 @@ TdmaBackend::TdmaBackend(Kind kind, int n_sys, int n_row,
                                                left_rank, right_rank,
                                                eps_constant);
     } else {
-        pasc_ = std::make_unique<PaScaLTDMAMany>(n_sys, myrank, nprocs, comm);
+        pasc_ = std::make_unique<PaScaLTDMA>(n_sys, myrank, nprocs, comm);
         dummy_rho_.assign(n_row + 1, 0.0);
     }
 }

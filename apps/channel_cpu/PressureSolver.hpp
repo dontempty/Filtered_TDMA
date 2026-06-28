@@ -22,7 +22,7 @@
 
 #include <mpi.h>
 #include "Field.hpp"
-#include "pascal_tdma_many.hpp"
+#include "pascal_tdma.hpp"
 
 namespace channel {
 
@@ -118,7 +118,7 @@ private:
     fftw_plan plan_bwd_y_ = nullptr;
 
     // ---- distributed z-TDMA (PaScaL_TDMA over comm_xz) ------------------
-    std::unique_ptr<PaScaLTDMAMany> tdma_z_;
+    std::unique_ptr<PaScaLTDMA> tdma_z_;
 
     // ---- dP field (with halos for projection) ----------------------------
     Field<double> dp_;

@@ -1,5 +1,5 @@
-#ifndef PASCAL_TDMA_MANY_HPP
-#define PASCAL_TDMA_MANY_HPP
+#ifndef PASCAL_TDMA_HPP
+#define PASCAL_TDMA_HPP
 
 #include <mpi.h>
 #include <vector>
@@ -11,17 +11,17 @@
 ///   - solve_profile() : same solve with per-phase timing (7 entries)
 ///
 /// Memory layout: row-major [n_row × n_sys], i.e. row j starts at offset j*n_sys.
-class PaScaLTDMAMany {
+class PaScaLTDMA {
 public:
     /// Construct solver for `n_sys` independent systems.
     /// `n_sys` is the number of parallel tridiagonal systems.
-    PaScaLTDMAMany(int n_sys, int myrank, int nprocs, MPI_Comm comm);
+    PaScaLTDMA(int n_sys, int myrank, int nprocs, MPI_Comm comm);
 
-    ~PaScaLTDMAMany();
+    ~PaScaLTDMA();
 
     // Non-copyable
-    PaScaLTDMAMany(const PaScaLTDMAMany&)            = delete;
-    PaScaLTDMAMany& operator=(const PaScaLTDMAMany&) = delete;
+    PaScaLTDMA(const PaScaLTDMA&)            = delete;
+    PaScaLTDMA& operator=(const PaScaLTDMA&) = delete;
 
     /// Solve n_sys tridiagonal systems each of size n_row.
     /// A, B, C: lower/diagonal/upper coefficients [n_row × n_sys].
@@ -66,4 +66,4 @@ private:
     std::vector<double> A_rt_, B_rt_, C_rt_, D_rt_;
 };
 
-#endif // PASCAL_TDMA_MANY_HPP
+#endif // PASCAL_TDMA_HPP

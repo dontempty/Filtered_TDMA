@@ -136,7 +136,7 @@ PressureSolver::PressureSolver(const Config& cfg,
 
     // Distributed z-TDMA (PaScaL_TDMA over comm_xz)
     if (n_sys_Y_ > 0) {
-        tdma_z_ = std::make_unique<PaScaLTDMAMany>(
+        tdma_z_ = std::make_unique<PaScaLTDMA>(
             n_sys_Y_, rank_xz_, size_xz_, topo.comm_xz());
         std::size_t tsz = (std::size_t)n3_I_ * n_sys_Y_;
         tdma_Am_.resize(tsz); tdma_Ac_.resize(tsz); tdma_Ap_.resize(tsz);

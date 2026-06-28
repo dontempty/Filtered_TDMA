@@ -1,4 +1,4 @@
-#include "../include/pascal_tdma_many.hpp"
+#include "../include/pascal_tdma.hpp"
 #include "tdma_local.hpp"
 #include "para_range.hpp"
 
@@ -9,7 +9,7 @@
 //  Constructor / Destructor
 // ============================================================================
 
-PaScaLTDMAMany::PaScaLTDMAMany(int n_sys, int myrank, int nprocs, MPI_Comm comm)
+PaScaLTDMA::PaScaLTDMA(int n_sys, int myrank, int nprocs, MPI_Comm comm)
     : comm_(comm), nprocs_(nprocs)
 {
     // Reduced system dimensions: each rank contributes 2 boundary rows
@@ -71,7 +71,7 @@ PaScaLTDMAMany::PaScaLTDMAMany(int n_sys, int myrank, int nprocs, MPI_Comm comm)
     displ_recv_.assign(nprocs, 0);
 }
 
-PaScaLTDMAMany::~PaScaLTDMAMany() {
+PaScaLTDMA::~PaScaLTDMA() {
     for (int p = 0; p < nprocs_; ++p) {
         if (ddtype_Fs_[p] != MPI_DATATYPE_NULL) MPI_Type_free(&ddtype_Fs_[p]);
         if (ddtype_Bs_[p] != MPI_DATATYPE_NULL) MPI_Type_free(&ddtype_Bs_[p]);
@@ -110,7 +110,7 @@ static inline BoundaryPtrs setup_ptrs(double* A, double* B, double* C, double* D
 //  solve() — no timing
 // ============================================================================
 
-void PaScaLTDMAMany::solve(double* __restrict A, double* __restrict B,
+void PaScaLTDMA::solve(double* __restrict A, double* __restrict B,
                            double* __restrict C, double* __restrict D,
                            int n_sys, int n_row) {
     if (nprocs_ == 1) {
@@ -231,7 +231,7 @@ void PaScaLTDMAMany::solve(double* __restrict A, double* __restrict B,
 //  so the global reduced system is solved as a cyclic tridiagonal.
 // ============================================================================
 
-void PaScaLTDMAMany::solve_cyclic(double* __restrict A, double* __restrict B,
+void PaScaLTDMA::solve_cyclic(double* __restrict A, double* __restrict B,
                                   double* __restrict C, double* __restrict D,
                                   int n_sys, int n_row) {
     if (nprocs_ == 1) {
@@ -351,7 +351,7 @@ void PaScaLTDMAMany::solve_cyclic(double* __restrict A, double* __restrict B,
 //  solve_profile() — per-phase timing with MPI_Barrier (7 entries)
 // ============================================================================
 
-void PaScaLTDMAMany::solve_profile(double* __restrict A, double* __restrict B,
+void PaScaLTDMA::solve_profile(double* __restrict A, double* __restrict B,
                                    double* __restrict C, double* __restrict D,
                                    int n_sys, int n_row,
                                    std::vector<double>& time_list) {

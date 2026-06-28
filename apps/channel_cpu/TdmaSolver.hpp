@@ -21,7 +21,7 @@
 #include <string>
 
 #include "filtered_tdma.hpp"
-#include "pascal_tdma_many.hpp"
+#include "pascal_tdma.hpp"
 
 namespace channel {
 
@@ -71,7 +71,7 @@ private:
 
     // Only one is allocated based on backend_
     std::unique_ptr<FilteredTDMA>   filt_;   // FILTERED
-    std::unique_ptr<PaScaLTDMAMany> pasc_;   // PASCAL
+    std::unique_ptr<PaScaLTDMA> pasc_;   // PASCAL
 };
 
 } // namespace channel

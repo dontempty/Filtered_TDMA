@@ -33,7 +33,7 @@ TdmaSolver::TdmaSolver(const MpiTopology& topo, int axis,
                                                rank, nprocs, comm,
                                                left, right, eps_constant);
     } else {
-        pasc_ = std::make_unique<PaScaLTDMAMany>(n_sys, rank, nprocs, comm);
+        pasc_ = std::make_unique<PaScaLTDMA>(n_sys, rank, nprocs, comm);
     }
 }
 

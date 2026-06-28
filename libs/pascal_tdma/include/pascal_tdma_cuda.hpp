@@ -1,12 +1,12 @@
-#ifndef PASCAL_TDMA_MANY_CUDA_HPP
-#define PASCAL_TDMA_MANY_CUDA_HPP
+#ifndef PASCAL_TDMA_CUDA_HPP
+#define PASCAL_TDMA_CUDA_HPP
 
 #include <mpi.h>
 #include <cuda_runtime.h>
 #include <cstddef>
 #include <vector>
 
-/// CUDA / GPU version of PaScaLTDMAMany.
+/// CUDA / GPU version of PaScaLTDMA.
 ///
 /// Communication pattern mirrors PaScaL_TDMA_F/src/pascal_tdma_cuda.f90 :
 ///   - explicit device-side pack into a contiguous send buffer,
@@ -15,14 +15,14 @@
 ///   - explicit device-side unpack into the transposed reduced-system buffer.
 /// This avoids the OpenMPI/UCX fallback that subarray derived datatypes on
 /// device pointers historically trigger (per-element D2H staging).
-class PaScaLTDMAManyCUDA {
+class PaScaLTDMACUDA {
 public:
-    PaScaLTDMAManyCUDA(int n_sys, int myrank, int nprocs, MPI_Comm comm,
+    PaScaLTDMACUDA(int n_sys, int myrank, int nprocs, MPI_Comm comm,
                        int block_x = 128, int block_y = 1);
-    ~PaScaLTDMAManyCUDA();
+    ~PaScaLTDMACUDA();
 
-    PaScaLTDMAManyCUDA(const PaScaLTDMAManyCUDA&)            = delete;
-    PaScaLTDMAManyCUDA& operator=(const PaScaLTDMAManyCUDA&) = delete;
+    PaScaLTDMACUDA(const PaScaLTDMACUDA&)            = delete;
+    PaScaLTDMACUDA& operator=(const PaScaLTDMACUDA&) = delete;
 
     /// Non-cyclic solve (lean production path — no timing overhead).
     void solve(double* d_A, double* d_B, double* d_C, double* d_D,
@@ -139,4 +139,4 @@ private:
     double      last_gpu_ms_  = 0.0;
 };
 
-#endif // PASCAL_TDMA_MANY_CUDA_HPP
+#endif // PASCAL_TDMA_CUDA_HPP

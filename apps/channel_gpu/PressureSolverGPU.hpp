@@ -7,7 +7,7 @@
 
 #include "DeviceBuffer.hpp"
 #include "DeviceField.hpp"
-#include "pascal_tdma_many_cuda.hpp"
+#include "pascal_tdma_cuda.hpp"
 
 namespace channel {
 
@@ -62,7 +62,7 @@ private:
     DeviceBuffer<double> tx_sbuf_C_, tx_rbuf_C_, tx_sbuf_Y_, tx_rbuf_Y_;
 
     cufftHandle plan_fwd_x_ = 0, plan_bwd_x_ = 0, plan_y_ = 0;
-    std::unique_ptr<PaScaLTDMAManyCUDA> tdma_z_;
+    std::unique_ptr<PaScaLTDMACUDA> tdma_z_;
 };
 
 } // namespace channel

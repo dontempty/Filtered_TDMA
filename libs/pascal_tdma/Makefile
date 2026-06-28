@@ -43,6 +43,6 @@ $(OBJDIR):
 clean:
 	@echo "Cleaning..."
 	rm -f $(OBJS) $(CPP_OBJS:.o=.d) $(LIBDIR)/$(LIB)
-	rm -f $(INCDIR)/pascal_tdma_many.hpp $(INCDIR)/pascal_tdma_many_cuda.hpp
+	rm -f $(INCDIR)/pascal_tdma.hpp $(INCDIR)/pascal_tdma_cuda.hpp
 
 -include $(CPP_OBJS:.o=.d)

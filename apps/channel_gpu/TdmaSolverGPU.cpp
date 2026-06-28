@@ -30,7 +30,7 @@ TdmaSolverGPU::TdmaSolverGPU(const MpiTopology& topo, int axis,
             n_sys, n_row, rank, nprocs, comm,
             topo.left_in_sub(axis), topo.right_in_sub(axis), eps_constant);
     } else {
-        pasc_ = std::make_unique<PaScaLTDMAManyCUDA>(n_sys, rank, nprocs, comm, 128, 1);
+        pasc_ = std::make_unique<PaScaLTDMACUDA>(n_sys, rank, nprocs, comm, 128, 1);
     }
 }
 

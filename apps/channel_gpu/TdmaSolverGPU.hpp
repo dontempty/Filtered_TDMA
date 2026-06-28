@@ -6,7 +6,7 @@
 #include <string>
 
 #include "filtered_tdma_cuda.hpp"
-#include "pascal_tdma_many_cuda.hpp"
+#include "pascal_tdma_cuda.hpp"
 
 namespace channel {
 
@@ -36,7 +36,7 @@ private:
     int n_row_ = 0;
     bool periodic_ = false;
     std::unique_ptr<FilteredTDMACUDA> filt_;
-    std::unique_ptr<PaScaLTDMAManyCUDA> pasc_;
+    std::unique_ptr<PaScaLTDMACUDA> pasc_;
 };
 
 } // namespace channel

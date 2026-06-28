@@ -16,7 +16,7 @@
 #include <vector>
 
 #include "filtered_tdma.hpp"
-#include "pascal_tdma_many.hpp"
+#include "pascal_tdma.hpp"
 
 class TdmaBackend {
 public:
@@ -59,7 +59,7 @@ private:
     Kind kind_;
     int  n_sys_, n_row_;
     std::unique_ptr<FilteredTDMA>   filt_;
-    std::unique_ptr<PaScaLTDMAMany> pasc_;
+    std::unique_ptr<PaScaLTDMA> pasc_;
     std::vector<double> dummy_rho_;   // PASCAL only
 };
 

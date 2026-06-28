@@ -379,7 +379,7 @@ PressureSolverGPU::PressureSolverGPU(const Config& cfg, const MpiTopology& topo,
         tdma_Am_.reset(tsz); tdma_Ac_.reset(tsz); tdma_Ap_.reset(tsz);
         tdma_Am2_.reset(tsz); tdma_Ac2_.reset(tsz); tdma_Ap2_.reset(tsz);
         tdma_Be_r_.reset(tsz); tdma_Be_c_.reset(tsz);
-        tdma_z_ = std::make_unique<PaScaLTDMAManyCUDA>(n_sys_Y_, rank_xz_, size_xz_, topo.comm_xz(), 128, 1);
+        tdma_z_ = std::make_unique<PaScaLTDMACUDA>(n_sys_Y_, rank_xz_, size_xz_, topo.comm_xz(), 128, 1);
     }
 
     int blkC = nx_loc_ * ny_loc_ * n3_I_;
