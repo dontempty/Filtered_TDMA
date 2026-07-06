@@ -4,7 +4,7 @@
 // Runtime backend selector for the Heat_gpu solver.
 //
 //   parse("filtered") → FILTERED → FilteredTDMACUDA
-//   parse("pascal")   → PASCAL   → PaScaLTDMAManyCUDA
+//   parse("pascal")   → PASCAL   → PaScaLTDMACUDA
 //
 // Both backends operate on device pointers; the CPU `TdmaBackend` (Heat/) is
 // the host-side analogue.  Only the FILTERED backend has spectral-radius and
@@ -16,7 +16,7 @@
 #include <vector>
 
 #include "filtered_tdma_cuda.hpp"
-#include "pascal_tdma_many_cuda.hpp"
+#include "pascal_tdma_cuda.hpp"
 
 class TdmaBackendGPU {
 public:
@@ -36,7 +36,7 @@ public:
                    double eps_constant);
 
     /// Solve all n_sys tridiagonal systems of length n_row.
-    /// FILTERED: solve_filtered_v1; PASCAL: PaScaLTDMAManyCUDA::solve.
+    /// FILTERED: solve_filtered_v1; PASCAL: PaScaLTDMACUDA::solve.
     void solve(double* d_A, double* d_B, double* d_C, double* d_D);
 
     // Periodic (cyclic) variant: row 0 couples to row n_row-1.
@@ -66,7 +66,7 @@ private:
     Kind kind_;
     int  n_sys_, n_row_;
     std::unique_ptr<FilteredTDMACUDA>   filt_;
-    std::unique_ptr<PaScaLTDMAManyCUDA> pasc_;
+    std::unique_ptr<PaScaLTDMACUDA> pasc_;
 };
 
 #endif // HEAT_GPU_TDMA_BACKEND_GPU_HPP

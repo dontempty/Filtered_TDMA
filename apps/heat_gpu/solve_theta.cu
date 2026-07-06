@@ -6,7 +6,7 @@
 //   - One H2D for theta at start, one D2H at end
 //   - Each time step: build_RHS → boundary corrections → (build_LHS + batched
 //     TDMA solve + permute back) per direction → update theta → ghost exchange
-//   - The TDMA solver is called with device pointers (PaScaLTDMAManyCUDA::solve)
+//   - The TDMA solver is called with device pointers (PaScaLTDMACUDA::solve)
 //
 // Layout convention for the interior cube (ix*iy*iz where ix=nx-2 etc.):
 //   d_rhs[ci] with ci = kk*iy*ix + jj*ix + ii,  ii=i-1, jj=j-1, kk=k-1

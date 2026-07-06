@@ -95,7 +95,7 @@ void FilteredTDMA::solve_filtered_v2_profile(double* __restrict A, double* __res
     }
 
     double t0, t1;
-    const int J  = cal_J_rhs_bound(D);
+    const int J  = std::min(cal_J_rhs_bound(D), n_row_ - 2);
     const int lo = (n_row_ - 2) - J;
 
     // 1) Forward elimination (filtered split at J)
@@ -129,6 +129,7 @@ void FilteredTDMA::solve_filtered_v2_profile(double* __restrict A, double* __res
 
     // 6) Final local solve
     MPI_Barrier(comm_); t0 = MPI_Wtime();
-    final_solve(A, C, D, n_sys_, n_row_, /*left_end=*/J, /*right_beg=*/lo + 1);
+    final_solve(A, C, D, n_sys_, n_row_, /*left_end=*/J,
+                                         /*right_beg=*/std::max(1, lo + 1));
     t1 = MPI_Wtime(); time_list[6] = t1 - t0;
 }

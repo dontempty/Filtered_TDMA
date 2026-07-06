@@ -1,0 +1,912 @@
+============================================================
+ host : gpu56
+ date : 2026-06-28 16:47:27
+ bin  : /scratch/x3319a05/Filtered_TDMA/build/bin/heat_gpu.out (751K)
+============================================================
+0, NVIDIA H200
+1, NVIDIA H200
+2, NVIDIA H200
+3, NVIDIA H200
+4, NVIDIA H200
+5, NVIDIA H200
+6, NVIDIA H200
+7, NVIDIA H200
+
+################## strong ##################
+---- strong_64x64x512_np1_pascal_rho025  NP=1  [16:47:27] ----
+[Tmax] = 0.000457764 | [max_iter] = 30
+[rho] = 0.25
+[backend] = pascal
+ [Timing] CSV saved to /scratch/x3319a05/Filtered_TDMA/apps/heat_gpu/results/scaling_profile/h200/strong/timing_strong_64x64x512_np1_pascal_rho025.csv
+   [wall 4s]  -> timing_strong_64x64x512_np1_pascal_rho025.csv
+---- strong_64x64x512_np1_pascal_rho040  NP=1  [16:47:31] ----
+[Tmax] = 0.00183105 | [max_iter] = 30
+[rho] = 0.4
+[backend] = pascal
+ [Timing] CSV saved to /scratch/x3319a05/Filtered_TDMA/apps/heat_gpu/results/scaling_profile/h200/strong/timing_strong_64x64x512_np1_pascal_rho040.csv
+   [wall 3s]  -> timing_strong_64x64x512_np1_pascal_rho040.csv
+---- strong_64x64x512_np2_pascal_rho025  NP=2  [16:47:34] ----
+[Tmax] = 0.000457764 | [max_iter] = 30
+[rho] = 0.25
+[backend] = pascal
+ [Timing] CSV saved to /scratch/x3319a05/Filtered_TDMA/apps/heat_gpu/results/scaling_profile/h200/strong/timing_strong_64x64x512_np2_pascal_rho025.csv
+   [wall 5s]  -> timing_strong_64x64x512_np2_pascal_rho025.csv
+---- strong_64x64x512_np2_pascal_rho040  NP=2  [16:47:39] ----
+[Tmax] = 0.00183105 | [max_iter] = 30
+[rho] = 0.4
+[backend] = pascal
+ [Timing] CSV saved to /scratch/x3319a05/Filtered_TDMA/apps/heat_gpu/results/scaling_profile/h200/strong/timing_strong_64x64x512_np2_pascal_rho040.csv
+   [wall 3s]  -> timing_strong_64x64x512_np2_pascal_rho040.csv
+---- strong_64x64x512_np4_pascal_rho025  NP=4  [16:47:43] ----
+[Tmax] = 0.000457764 | [max_iter] = 30
+[rho] = 0.25
+[backend] = pascal
+ [Timing] CSV saved to /scratch/x3319a05/Filtered_TDMA/apps/heat_gpu/results/scaling_profile/h200/strong/timing_strong_64x64x512_np4_pascal_rho025.csv
+   [wall 5s]  -> timing_strong_64x64x512_np4_pascal_rho025.csv
+---- strong_64x64x512_np4_pascal_rho040  NP=4  [16:47:48] ----
+[Tmax] = 0.00183105 | [max_iter] = 30
+[rho] = 0.4
+[backend] = pascal
+ [Timing] CSV saved to /scratch/x3319a05/Filtered_TDMA/apps/heat_gpu/results/scaling_profile/h200/strong/timing_strong_64x64x512_np4_pascal_rho040.csv
+   [wall 5s]  -> timing_strong_64x64x512_np4_pascal_rho040.csv
+---- strong_64x64x512_np8_pascal_rho025  NP=8  [16:47:53] ----
+[Tmax] = 0.000457764 | [max_iter] = 30
+[rho] = 0.25
+[backend] = pascal
+ [Timing] CSV saved to /scratch/x3319a05/Filtered_TDMA/apps/heat_gpu/results/scaling_profile/h200/strong/timing_strong_64x64x512_np8_pascal_rho025.csv
+   [wall 7s]  -> timing_strong_64x64x512_np8_pascal_rho025.csv
+---- strong_64x64x512_np8_pascal_rho040  NP=8  [16:48:00] ----
+[Tmax] = 0.00183105 | [max_iter] = 30
+[rho] = 0.4
+[backend] = pascal
+ [Timing] CSV saved to /scratch/x3319a05/Filtered_TDMA/apps/heat_gpu/results/scaling_profile/h200/strong/timing_strong_64x64x512_np8_pascal_rho040.csv
+   [wall 7s]  -> timing_strong_64x64x512_np8_pascal_rho040.csv
+---- strong_128x128x1024_np1_pascal_rho025  NP=1  [16:48:07] ----
+[Tmax] = 0.000114441 | [max_iter] = 30
+[rho] = 0.25
+[backend] = pascal
+ [Timing] CSV saved to /scratch/x3319a05/Filtered_TDMA/apps/heat_gpu/results/scaling_profile/h200/strong/timing_strong_128x128x1024_np1_pascal_rho025.csv
+   [wall 4s]  -> timing_strong_128x128x1024_np1_pascal_rho025.csv
+---- strong_128x128x1024_np1_pascal_rho040  NP=1  [16:48:11] ----
+[Tmax] = 0.000457764 | [max_iter] = 30
+[rho] = 0.4
+[backend] = pascal
+ [Timing] CSV saved to /scratch/x3319a05/Filtered_TDMA/apps/heat_gpu/results/scaling_profile/h200/strong/timing_strong_128x128x1024_np1_pascal_rho040.csv
+   [wall 4s]  -> timing_strong_128x128x1024_np1_pascal_rho040.csv
+---- strong_128x128x1024_np2_pascal_rho025  NP=2  [16:48:15] ----
+[Tmax] = 0.000114441 | [max_iter] = 30
+[rho] = 0.25
+[backend] = pascal
+ [Timing] CSV saved to /scratch/x3319a05/Filtered_TDMA/apps/heat_gpu/results/scaling_profile/h200/strong/timing_strong_128x128x1024_np2_pascal_rho025.csv
+   [wall 4s]  -> timing_strong_128x128x1024_np2_pascal_rho025.csv
+---- strong_128x128x1024_np2_pascal_rho040  NP=2  [16:48:19] ----
+[Tmax] = 0.000457764 | [max_iter] = 30
+[rho] = 0.4
+[backend] = pascal
+ [Timing] CSV saved to /scratch/x3319a05/Filtered_TDMA/apps/heat_gpu/results/scaling_profile/h200/strong/timing_strong_128x128x1024_np2_pascal_rho040.csv
+   [wall 4s]  -> timing_strong_128x128x1024_np2_pascal_rho040.csv
+---- strong_128x128x1024_np4_pascal_rho025  NP=4  [16:48:23] ----
+[Tmax] = 0.000114441 | [max_iter] = 30
+[rho] = 0.25
+[backend] = pascal
+ [Timing] CSV saved to /scratch/x3319a05/Filtered_TDMA/apps/heat_gpu/results/scaling_profile/h200/strong/timing_strong_128x128x1024_np4_pascal_rho025.csv
+   [wall 5s]  -> timing_strong_128x128x1024_np4_pascal_rho025.csv
+---- strong_128x128x1024_np4_pascal_rho040  NP=4  [16:48:28] ----
+[Tmax] = 0.000457764 | [max_iter] = 30
+[rho] = 0.4
+[backend] = pascal
+ [Timing] CSV saved to /scratch/x3319a05/Filtered_TDMA/apps/heat_gpu/results/scaling_profile/h200/strong/timing_strong_128x128x1024_np4_pascal_rho040.csv
+   [wall 5s]  -> timing_strong_128x128x1024_np4_pascal_rho040.csv
+---- strong_128x128x1024_np8_pascal_rho025  NP=8  [16:48:33] ----
+[Tmax] = 0.000114441 | [max_iter] = 30
+[rho] = 0.25
+[backend] = pascal
+ [Timing] CSV saved to /scratch/x3319a05/Filtered_TDMA/apps/heat_gpu/results/scaling_profile/h200/strong/timing_strong_128x128x1024_np8_pascal_rho025.csv
+   [wall 8s]  -> timing_strong_128x128x1024_np8_pascal_rho025.csv
+---- strong_128x128x1024_np8_pascal_rho040  NP=8  [16:48:41] ----
+[Tmax] = 0.000457764 | [max_iter] = 30
+[rho] = 0.4
+[backend] = pascal
+ [Timing] CSV saved to /scratch/x3319a05/Filtered_TDMA/apps/heat_gpu/results/scaling_profile/h200/strong/timing_strong_128x128x1024_np8_pascal_rho040.csv
+   [wall 7s]  -> timing_strong_128x128x1024_np8_pascal_rho040.csv
+---- strong_256x256x2048_np1_pascal_rho025  NP=1  [16:48:48] ----
+[Tmax] = 2.86102e-05 | [max_iter] = 30
+[rho] = 0.25
+[backend] = pascal
+ [Timing] CSV saved to /scratch/x3319a05/Filtered_TDMA/apps/heat_gpu/results/scaling_profile/h200/strong/timing_strong_256x256x2048_np1_pascal_rho025.csv
+   [wall 3s]  -> timing_strong_256x256x2048_np1_pascal_rho025.csv
+---- strong_256x256x2048_np1_pascal_rho040  NP=1  [16:48:51] ----
+[Tmax] = 0.000114441 | [max_iter] = 30
+[rho] = 0.4
+[backend] = pascal
+ [Timing] CSV saved to /scratch/x3319a05/Filtered_TDMA/apps/heat_gpu/results/scaling_profile/h200/strong/timing_strong_256x256x2048_np1_pascal_rho040.csv
+   [wall 5s]  -> timing_strong_256x256x2048_np1_pascal_rho040.csv
+---- strong_256x256x2048_np2_pascal_rho025  NP=2  [16:48:56] ----
+[Tmax] = 2.86102e-05 | [max_iter] = 30
+[rho] = 0.25
+[backend] = pascal
+ [Timing] CSV saved to /scratch/x3319a05/Filtered_TDMA/apps/heat_gpu/results/scaling_profile/h200/strong/timing_strong_256x256x2048_np2_pascal_rho025.csv
+   [wall 4s]  -> timing_strong_256x256x2048_np2_pascal_rho025.csv
+---- strong_256x256x2048_np2_pascal_rho040  NP=2  [16:49:00] ----
+[Tmax] = 0.000114441 | [max_iter] = 30
+[rho] = 0.4
+[backend] = pascal
+ [Timing] CSV saved to /scratch/x3319a05/Filtered_TDMA/apps/heat_gpu/results/scaling_profile/h200/strong/timing_strong_256x256x2048_np2_pascal_rho040.csv
+   [wall 6s]  -> timing_strong_256x256x2048_np2_pascal_rho040.csv
+---- strong_256x256x2048_np4_pascal_rho025  NP=4  [16:49:06] ----
+[Tmax] = 2.86102e-05 | [max_iter] = 30
+[rho] = 0.25
+[backend] = pascal
+ [Timing] CSV saved to /scratch/x3319a05/Filtered_TDMA/apps/heat_gpu/results/scaling_profile/h200/strong/timing_strong_256x256x2048_np4_pascal_rho025.csv
+   [wall 5s]  -> timing_strong_256x256x2048_np4_pascal_rho025.csv
+---- strong_256x256x2048_np4_pascal_rho040  NP=4  [16:49:11] ----
+[Tmax] = 0.000114441 | [max_iter] = 30
+[rho] = 0.4
+[backend] = pascal
+ [Timing] CSV saved to /scratch/x3319a05/Filtered_TDMA/apps/heat_gpu/results/scaling_profile/h200/strong/timing_strong_256x256x2048_np4_pascal_rho040.csv
+   [wall 6s]  -> timing_strong_256x256x2048_np4_pascal_rho040.csv
+---- strong_256x256x2048_np8_pascal_rho025  NP=8  [16:49:17] ----
+[Tmax] = 2.86102e-05 | [max_iter] = 30
+[rho] = 0.25
+[backend] = pascal
+ [Timing] CSV saved to /scratch/x3319a05/Filtered_TDMA/apps/heat_gpu/results/scaling_profile/h200/strong/timing_strong_256x256x2048_np8_pascal_rho025.csv
+   [wall 7s]  -> timing_strong_256x256x2048_np8_pascal_rho025.csv
+---- strong_256x256x2048_np8_pascal_rho040  NP=8  [16:49:24] ----
+[Tmax] = 0.000114441 | [max_iter] = 30
+[rho] = 0.4
+[backend] = pascal
+ [Timing] CSV saved to /scratch/x3319a05/Filtered_TDMA/apps/heat_gpu/results/scaling_profile/h200/strong/timing_strong_256x256x2048_np8_pascal_rho040.csv
+   [wall 7s]  -> timing_strong_256x256x2048_np8_pascal_rho040.csv
+---- strong_1024x1024x1024_np1_pascal_rho025  NP=1  [16:49:31] ----
+[Tmax] = 0.000114441 | [max_iter] = 30
+[rho] = 0.25
+[backend] = pascal
+ [Timing] CSV saved to /scratch/x3319a05/Filtered_TDMA/apps/heat_gpu/results/scaling_profile/h200/strong/timing_strong_1024x1024x1024_np1_pascal_rho025.csv
+   [wall 9s]  -> timing_strong_1024x1024x1024_np1_pascal_rho025.csv
+---- strong_1024x1024x1024_np1_pascal_rho040  NP=1  [16:49:40] ----
+[Tmax] = 0.000457764 | [max_iter] = 30
+[rho] = 0.4
+[backend] = pascal
+ [Timing] CSV saved to /scratch/x3319a05/Filtered_TDMA/apps/heat_gpu/results/scaling_profile/h200/strong/timing_strong_1024x1024x1024_np1_pascal_rho040.csv
+   [wall 10s]  -> timing_strong_1024x1024x1024_np1_pascal_rho040.csv
+---- strong_1024x1024x1024_np2_pascal_rho025  NP=2  [16:49:50] ----
+[Tmax] = 0.000114441 | [max_iter] = 30
+[rho] = 0.25
+[backend] = pascal
+ [Timing] CSV saved to /scratch/x3319a05/Filtered_TDMA/apps/heat_gpu/results/scaling_profile/h200/strong/timing_strong_1024x1024x1024_np2_pascal_rho025.csv
+   [wall 8s]  -> timing_strong_1024x1024x1024_np2_pascal_rho025.csv
+---- strong_1024x1024x1024_np2_pascal_rho040  NP=2  [16:49:58] ----
+[Tmax] = 0.000457764 | [max_iter] = 30
+[rho] = 0.4
+[backend] = pascal
+ [Timing] CSV saved to /scratch/x3319a05/Filtered_TDMA/apps/heat_gpu/results/scaling_profile/h200/strong/timing_strong_1024x1024x1024_np2_pascal_rho040.csv
+   [wall 9s]  -> timing_strong_1024x1024x1024_np2_pascal_rho040.csv
+---- strong_1024x1024x1024_np4_pascal_rho025  NP=4  [16:50:07] ----
+[Tmax] = 0.000114441 | [max_iter] = 30
+[rho] = 0.25
+[backend] = pascal
+ [Timing] CSV saved to /scratch/x3319a05/Filtered_TDMA/apps/heat_gpu/results/scaling_profile/h200/strong/timing_strong_1024x1024x1024_np4_pascal_rho025.csv
+   [wall 7s]  -> timing_strong_1024x1024x1024_np4_pascal_rho025.csv
+---- strong_1024x1024x1024_np4_pascal_rho040  NP=4  [16:50:14] ----
+[Tmax] = 0.000457764 | [max_iter] = 30
+[rho] = 0.4
+[backend] = pascal
+ [Timing] CSV saved to /scratch/x3319a05/Filtered_TDMA/apps/heat_gpu/results/scaling_profile/h200/strong/timing_strong_1024x1024x1024_np4_pascal_rho040.csv
+   [wall 6s]  -> timing_strong_1024x1024x1024_np4_pascal_rho040.csv
+---- strong_1024x1024x1024_np8_pascal_rho025  NP=8  [16:50:20] ----
+[Tmax] = 0.000114441 | [max_iter] = 30
+[rho] = 0.25
+[backend] = pascal
+ [Timing] CSV saved to /scratch/x3319a05/Filtered_TDMA/apps/heat_gpu/results/scaling_profile/h200/strong/timing_strong_1024x1024x1024_np8_pascal_rho025.csv
+   [wall 8s]  -> timing_strong_1024x1024x1024_np8_pascal_rho025.csv
+---- strong_1024x1024x1024_np8_pascal_rho040  NP=8  [16:50:29] ----
+[Tmax] = 0.000457764 | [max_iter] = 30
+[rho] = 0.4
+[backend] = pascal
+ [Timing] CSV saved to /scratch/x3319a05/Filtered_TDMA/apps/heat_gpu/results/scaling_profile/h200/strong/timing_strong_1024x1024x1024_np8_pascal_rho040.csv
+   [wall 8s]  -> timing_strong_1024x1024x1024_np8_pascal_rho040.csv
+---- strong_64x64x512_np1_filtered_v2_rho025  NP=1  [16:50:37] ----
+[Tmax] = 0.000457764 | [max_iter] = 30
+[rho] = 0.25
+[backend] = filtered_v2
+ [Timing] CSV saved to /scratch/x3319a05/Filtered_TDMA/apps/heat_gpu/results/scaling_profile/h200/strong/timing_strong_64x64x512_np1_filtered_v2_rho025.csv
+   [wall 3s]  -> timing_strong_64x64x512_np1_filtered_v2_rho025.csv
+---- strong_64x64x512_np1_filtered_v2_rho040  NP=1  [16:50:40] ----
+[Tmax] = 0.00183105 | [max_iter] = 30
+[rho] = 0.4
+[backend] = filtered_v2
+ [Timing] CSV saved to /scratch/x3319a05/Filtered_TDMA/apps/heat_gpu/results/scaling_profile/h200/strong/timing_strong_64x64x512_np1_filtered_v2_rho040.csv
+   [wall 4s]  -> timing_strong_64x64x512_np1_filtered_v2_rho040.csv
+---- strong_64x64x512_np2_filtered_v2_rho025  NP=2  [16:50:44] ----
+[Tmax] = 0.000457764 | [max_iter] = 30
+[rho] = 0.25
+[backend] = filtered_v2
+ [Timing] CSV saved to /scratch/x3319a05/Filtered_TDMA/apps/heat_gpu/results/scaling_profile/h200/strong/timing_strong_64x64x512_np2_filtered_v2_rho025.csv
+   [wall 4s]  -> timing_strong_64x64x512_np2_filtered_v2_rho025.csv
+---- strong_64x64x512_np2_filtered_v2_rho040  NP=2  [16:50:48] ----
+[Tmax] = 0.00183105 | [max_iter] = 30
+[rho] = 0.4
+[backend] = filtered_v2
+ [Timing] CSV saved to /scratch/x3319a05/Filtered_TDMA/apps/heat_gpu/results/scaling_profile/h200/strong/timing_strong_64x64x512_np2_filtered_v2_rho040.csv
+   [wall 4s]  -> timing_strong_64x64x512_np2_filtered_v2_rho040.csv
+---- strong_64x64x512_np4_filtered_v2_rho025  NP=4  [16:50:52] ----
+[Tmax] = 0.000457764 | [max_iter] = 30
+[rho] = 0.25
+[backend] = filtered_v2
+ [Timing] CSV saved to /scratch/x3319a05/Filtered_TDMA/apps/heat_gpu/results/scaling_profile/h200/strong/timing_strong_64x64x512_np4_filtered_v2_rho025.csv
+   [wall 5s]  -> timing_strong_64x64x512_np4_filtered_v2_rho025.csv
+---- strong_64x64x512_np4_filtered_v2_rho040  NP=4  [16:50:57] ----
+[Tmax] = 0.00183105 | [max_iter] = 30
+[rho] = 0.4
+[backend] = filtered_v2
+ [Timing] CSV saved to /scratch/x3319a05/Filtered_TDMA/apps/heat_gpu/results/scaling_profile/h200/strong/timing_strong_64x64x512_np4_filtered_v2_rho040.csv
+   [wall 5s]  -> timing_strong_64x64x512_np4_filtered_v2_rho040.csv
+---- strong_64x64x512_np8_filtered_v2_rho025  NP=8  [16:51:02] ----
+[Tmax] = 0.000457764 | [max_iter] = 30
+[rho] = 0.25
+[backend] = filtered_v2
+ [Timing] CSV saved to /scratch/x3319a05/Filtered_TDMA/apps/heat_gpu/results/scaling_profile/h200/strong/timing_strong_64x64x512_np8_filtered_v2_rho025.csv
+   [wall 7s]  -> timing_strong_64x64x512_np8_filtered_v2_rho025.csv
+---- strong_64x64x512_np8_filtered_v2_rho040  NP=8  [16:51:10] ----
+[Tmax] = 0.00183105 | [max_iter] = 30
+[rho] = 0.4
+[backend] = filtered_v2
+ [Timing] CSV saved to /scratch/x3319a05/Filtered_TDMA/apps/heat_gpu/results/scaling_profile/h200/strong/timing_strong_64x64x512_np8_filtered_v2_rho040.csv
+   [wall 7s]  -> timing_strong_64x64x512_np8_filtered_v2_rho040.csv
+---- strong_128x128x1024_np1_filtered_v2_rho025  NP=1  [16:51:17] ----
+[Tmax] = 0.000114441 | [max_iter] = 30
+[rho] = 0.25
+[backend] = filtered_v2
+ [Timing] CSV saved to /scratch/x3319a05/Filtered_TDMA/apps/heat_gpu/results/scaling_profile/h200/strong/timing_strong_128x128x1024_np1_filtered_v2_rho025.csv
+   [wall 3s]  -> timing_strong_128x128x1024_np1_filtered_v2_rho025.csv
+---- strong_128x128x1024_np1_filtered_v2_rho040  NP=1  [16:51:20] ----
+[Tmax] = 0.000457764 | [max_iter] = 30
+[rho] = 0.4
+[backend] = filtered_v2
+ [Timing] CSV saved to /scratch/x3319a05/Filtered_TDMA/apps/heat_gpu/results/scaling_profile/h200/strong/timing_strong_128x128x1024_np1_filtered_v2_rho040.csv
+   [wall 3s]  -> timing_strong_128x128x1024_np1_filtered_v2_rho040.csv
+---- strong_128x128x1024_np2_filtered_v2_rho025  NP=2  [16:51:23] ----
+[Tmax] = 0.000114441 | [max_iter] = 30
+[rho] = 0.25
+[backend] = filtered_v2
+ [Timing] CSV saved to /scratch/x3319a05/Filtered_TDMA/apps/heat_gpu/results/scaling_profile/h200/strong/timing_strong_128x128x1024_np2_filtered_v2_rho025.csv
+   [wall 5s]  -> timing_strong_128x128x1024_np2_filtered_v2_rho025.csv
+---- strong_128x128x1024_np2_filtered_v2_rho040  NP=2  [16:51:28] ----
+[Tmax] = 0.000457764 | [max_iter] = 30
+[rho] = 0.4
+[backend] = filtered_v2
+ [Timing] CSV saved to /scratch/x3319a05/Filtered_TDMA/apps/heat_gpu/results/scaling_profile/h200/strong/timing_strong_128x128x1024_np2_filtered_v2_rho040.csv
+   [wall 4s]  -> timing_strong_128x128x1024_np2_filtered_v2_rho040.csv
+---- strong_128x128x1024_np4_filtered_v2_rho025  NP=4  [16:51:32] ----
+[Tmax] = 0.000114441 | [max_iter] = 30
+[rho] = 0.25
+[backend] = filtered_v2
+ [Timing] CSV saved to /scratch/x3319a05/Filtered_TDMA/apps/heat_gpu/results/scaling_profile/h200/strong/timing_strong_128x128x1024_np4_filtered_v2_rho025.csv
+   [wall 5s]  -> timing_strong_128x128x1024_np4_filtered_v2_rho025.csv
+---- strong_128x128x1024_np4_filtered_v2_rho040  NP=4  [16:51:37] ----
+[Tmax] = 0.000457764 | [max_iter] = 30
+[rho] = 0.4
+[backend] = filtered_v2
+ [Timing] CSV saved to /scratch/x3319a05/Filtered_TDMA/apps/heat_gpu/results/scaling_profile/h200/strong/timing_strong_128x128x1024_np4_filtered_v2_rho040.csv
+   [wall 5s]  -> timing_strong_128x128x1024_np4_filtered_v2_rho040.csv
+---- strong_128x128x1024_np8_filtered_v2_rho025  NP=8  [16:51:42] ----
+[Tmax] = 0.000114441 | [max_iter] = 30
+[rho] = 0.25
+[backend] = filtered_v2
+ [Timing] CSV saved to /scratch/x3319a05/Filtered_TDMA/apps/heat_gpu/results/scaling_profile/h200/strong/timing_strong_128x128x1024_np8_filtered_v2_rho025.csv
+   [wall 7s]  -> timing_strong_128x128x1024_np8_filtered_v2_rho025.csv
+---- strong_128x128x1024_np8_filtered_v2_rho040  NP=8  [16:51:49] ----
+[Tmax] = 0.000457764 | [max_iter] = 30
+[rho] = 0.4
+[backend] = filtered_v2
+ [Timing] CSV saved to /scratch/x3319a05/Filtered_TDMA/apps/heat_gpu/results/scaling_profile/h200/strong/timing_strong_128x128x1024_np8_filtered_v2_rho040.csv
+   [wall 7s]  -> timing_strong_128x128x1024_np8_filtered_v2_rho040.csv
+---- strong_256x256x2048_np1_filtered_v2_rho025  NP=1  [16:51:56] ----
+[Tmax] = 2.86102e-05 | [max_iter] = 30
+[rho] = 0.25
+[backend] = filtered_v2
+ [Timing] CSV saved to /scratch/x3319a05/Filtered_TDMA/apps/heat_gpu/results/scaling_profile/h200/strong/timing_strong_256x256x2048_np1_filtered_v2_rho025.csv
+   [wall 4s]  -> timing_strong_256x256x2048_np1_filtered_v2_rho025.csv
+---- strong_256x256x2048_np1_filtered_v2_rho040  NP=1  [16:52:00] ----
+[Tmax] = 0.000114441 | [max_iter] = 30
+[rho] = 0.4
+[backend] = filtered_v2
+ [Timing] CSV saved to /scratch/x3319a05/Filtered_TDMA/apps/heat_gpu/results/scaling_profile/h200/strong/timing_strong_256x256x2048_np1_filtered_v2_rho040.csv
+   [wall 5s]  -> timing_strong_256x256x2048_np1_filtered_v2_rho040.csv
+---- strong_256x256x2048_np2_filtered_v2_rho025  NP=2  [16:52:05] ----
+[Tmax] = 2.86102e-05 | [max_iter] = 30
+[rho] = 0.25
+[backend] = filtered_v2
+ [Timing] CSV saved to /scratch/x3319a05/Filtered_TDMA/apps/heat_gpu/results/scaling_profile/h200/strong/timing_strong_256x256x2048_np2_filtered_v2_rho025.csv
+   [wall 4s]  -> timing_strong_256x256x2048_np2_filtered_v2_rho025.csv
+---- strong_256x256x2048_np2_filtered_v2_rho040  NP=2  [16:52:09] ----
+[Tmax] = 0.000114441 | [max_iter] = 30
+[rho] = 0.4
+[backend] = filtered_v2
+ [Timing] CSV saved to /scratch/x3319a05/Filtered_TDMA/apps/heat_gpu/results/scaling_profile/h200/strong/timing_strong_256x256x2048_np2_filtered_v2_rho040.csv
+   [wall 5s]  -> timing_strong_256x256x2048_np2_filtered_v2_rho040.csv
+---- strong_256x256x2048_np4_filtered_v2_rho025  NP=4  [16:52:14] ----
+[Tmax] = 2.86102e-05 | [max_iter] = 30
+[rho] = 0.25
+[backend] = filtered_v2
+ [Timing] CSV saved to /scratch/x3319a05/Filtered_TDMA/apps/heat_gpu/results/scaling_profile/h200/strong/timing_strong_256x256x2048_np4_filtered_v2_rho025.csv
+   [wall 5s]  -> timing_strong_256x256x2048_np4_filtered_v2_rho025.csv
+---- strong_256x256x2048_np4_filtered_v2_rho040  NP=4  [16:52:19] ----
+[Tmax] = 0.000114441 | [max_iter] = 30
+[rho] = 0.4
+[backend] = filtered_v2
+ [Timing] CSV saved to /scratch/x3319a05/Filtered_TDMA/apps/heat_gpu/results/scaling_profile/h200/strong/timing_strong_256x256x2048_np4_filtered_v2_rho040.csv
+   [wall 6s]  -> timing_strong_256x256x2048_np4_filtered_v2_rho040.csv
+---- strong_256x256x2048_np8_filtered_v2_rho025  NP=8  [16:52:25] ----
+[Tmax] = 2.86102e-05 | [max_iter] = 30
+[rho] = 0.25
+[backend] = filtered_v2
+ [Timing] CSV saved to /scratch/x3319a05/Filtered_TDMA/apps/heat_gpu/results/scaling_profile/h200/strong/timing_strong_256x256x2048_np8_filtered_v2_rho025.csv
+   [wall 7s]  -> timing_strong_256x256x2048_np8_filtered_v2_rho025.csv
+---- strong_256x256x2048_np8_filtered_v2_rho040  NP=8  [16:52:32] ----
+[Tmax] = 0.000114441 | [max_iter] = 30
+[rho] = 0.4
+[backend] = filtered_v2
+ [Timing] CSV saved to /scratch/x3319a05/Filtered_TDMA/apps/heat_gpu/results/scaling_profile/h200/strong/timing_strong_256x256x2048_np8_filtered_v2_rho040.csv
+   [wall 7s]  -> timing_strong_256x256x2048_np8_filtered_v2_rho040.csv
+---- strong_1024x1024x1024_np1_filtered_v2_rho025  NP=1  [16:52:39] ----
+[Tmax] = 0.000114441 | [max_iter] = 30
+[rho] = 0.25
+[backend] = filtered_v2
+ [Timing] CSV saved to /scratch/x3319a05/Filtered_TDMA/apps/heat_gpu/results/scaling_profile/h200/strong/timing_strong_1024x1024x1024_np1_filtered_v2_rho025.csv
+   [wall 9s]  -> timing_strong_1024x1024x1024_np1_filtered_v2_rho025.csv
+---- strong_1024x1024x1024_np1_filtered_v2_rho040  NP=1  [16:52:48] ----
+[Tmax] = 0.000457764 | [max_iter] = 30
+[rho] = 0.4
+[backend] = filtered_v2
+ [Timing] CSV saved to /scratch/x3319a05/Filtered_TDMA/apps/heat_gpu/results/scaling_profile/h200/strong/timing_strong_1024x1024x1024_np1_filtered_v2_rho040.csv
+   [wall 10s]  -> timing_strong_1024x1024x1024_np1_filtered_v2_rho040.csv
+---- strong_1024x1024x1024_np2_filtered_v2_rho025  NP=2  [16:52:58] ----
+[Tmax] = 0.000114441 | [max_iter] = 30
+[rho] = 0.25
+[backend] = filtered_v2
+ [Timing] CSV saved to /scratch/x3319a05/Filtered_TDMA/apps/heat_gpu/results/scaling_profile/h200/strong/timing_strong_1024x1024x1024_np2_filtered_v2_rho025.csv
+   [wall 8s]  -> timing_strong_1024x1024x1024_np2_filtered_v2_rho025.csv
+---- strong_1024x1024x1024_np2_filtered_v2_rho040  NP=2  [16:53:06] ----
+[Tmax] = 0.000457764 | [max_iter] = 30
+[rho] = 0.4
+[backend] = filtered_v2
+ [Timing] CSV saved to /scratch/x3319a05/Filtered_TDMA/apps/heat_gpu/results/scaling_profile/h200/strong/timing_strong_1024x1024x1024_np2_filtered_v2_rho040.csv
+   [wall 8s]  -> timing_strong_1024x1024x1024_np2_filtered_v2_rho040.csv
+---- strong_1024x1024x1024_np4_filtered_v2_rho025  NP=4  [16:53:14] ----
+[Tmax] = 0.000114441 | [max_iter] = 30
+[rho] = 0.25
+[backend] = filtered_v2
+ [Timing] CSV saved to /scratch/x3319a05/Filtered_TDMA/apps/heat_gpu/results/scaling_profile/h200/strong/timing_strong_1024x1024x1024_np4_filtered_v2_rho025.csv
+   [wall 7s]  -> timing_strong_1024x1024x1024_np4_filtered_v2_rho025.csv
+---- strong_1024x1024x1024_np4_filtered_v2_rho040  NP=4  [16:53:21] ----
+[Tmax] = 0.000457764 | [max_iter] = 30
+[rho] = 0.4
+[backend] = filtered_v2
+ [Timing] CSV saved to /scratch/x3319a05/Filtered_TDMA/apps/heat_gpu/results/scaling_profile/h200/strong/timing_strong_1024x1024x1024_np4_filtered_v2_rho040.csv
+   [wall 7s]  -> timing_strong_1024x1024x1024_np4_filtered_v2_rho040.csv
+---- strong_1024x1024x1024_np8_filtered_v2_rho025  NP=8  [16:53:28] ----
+[Tmax] = 0.000114441 | [max_iter] = 30
+[rho] = 0.25
+[backend] = filtered_v2
+ [Timing] CSV saved to /scratch/x3319a05/Filtered_TDMA/apps/heat_gpu/results/scaling_profile/h200/strong/timing_strong_1024x1024x1024_np8_filtered_v2_rho025.csv
+   [wall 8s]  -> timing_strong_1024x1024x1024_np8_filtered_v2_rho025.csv
+---- strong_1024x1024x1024_np8_filtered_v2_rho040  NP=8  [16:53:36] ----
+[Tmax] = 0.000457764 | [max_iter] = 30
+[rho] = 0.4
+[backend] = filtered_v2
+ [Timing] CSV saved to /scratch/x3319a05/Filtered_TDMA/apps/heat_gpu/results/scaling_profile/h200/strong/timing_strong_1024x1024x1024_np8_filtered_v2_rho040.csv
+   [wall 8s]  -> timing_strong_1024x1024x1024_np8_filtered_v2_rho040.csv
+
+################## weak ##################
+---- weak_128cube_np1_pascal_rho025  NP=1  [16:53:44] ----
+[Tmax] = 0.00732422 | [max_iter] = 30
+[rho] = 0.25
+[backend] = pascal
+ [Timing] CSV saved to /scratch/x3319a05/Filtered_TDMA/apps/heat_gpu/results/scaling_profile/h200/weak/timing_weak_128cube_np1_pascal_rho025.csv
+   [wall 3s]  -> timing_weak_128cube_np1_pascal_rho025.csv
+---- weak_128cube_np1_pascal_rho040  NP=1  [16:53:47] ----
+[Tmax] = 0.0292969 | [max_iter] = 30
+[rho] = 0.4
+[backend] = pascal
+ [Timing] CSV saved to /scratch/x3319a05/Filtered_TDMA/apps/heat_gpu/results/scaling_profile/h200/weak/timing_weak_128cube_np1_pascal_rho040.csv
+   [wall 3s]  -> timing_weak_128cube_np1_pascal_rho040.csv
+---- weak_128cube_np2_pascal_rho025  NP=2  [16:53:50] ----
+[Tmax] = 0.00183105 | [max_iter] = 30
+[rho] = 0.25
+[backend] = pascal
+ [Timing] CSV saved to /scratch/x3319a05/Filtered_TDMA/apps/heat_gpu/results/scaling_profile/h200/weak/timing_weak_128cube_np2_pascal_rho025.csv
+   [wall 5s]  -> timing_weak_128cube_np2_pascal_rho025.csv
+---- weak_128cube_np2_pascal_rho040  NP=2  [16:53:55] ----
+[Tmax] = 0.00732422 | [max_iter] = 30
+[rho] = 0.4
+[backend] = pascal
+ [Timing] CSV saved to /scratch/x3319a05/Filtered_TDMA/apps/heat_gpu/results/scaling_profile/h200/weak/timing_weak_128cube_np2_pascal_rho040.csv
+   [wall 4s]  -> timing_weak_128cube_np2_pascal_rho040.csv
+---- weak_128cube_np4_pascal_rho025  NP=4  [16:53:59] ----
+[Tmax] = 0.000457764 | [max_iter] = 30
+[rho] = 0.25
+[backend] = pascal
+ [Timing] CSV saved to /scratch/x3319a05/Filtered_TDMA/apps/heat_gpu/results/scaling_profile/h200/weak/timing_weak_128cube_np4_pascal_rho025.csv
+   [wall 5s]  -> timing_weak_128cube_np4_pascal_rho025.csv
+---- weak_128cube_np4_pascal_rho040  NP=4  [16:54:04] ----
+[Tmax] = 0.00183105 | [max_iter] = 30
+[rho] = 0.4
+[backend] = pascal
+ [Timing] CSV saved to /scratch/x3319a05/Filtered_TDMA/apps/heat_gpu/results/scaling_profile/h200/weak/timing_weak_128cube_np4_pascal_rho040.csv
+   [wall 6s]  -> timing_weak_128cube_np4_pascal_rho040.csv
+---- weak_128cube_np8_pascal_rho025  NP=8  [16:54:10] ----
+[Tmax] = 0.000114441 | [max_iter] = 30
+[rho] = 0.25
+[backend] = pascal
+ [Timing] CSV saved to /scratch/x3319a05/Filtered_TDMA/apps/heat_gpu/results/scaling_profile/h200/weak/timing_weak_128cube_np8_pascal_rho025.csv
+   [wall 7s]  -> timing_weak_128cube_np8_pascal_rho025.csv
+---- weak_128cube_np8_pascal_rho040  NP=8  [16:54:17] ----
+[Tmax] = 0.000457764 | [max_iter] = 30
+[rho] = 0.4
+[backend] = pascal
+ [Timing] CSV saved to /scratch/x3319a05/Filtered_TDMA/apps/heat_gpu/results/scaling_profile/h200/weak/timing_weak_128cube_np8_pascal_rho040.csv
+   [wall 7s]  -> timing_weak_128cube_np8_pascal_rho040.csv
+---- weak_256cube_np1_pascal_rho025  NP=1  [16:54:24] ----
+[Tmax] = 0.00183105 | [max_iter] = 30
+[rho] = 0.25
+[backend] = pascal
+ [Timing] CSV saved to /scratch/x3319a05/Filtered_TDMA/apps/heat_gpu/results/scaling_profile/h200/weak/timing_weak_256cube_np1_pascal_rho025.csv
+   [wall 3s]  -> timing_weak_256cube_np1_pascal_rho025.csv
+---- weak_256cube_np1_pascal_rho040  NP=1  [16:54:27] ----
+[Tmax] = 0.00732422 | [max_iter] = 30
+[rho] = 0.4
+[backend] = pascal
+ [Timing] CSV saved to /scratch/x3319a05/Filtered_TDMA/apps/heat_gpu/results/scaling_profile/h200/weak/timing_weak_256cube_np1_pascal_rho040.csv
+   [wall 4s]  -> timing_weak_256cube_np1_pascal_rho040.csv
+---- weak_256cube_np2_pascal_rho025  NP=2  [16:54:31] ----
+[Tmax] = 0.000457764 | [max_iter] = 30
+[rho] = 0.25
+[backend] = pascal
+ [Timing] CSV saved to /scratch/x3319a05/Filtered_TDMA/apps/heat_gpu/results/scaling_profile/h200/weak/timing_weak_256cube_np2_pascal_rho025.csv
+   [wall 4s]  -> timing_weak_256cube_np2_pascal_rho025.csv
+---- weak_256cube_np2_pascal_rho040  NP=2  [16:54:35] ----
+[Tmax] = 0.00183105 | [max_iter] = 30
+[rho] = 0.4
+[backend] = pascal
+ [Timing] CSV saved to /scratch/x3319a05/Filtered_TDMA/apps/heat_gpu/results/scaling_profile/h200/weak/timing_weak_256cube_np2_pascal_rho040.csv
+   [wall 4s]  -> timing_weak_256cube_np2_pascal_rho040.csv
+---- weak_256cube_np4_pascal_rho025  NP=4  [16:54:39] ----
+[Tmax] = 0.000114441 | [max_iter] = 30
+[rho] = 0.25
+[backend] = pascal
+ [Timing] CSV saved to /scratch/x3319a05/Filtered_TDMA/apps/heat_gpu/results/scaling_profile/h200/weak/timing_weak_256cube_np4_pascal_rho025.csv
+   [wall 6s]  -> timing_weak_256cube_np4_pascal_rho025.csv
+---- weak_256cube_np4_pascal_rho040  NP=4  [16:54:45] ----
+[Tmax] = 0.000457764 | [max_iter] = 30
+[rho] = 0.4
+[backend] = pascal
+ [Timing] CSV saved to /scratch/x3319a05/Filtered_TDMA/apps/heat_gpu/results/scaling_profile/h200/weak/timing_weak_256cube_np4_pascal_rho040.csv
+   [wall 5s]  -> timing_weak_256cube_np4_pascal_rho040.csv
+---- weak_256cube_np8_pascal_rho025  NP=8  [16:54:50] ----
+[Tmax] = 2.86102e-05 | [max_iter] = 30
+[rho] = 0.25
+[backend] = pascal
+ [Timing] CSV saved to /scratch/x3319a05/Filtered_TDMA/apps/heat_gpu/results/scaling_profile/h200/weak/timing_weak_256cube_np8_pascal_rho025.csv
+   [wall 7s]  -> timing_weak_256cube_np8_pascal_rho025.csv
+---- weak_256cube_np8_pascal_rho040  NP=8  [16:54:57] ----
+[Tmax] = 0.000114441 | [max_iter] = 30
+[rho] = 0.4
+[backend] = pascal
+ [Timing] CSV saved to /scratch/x3319a05/Filtered_TDMA/apps/heat_gpu/results/scaling_profile/h200/weak/timing_weak_256cube_np8_pascal_rho040.csv
+   [wall 8s]  -> timing_weak_256cube_np8_pascal_rho040.csv
+---- weak_512cube_np1_pascal_rho025  NP=1  [16:55:05] ----
+[Tmax] = 0.000457764 | [max_iter] = 30
+[rho] = 0.25
+[backend] = pascal
+ [Timing] CSV saved to /scratch/x3319a05/Filtered_TDMA/apps/heat_gpu/results/scaling_profile/h200/weak/timing_weak_512cube_np1_pascal_rho025.csv
+   [wall 5s]  -> timing_weak_512cube_np1_pascal_rho025.csv
+---- weak_512cube_np1_pascal_rho040  NP=1  [16:55:10] ----
+[Tmax] = 0.00183105 | [max_iter] = 30
+[rho] = 0.4
+[backend] = pascal
+ [Timing] CSV saved to /scratch/x3319a05/Filtered_TDMA/apps/heat_gpu/results/scaling_profile/h200/weak/timing_weak_512cube_np1_pascal_rho040.csv
+   [wall 4s]  -> timing_weak_512cube_np1_pascal_rho040.csv
+---- weak_512cube_np2_pascal_rho025  NP=2  [16:55:14] ----
+[Tmax] = 0.000114441 | [max_iter] = 30
+[rho] = 0.25
+[backend] = pascal
+ [Timing] CSV saved to /scratch/x3319a05/Filtered_TDMA/apps/heat_gpu/results/scaling_profile/h200/weak/timing_weak_512cube_np2_pascal_rho025.csv
+   [wall 5s]  -> timing_weak_512cube_np2_pascal_rho025.csv
+---- weak_512cube_np2_pascal_rho040  NP=2  [16:55:19] ----
+[Tmax] = 0.000457764 | [max_iter] = 30
+[rho] = 0.4
+[backend] = pascal
+ [Timing] CSV saved to /scratch/x3319a05/Filtered_TDMA/apps/heat_gpu/results/scaling_profile/h200/weak/timing_weak_512cube_np2_pascal_rho040.csv
+   [wall 5s]  -> timing_weak_512cube_np2_pascal_rho040.csv
+---- weak_512cube_np4_pascal_rho025  NP=4  [16:55:24] ----
+[Tmax] = 2.86102e-05 | [max_iter] = 30
+[rho] = 0.25
+[backend] = pascal
+ [Timing] CSV saved to /scratch/x3319a05/Filtered_TDMA/apps/heat_gpu/results/scaling_profile/h200/weak/timing_weak_512cube_np4_pascal_rho025.csv
+   [wall 6s]  -> timing_weak_512cube_np4_pascal_rho025.csv
+---- weak_512cube_np4_pascal_rho040  NP=4  [16:55:30] ----
+[Tmax] = 0.000114441 | [max_iter] = 30
+[rho] = 0.4
+[backend] = pascal
+ [Timing] CSV saved to /scratch/x3319a05/Filtered_TDMA/apps/heat_gpu/results/scaling_profile/h200/weak/timing_weak_512cube_np4_pascal_rho040.csv
+   [wall 6s]  -> timing_weak_512cube_np4_pascal_rho040.csv
+---- weak_512cube_np8_pascal_rho025  NP=8  [16:55:36] ----
+[Tmax] = 7.15256e-06 | [max_iter] = 30
+[rho] = 0.25
+[backend] = pascal
+ [Timing] CSV saved to /scratch/x3319a05/Filtered_TDMA/apps/heat_gpu/results/scaling_profile/h200/weak/timing_weak_512cube_np8_pascal_rho025.csv
+   [wall 9s]  -> timing_weak_512cube_np8_pascal_rho025.csv
+---- weak_512cube_np8_pascal_rho040  NP=8  [16:55:45] ----
+[Tmax] = 2.86102e-05 | [max_iter] = 30
+[rho] = 0.4
+[backend] = pascal
+ [Timing] CSV saved to /scratch/x3319a05/Filtered_TDMA/apps/heat_gpu/results/scaling_profile/h200/weak/timing_weak_512cube_np8_pascal_rho040.csv
+   [wall 8s]  -> timing_weak_512cube_np8_pascal_rho040.csv
+---- weak_128cube_np1_filtered_v2_rho025  NP=1  [16:55:53] ----
+[Tmax] = 0.00732422 | [max_iter] = 30
+[rho] = 0.25
+[backend] = filtered_v2
+ [Timing] CSV saved to /scratch/x3319a05/Filtered_TDMA/apps/heat_gpu/results/scaling_profile/h200/weak/timing_weak_128cube_np1_filtered_v2_rho025.csv
+   [wall 3s]  -> timing_weak_128cube_np1_filtered_v2_rho025.csv
+---- weak_128cube_np1_filtered_v2_rho040  NP=1  [16:55:56] ----
+[Tmax] = 0.0292969 | [max_iter] = 30
+[rho] = 0.4
+[backend] = filtered_v2
+ [Timing] CSV saved to /scratch/x3319a05/Filtered_TDMA/apps/heat_gpu/results/scaling_profile/h200/weak/timing_weak_128cube_np1_filtered_v2_rho040.csv
+   [wall 3s]  -> timing_weak_128cube_np1_filtered_v2_rho040.csv
+---- weak_128cube_np2_filtered_v2_rho025  NP=2  [16:55:59] ----
+[Tmax] = 0.00183105 | [max_iter] = 30
+[rho] = 0.25
+[backend] = filtered_v2
+ [Timing] CSV saved to /scratch/x3319a05/Filtered_TDMA/apps/heat_gpu/results/scaling_profile/h200/weak/timing_weak_128cube_np2_filtered_v2_rho025.csv
+   [wall 5s]  -> timing_weak_128cube_np2_filtered_v2_rho025.csv
+---- weak_128cube_np2_filtered_v2_rho040  NP=2  [16:56:04] ----
+[Tmax] = 0.00732422 | [max_iter] = 30
+[rho] = 0.4
+[backend] = filtered_v2
+ [Timing] CSV saved to /scratch/x3319a05/Filtered_TDMA/apps/heat_gpu/results/scaling_profile/h200/weak/timing_weak_128cube_np2_filtered_v2_rho040.csv
+   [wall 4s]  -> timing_weak_128cube_np2_filtered_v2_rho040.csv
+---- weak_128cube_np4_filtered_v2_rho025  NP=4  [16:56:08] ----
+[Tmax] = 0.000457764 | [max_iter] = 30
+[rho] = 0.25
+[backend] = filtered_v2
+ [Timing] CSV saved to /scratch/x3319a05/Filtered_TDMA/apps/heat_gpu/results/scaling_profile/h200/weak/timing_weak_128cube_np4_filtered_v2_rho025.csv
+   [wall 5s]  -> timing_weak_128cube_np4_filtered_v2_rho025.csv
+---- weak_128cube_np4_filtered_v2_rho040  NP=4  [16:56:13] ----
+[Tmax] = 0.00183105 | [max_iter] = 30
+[rho] = 0.4
+[backend] = filtered_v2
+ [Timing] CSV saved to /scratch/x3319a05/Filtered_TDMA/apps/heat_gpu/results/scaling_profile/h200/weak/timing_weak_128cube_np4_filtered_v2_rho040.csv
+   [wall 5s]  -> timing_weak_128cube_np4_filtered_v2_rho040.csv
+---- weak_128cube_np8_filtered_v2_rho025  NP=8  [16:56:18] ----
+[Tmax] = 0.000114441 | [max_iter] = 30
+[rho] = 0.25
+[backend] = filtered_v2
+ [Timing] CSV saved to /scratch/x3319a05/Filtered_TDMA/apps/heat_gpu/results/scaling_profile/h200/weak/timing_weak_128cube_np8_filtered_v2_rho025.csv
+   [wall 8s]  -> timing_weak_128cube_np8_filtered_v2_rho025.csv
+---- weak_128cube_np8_filtered_v2_rho040  NP=8  [16:56:26] ----
+[Tmax] = 0.000457764 | [max_iter] = 30
+[rho] = 0.4
+[backend] = filtered_v2
+ [Timing] CSV saved to /scratch/x3319a05/Filtered_TDMA/apps/heat_gpu/results/scaling_profile/h200/weak/timing_weak_128cube_np8_filtered_v2_rho040.csv
+   [wall 6s]  -> timing_weak_128cube_np8_filtered_v2_rho040.csv
+---- weak_256cube_np1_filtered_v2_rho025  NP=1  [16:56:32] ----
+[Tmax] = 0.00183105 | [max_iter] = 30
+[rho] = 0.25
+[backend] = filtered_v2
+ [Timing] CSV saved to /scratch/x3319a05/Filtered_TDMA/apps/heat_gpu/results/scaling_profile/h200/weak/timing_weak_256cube_np1_filtered_v2_rho025.csv
+   [wall 3s]  -> timing_weak_256cube_np1_filtered_v2_rho025.csv
+---- weak_256cube_np1_filtered_v2_rho040  NP=1  [16:56:35] ----
+[Tmax] = 0.00732422 | [max_iter] = 30
+[rho] = 0.4
+[backend] = filtered_v2
+ [Timing] CSV saved to /scratch/x3319a05/Filtered_TDMA/apps/heat_gpu/results/scaling_profile/h200/weak/timing_weak_256cube_np1_filtered_v2_rho040.csv
+   [wall 4s]  -> timing_weak_256cube_np1_filtered_v2_rho040.csv
+---- weak_256cube_np2_filtered_v2_rho025  NP=2  [16:56:39] ----
+[Tmax] = 0.000457764 | [max_iter] = 30
+[rho] = 0.25
+[backend] = filtered_v2
+ [Timing] CSV saved to /scratch/x3319a05/Filtered_TDMA/apps/heat_gpu/results/scaling_profile/h200/weak/timing_weak_256cube_np2_filtered_v2_rho025.csv
+   [wall 4s]  -> timing_weak_256cube_np2_filtered_v2_rho025.csv
+---- weak_256cube_np2_filtered_v2_rho040  NP=2  [16:56:43] ----
+[Tmax] = 0.00183105 | [max_iter] = 30
+[rho] = 0.4
+[backend] = filtered_v2
+ [Timing] CSV saved to /scratch/x3319a05/Filtered_TDMA/apps/heat_gpu/results/scaling_profile/h200/weak/timing_weak_256cube_np2_filtered_v2_rho040.csv
+   [wall 5s]  -> timing_weak_256cube_np2_filtered_v2_rho040.csv
+---- weak_256cube_np4_filtered_v2_rho025  NP=4  [16:56:48] ----
+[Tmax] = 0.000114441 | [max_iter] = 30
+[rho] = 0.25
+[backend] = filtered_v2
+ [Timing] CSV saved to /scratch/x3319a05/Filtered_TDMA/apps/heat_gpu/results/scaling_profile/h200/weak/timing_weak_256cube_np4_filtered_v2_rho025.csv
+   [wall 5s]  -> timing_weak_256cube_np4_filtered_v2_rho025.csv
+---- weak_256cube_np4_filtered_v2_rho040  NP=4  [16:56:53] ----
+[Tmax] = 0.000457764 | [max_iter] = 30
+[rho] = 0.4
+[backend] = filtered_v2
+ [Timing] CSV saved to /scratch/x3319a05/Filtered_TDMA/apps/heat_gpu/results/scaling_profile/h200/weak/timing_weak_256cube_np4_filtered_v2_rho040.csv
+   [wall 5s]  -> timing_weak_256cube_np4_filtered_v2_rho040.csv
+---- weak_256cube_np8_filtered_v2_rho025  NP=8  [16:56:58] ----
+[Tmax] = 2.86102e-05 | [max_iter] = 30
+[rho] = 0.25
+[backend] = filtered_v2
+ [Timing] CSV saved to /scratch/x3319a05/Filtered_TDMA/apps/heat_gpu/results/scaling_profile/h200/weak/timing_weak_256cube_np8_filtered_v2_rho025.csv
+   [wall 7s]  -> timing_weak_256cube_np8_filtered_v2_rho025.csv
+---- weak_256cube_np8_filtered_v2_rho040  NP=8  [16:57:05] ----
+[Tmax] = 0.000114441 | [max_iter] = 30
+[rho] = 0.4
+[backend] = filtered_v2
+ [Timing] CSV saved to /scratch/x3319a05/Filtered_TDMA/apps/heat_gpu/results/scaling_profile/h200/weak/timing_weak_256cube_np8_filtered_v2_rho040.csv
+   [wall 8s]  -> timing_weak_256cube_np8_filtered_v2_rho040.csv
+---- weak_512cube_np1_filtered_v2_rho025  NP=1  [16:57:13] ----
+[Tmax] = 0.000457764 | [max_iter] = 30
+[rho] = 0.25
+[backend] = filtered_v2
+ [Timing] CSV saved to /scratch/x3319a05/Filtered_TDMA/apps/heat_gpu/results/scaling_profile/h200/weak/timing_weak_512cube_np1_filtered_v2_rho025.csv
+   [wall 4s]  -> timing_weak_512cube_np1_filtered_v2_rho025.csv
+---- weak_512cube_np1_filtered_v2_rho040  NP=1  [16:57:17] ----
+[Tmax] = 0.00183105 | [max_iter] = 30
+[rho] = 0.4
+[backend] = filtered_v2
+ [Timing] CSV saved to /scratch/x3319a05/Filtered_TDMA/apps/heat_gpu/results/scaling_profile/h200/weak/timing_weak_512cube_np1_filtered_v2_rho040.csv
+   [wall 4s]  -> timing_weak_512cube_np1_filtered_v2_rho040.csv
+---- weak_512cube_np2_filtered_v2_rho025  NP=2  [16:57:21] ----
+[Tmax] = 0.000114441 | [max_iter] = 30
+[rho] = 0.25
+[backend] = filtered_v2
+ [Timing] CSV saved to /scratch/x3319a05/Filtered_TDMA/apps/heat_gpu/results/scaling_profile/h200/weak/timing_weak_512cube_np2_filtered_v2_rho025.csv
+   [wall 5s]  -> timing_weak_512cube_np2_filtered_v2_rho025.csv
+---- weak_512cube_np2_filtered_v2_rho040  NP=2  [16:57:26] ----
+[Tmax] = 0.000457764 | [max_iter] = 30
+[rho] = 0.4
+[backend] = filtered_v2
+ [Timing] CSV saved to /scratch/x3319a05/Filtered_TDMA/apps/heat_gpu/results/scaling_profile/h200/weak/timing_weak_512cube_np2_filtered_v2_rho040.csv
+   [wall 5s]  -> timing_weak_512cube_np2_filtered_v2_rho040.csv
+---- weak_512cube_np4_filtered_v2_rho025  NP=4  [16:57:31] ----
+[Tmax] = 2.86102e-05 | [max_iter] = 30
+[rho] = 0.25
+[backend] = filtered_v2
+ [Timing] CSV saved to /scratch/x3319a05/Filtered_TDMA/apps/heat_gpu/results/scaling_profile/h200/weak/timing_weak_512cube_np4_filtered_v2_rho025.csv
+   [wall 6s]  -> timing_weak_512cube_np4_filtered_v2_rho025.csv
+---- weak_512cube_np4_filtered_v2_rho040  NP=4  [16:57:37] ----
+[Tmax] = 0.000114441 | [max_iter] = 30
+[rho] = 0.4
+[backend] = filtered_v2
+ [Timing] CSV saved to /scratch/x3319a05/Filtered_TDMA/apps/heat_gpu/results/scaling_profile/h200/weak/timing_weak_512cube_np4_filtered_v2_rho040.csv
+   [wall 6s]  -> timing_weak_512cube_np4_filtered_v2_rho040.csv
+---- weak_512cube_np8_filtered_v2_rho025  NP=8  [16:57:43] ----
+[Tmax] = 7.15256e-06 | [max_iter] = 30
+[rho] = 0.25
+[backend] = filtered_v2
+ [Timing] CSV saved to /scratch/x3319a05/Filtered_TDMA/apps/heat_gpu/results/scaling_profile/h200/weak/timing_weak_512cube_np8_filtered_v2_rho025.csv
+   [wall 8s]  -> timing_weak_512cube_np8_filtered_v2_rho025.csv
+---- weak_512cube_np8_filtered_v2_rho040  NP=8  [16:57:51] ----
+[Tmax] = 2.86102e-05 | [max_iter] = 30
+[rho] = 0.4
+[backend] = filtered_v2
+ [Timing] CSV saved to /scratch/x3319a05/Filtered_TDMA/apps/heat_gpu/results/scaling_profile/h200/weak/timing_weak_512cube_np8_filtered_v2_rho040.csv
+   [wall 8s]  -> timing_weak_512cube_np8_filtered_v2_rho040.csv
+
+################## refine ##################
+---- refine_64x64x64_np2_pascal_rho025  NP=2  [16:57:59] ----
+[Tmax] = 0.0292969 | [max_iter] = 30
+[rho] = 0.25
+[backend] = pascal
+ [Timing] CSV saved to /scratch/x3319a05/Filtered_TDMA/apps/heat_gpu/results/scaling_profile/h200/refine/timing_refine_64x64x64_np2_pascal_rho025.csv
+   [wall 4s]  -> timing_refine_64x64x64_np2_pascal_rho025.csv
+---- refine_64x64x64_np2_pascal_rho040  NP=2  [16:58:03] ----
+[Tmax] = 0.117188 | [max_iter] = 30
+[rho] = 0.4
+[backend] = pascal
+ [Timing] CSV saved to /scratch/x3319a05/Filtered_TDMA/apps/heat_gpu/results/scaling_profile/h200/refine/timing_refine_64x64x64_np2_pascal_rho040.csv
+   [wall 5s]  -> timing_refine_64x64x64_np2_pascal_rho040.csv
+---- refine_64x64x128_np2_pascal_rho025  NP=2  [16:58:08] ----
+[Tmax] = 0.00732422 | [max_iter] = 30
+[rho] = 0.25
+[backend] = pascal
+ [Timing] CSV saved to /scratch/x3319a05/Filtered_TDMA/apps/heat_gpu/results/scaling_profile/h200/refine/timing_refine_64x64x128_np2_pascal_rho025.csv
+   [wall 3s]  -> timing_refine_64x64x128_np2_pascal_rho025.csv
+---- refine_64x64x128_np2_pascal_rho040  NP=2  [16:58:12] ----
+[Tmax] = 0.0292969 | [max_iter] = 30
+[rho] = 0.4
+[backend] = pascal
+ [Timing] CSV saved to /scratch/x3319a05/Filtered_TDMA/apps/heat_gpu/results/scaling_profile/h200/refine/timing_refine_64x64x128_np2_pascal_rho040.csv
+   [wall 4s]  -> timing_refine_64x64x128_np2_pascal_rho040.csv
+---- refine_64x64x256_np2_pascal_rho025  NP=2  [16:58:16] ----
+[Tmax] = 0.00183105 | [max_iter] = 30
+[rho] = 0.25
+[backend] = pascal
+ [Timing] CSV saved to /scratch/x3319a05/Filtered_TDMA/apps/heat_gpu/results/scaling_profile/h200/refine/timing_refine_64x64x256_np2_pascal_rho025.csv
+   [wall 4s]  -> timing_refine_64x64x256_np2_pascal_rho025.csv
+---- refine_64x64x256_np2_pascal_rho040  NP=2  [16:58:20] ----
+[Tmax] = 0.00732422 | [max_iter] = 30
+[rho] = 0.4
+[backend] = pascal
+ [Timing] CSV saved to /scratch/x3319a05/Filtered_TDMA/apps/heat_gpu/results/scaling_profile/h200/refine/timing_refine_64x64x256_np2_pascal_rho040.csv
+   [wall 4s]  -> timing_refine_64x64x256_np2_pascal_rho040.csv
+---- refine_128x128x128_np2_pascal_rho025  NP=2  [16:58:24] ----
+[Tmax] = 0.00732422 | [max_iter] = 30
+[rho] = 0.25
+[backend] = pascal
+ [Timing] CSV saved to /scratch/x3319a05/Filtered_TDMA/apps/heat_gpu/results/scaling_profile/h200/refine/timing_refine_128x128x128_np2_pascal_rho025.csv
+   [wall 4s]  -> timing_refine_128x128x128_np2_pascal_rho025.csv
+---- refine_128x128x128_np2_pascal_rho040  NP=2  [16:58:28] ----
+[Tmax] = 0.0292969 | [max_iter] = 30
+[rho] = 0.4
+[backend] = pascal
+ [Timing] CSV saved to /scratch/x3319a05/Filtered_TDMA/apps/heat_gpu/results/scaling_profile/h200/refine/timing_refine_128x128x128_np2_pascal_rho040.csv
+   [wall 4s]  -> timing_refine_128x128x128_np2_pascal_rho040.csv
+---- refine_128x128x256_np2_pascal_rho025  NP=2  [16:58:32] ----
+[Tmax] = 0.00183105 | [max_iter] = 30
+[rho] = 0.25
+[backend] = pascal
+ [Timing] CSV saved to /scratch/x3319a05/Filtered_TDMA/apps/heat_gpu/results/scaling_profile/h200/refine/timing_refine_128x128x256_np2_pascal_rho025.csv
+   [wall 4s]  -> timing_refine_128x128x256_np2_pascal_rho025.csv
+---- refine_128x128x256_np2_pascal_rho040  NP=2  [16:58:36] ----
+[Tmax] = 0.00732422 | [max_iter] = 30
+[rho] = 0.4
+[backend] = pascal
+ [Timing] CSV saved to /scratch/x3319a05/Filtered_TDMA/apps/heat_gpu/results/scaling_profile/h200/refine/timing_refine_128x128x256_np2_pascal_rho040.csv
+   [wall 4s]  -> timing_refine_128x128x256_np2_pascal_rho040.csv
+---- refine_128x128x512_np2_pascal_rho025  NP=2  [16:58:40] ----
+[Tmax] = 0.000457764 | [max_iter] = 30
+[rho] = 0.25
+[backend] = pascal
+ [Timing] CSV saved to /scratch/x3319a05/Filtered_TDMA/apps/heat_gpu/results/scaling_profile/h200/refine/timing_refine_128x128x512_np2_pascal_rho025.csv
+   [wall 4s]  -> timing_refine_128x128x512_np2_pascal_rho025.csv
+---- refine_128x128x512_np2_pascal_rho040  NP=2  [16:58:44] ----
+[Tmax] = 0.00183105 | [max_iter] = 30
+[rho] = 0.4
+[backend] = pascal
+ [Timing] CSV saved to /scratch/x3319a05/Filtered_TDMA/apps/heat_gpu/results/scaling_profile/h200/refine/timing_refine_128x128x512_np2_pascal_rho040.csv
+   [wall 4s]  -> timing_refine_128x128x512_np2_pascal_rho040.csv
+---- refine_256x256x256_np2_pascal_rho025  NP=2  [16:58:48] ----
+[Tmax] = 0.00183105 | [max_iter] = 30
+[rho] = 0.25
+[backend] = pascal
+ [Timing] CSV saved to /scratch/x3319a05/Filtered_TDMA/apps/heat_gpu/results/scaling_profile/h200/refine/timing_refine_256x256x256_np2_pascal_rho025.csv
+   [wall 4s]  -> timing_refine_256x256x256_np2_pascal_rho025.csv
+---- refine_256x256x256_np2_pascal_rho040  NP=2  [16:58:52] ----
+[Tmax] = 0.00732422 | [max_iter] = 30
+[rho] = 0.4
+[backend] = pascal
+ [Timing] CSV saved to /scratch/x3319a05/Filtered_TDMA/apps/heat_gpu/results/scaling_profile/h200/refine/timing_refine_256x256x256_np2_pascal_rho040.csv
+   [wall 4s]  -> timing_refine_256x256x256_np2_pascal_rho040.csv
+---- refine_256x256x512_np2_pascal_rho025  NP=2  [16:58:56] ----
+[Tmax] = 0.000457764 | [max_iter] = 30
+[rho] = 0.25
+[backend] = pascal
+ [Timing] CSV saved to /scratch/x3319a05/Filtered_TDMA/apps/heat_gpu/results/scaling_profile/h200/refine/timing_refine_256x256x512_np2_pascal_rho025.csv
+   [wall 4s]  -> timing_refine_256x256x512_np2_pascal_rho025.csv
+---- refine_256x256x512_np2_pascal_rho040  NP=2  [16:59:01] ----
+[Tmax] = 0.00183105 | [max_iter] = 30
+[rho] = 0.4
+[backend] = pascal
+ [Timing] CSV saved to /scratch/x3319a05/Filtered_TDMA/apps/heat_gpu/results/scaling_profile/h200/refine/timing_refine_256x256x512_np2_pascal_rho040.csv
+   [wall 4s]  -> timing_refine_256x256x512_np2_pascal_rho040.csv
+---- refine_256x256x1024_np2_pascal_rho025  NP=2  [16:59:05] ----
+[Tmax] = 0.000114441 | [max_iter] = 30
+[rho] = 0.25
+[backend] = pascal
+ [Timing] CSV saved to /scratch/x3319a05/Filtered_TDMA/apps/heat_gpu/results/scaling_profile/h200/refine/timing_refine_256x256x1024_np2_pascal_rho025.csv
+   [wall 5s]  -> timing_refine_256x256x1024_np2_pascal_rho025.csv
+---- refine_256x256x1024_np2_pascal_rho040  NP=2  [16:59:10] ----
+[Tmax] = 0.000457764 | [max_iter] = 30
+[rho] = 0.4
+[backend] = pascal
+ [Timing] CSV saved to /scratch/x3319a05/Filtered_TDMA/apps/heat_gpu/results/scaling_profile/h200/refine/timing_refine_256x256x1024_np2_pascal_rho040.csv
+   [wall 4s]  -> timing_refine_256x256x1024_np2_pascal_rho040.csv
+---- refine_64x64x64_np2_filtered_v2_rho025  NP=2  [16:59:14] ----
+[Tmax] = 0.0292969 | [max_iter] = 30
+[rho] = 0.25
+[backend] = filtered_v2
+ [Timing] CSV saved to /scratch/x3319a05/Filtered_TDMA/apps/heat_gpu/results/scaling_profile/h200/refine/timing_refine_64x64x64_np2_filtered_v2_rho025.csv
+   [wall 4s]  -> timing_refine_64x64x64_np2_filtered_v2_rho025.csv
+---- refine_64x64x64_np2_filtered_v2_rho040  NP=2  [16:59:18] ----
+[Tmax] = 0.117188 | [max_iter] = 30
+[rho] = 0.4
+[backend] = filtered_v2
+ [Timing] CSV saved to /scratch/x3319a05/Filtered_TDMA/apps/heat_gpu/results/scaling_profile/h200/refine/timing_refine_64x64x64_np2_filtered_v2_rho040.csv
+   [wall 4s]  -> timing_refine_64x64x64_np2_filtered_v2_rho040.csv
+---- refine_64x64x128_np2_filtered_v2_rho025  NP=2  [16:59:22] ----
+[Tmax] = 0.00732422 | [max_iter] = 30
+[rho] = 0.25
+[backend] = filtered_v2
+ [Timing] CSV saved to /scratch/x3319a05/Filtered_TDMA/apps/heat_gpu/results/scaling_profile/h200/refine/timing_refine_64x64x128_np2_filtered_v2_rho025.csv
+   [wall 4s]  -> timing_refine_64x64x128_np2_filtered_v2_rho025.csv
+---- refine_64x64x128_np2_filtered_v2_rho040  NP=2  [16:59:26] ----
+[Tmax] = 0.0292969 | [max_iter] = 30
+[rho] = 0.4
+[backend] = filtered_v2
+ [Timing] CSV saved to /scratch/x3319a05/Filtered_TDMA/apps/heat_gpu/results/scaling_profile/h200/refine/timing_refine_64x64x128_np2_filtered_v2_rho040.csv
+   [wall 4s]  -> timing_refine_64x64x128_np2_filtered_v2_rho040.csv
+---- refine_64x64x256_np2_filtered_v2_rho025  NP=2  [16:59:30] ----
+[Tmax] = 0.00183105 | [max_iter] = 30
+[rho] = 0.25
+[backend] = filtered_v2
+ [Timing] CSV saved to /scratch/x3319a05/Filtered_TDMA/apps/heat_gpu/results/scaling_profile/h200/refine/timing_refine_64x64x256_np2_filtered_v2_rho025.csv
+   [wall 4s]  -> timing_refine_64x64x256_np2_filtered_v2_rho025.csv
+---- refine_64x64x256_np2_filtered_v2_rho040  NP=2  [16:59:34] ----
+[Tmax] = 0.00732422 | [max_iter] = 30
+[rho] = 0.4
+[backend] = filtered_v2
+ [Timing] CSV saved to /scratch/x3319a05/Filtered_TDMA/apps/heat_gpu/results/scaling_profile/h200/refine/timing_refine_64x64x256_np2_filtered_v2_rho040.csv
+   [wall 4s]  -> timing_refine_64x64x256_np2_filtered_v2_rho040.csv
+---- refine_128x128x128_np2_filtered_v2_rho025  NP=2  [16:59:38] ----
+[Tmax] = 0.00732422 | [max_iter] = 30
+[rho] = 0.25
+[backend] = filtered_v2
+ [Timing] CSV saved to /scratch/x3319a05/Filtered_TDMA/apps/heat_gpu/results/scaling_profile/h200/refine/timing_refine_128x128x128_np2_filtered_v2_rho025.csv
+   [wall 4s]  -> timing_refine_128x128x128_np2_filtered_v2_rho025.csv
+---- refine_128x128x128_np2_filtered_v2_rho040  NP=2  [16:59:42] ----
+[Tmax] = 0.0292969 | [max_iter] = 30
+[rho] = 0.4
+[backend] = filtered_v2
+ [Timing] CSV saved to /scratch/x3319a05/Filtered_TDMA/apps/heat_gpu/results/scaling_profile/h200/refine/timing_refine_128x128x128_np2_filtered_v2_rho040.csv
+   [wall 4s]  -> timing_refine_128x128x128_np2_filtered_v2_rho040.csv
+---- refine_128x128x256_np2_filtered_v2_rho025  NP=2  [16:59:46] ----
+[Tmax] = 0.00183105 | [max_iter] = 30
+[rho] = 0.25
+[backend] = filtered_v2
+ [Timing] CSV saved to /scratch/x3319a05/Filtered_TDMA/apps/heat_gpu/results/scaling_profile/h200/refine/timing_refine_128x128x256_np2_filtered_v2_rho025.csv
+   [wall 4s]  -> timing_refine_128x128x256_np2_filtered_v2_rho025.csv
+---- refine_128x128x256_np2_filtered_v2_rho040  NP=2  [16:59:50] ----
+[Tmax] = 0.00732422 | [max_iter] = 30
+[rho] = 0.4
+[backend] = filtered_v2
+ [Timing] CSV saved to /scratch/x3319a05/Filtered_TDMA/apps/heat_gpu/results/scaling_profile/h200/refine/timing_refine_128x128x256_np2_filtered_v2_rho040.csv
+   [wall 4s]  -> timing_refine_128x128x256_np2_filtered_v2_rho040.csv
+---- refine_128x128x512_np2_filtered_v2_rho025  NP=2  [16:59:54] ----
+[Tmax] = 0.000457764 | [max_iter] = 30
+[rho] = 0.25
+[backend] = filtered_v2
+ [Timing] CSV saved to /scratch/x3319a05/Filtered_TDMA/apps/heat_gpu/results/scaling_profile/h200/refine/timing_refine_128x128x512_np2_filtered_v2_rho025.csv
+   [wall 4s]  -> timing_refine_128x128x512_np2_filtered_v2_rho025.csv
+---- refine_128x128x512_np2_filtered_v2_rho040  NP=2  [16:59:58] ----
+[Tmax] = 0.00183105 | [max_iter] = 30
+[rho] = 0.4
+[backend] = filtered_v2
+ [Timing] CSV saved to /scratch/x3319a05/Filtered_TDMA/apps/heat_gpu/results/scaling_profile/h200/refine/timing_refine_128x128x512_np2_filtered_v2_rho040.csv
+   [wall 5s]  -> timing_refine_128x128x512_np2_filtered_v2_rho040.csv
+---- refine_256x256x256_np2_filtered_v2_rho025  NP=2  [17:00:03] ----
+[Tmax] = 0.00183105 | [max_iter] = 30
+[rho] = 0.25
+[backend] = filtered_v2
+ [Timing] CSV saved to /scratch/x3319a05/Filtered_TDMA/apps/heat_gpu/results/scaling_profile/h200/refine/timing_refine_256x256x256_np2_filtered_v2_rho025.csv
+   [wall 5s]  -> timing_refine_256x256x256_np2_filtered_v2_rho025.csv
+---- refine_256x256x256_np2_filtered_v2_rho040  NP=2  [17:00:08] ----
+[Tmax] = 0.00732422 | [max_iter] = 30
+[rho] = 0.4
+[backend] = filtered_v2
+ [Timing] CSV saved to /scratch/x3319a05/Filtered_TDMA/apps/heat_gpu/results/scaling_profile/h200/refine/timing_refine_256x256x256_np2_filtered_v2_rho040.csv
+   [wall 4s]  -> timing_refine_256x256x256_np2_filtered_v2_rho040.csv
+---- refine_256x256x512_np2_filtered_v2_rho025  NP=2  [17:00:12] ----
+[Tmax] = 0.000457764 | [max_iter] = 30
+[rho] = 0.25
+[backend] = filtered_v2
+ [Timing] CSV saved to /scratch/x3319a05/Filtered_TDMA/apps/heat_gpu/results/scaling_profile/h200/refine/timing_refine_256x256x512_np2_filtered_v2_rho025.csv
+   [wall 4s]  -> timing_refine_256x256x512_np2_filtered_v2_rho025.csv
+---- refine_256x256x512_np2_filtered_v2_rho040  NP=2  [17:00:16] ----
+[Tmax] = 0.00183105 | [max_iter] = 30
+[rho] = 0.4
+[backend] = filtered_v2
+ [Timing] CSV saved to /scratch/x3319a05/Filtered_TDMA/apps/heat_gpu/results/scaling_profile/h200/refine/timing_refine_256x256x512_np2_filtered_v2_rho040.csv
+   [wall 4s]  -> timing_refine_256x256x512_np2_filtered_v2_rho040.csv
+---- refine_256x256x1024_np2_filtered_v2_rho025  NP=2  [17:00:20] ----
+[Tmax] = 0.000114441 | [max_iter] = 30
+[rho] = 0.25
+[backend] = filtered_v2
+ [Timing] CSV saved to /scratch/x3319a05/Filtered_TDMA/apps/heat_gpu/results/scaling_profile/h200/refine/timing_refine_256x256x1024_np2_filtered_v2_rho025.csv
+   [wall 4s]  -> timing_refine_256x256x1024_np2_filtered_v2_rho025.csv
+---- refine_256x256x1024_np2_filtered_v2_rho040  NP=2  [17:00:24] ----
+[Tmax] = 0.000457764 | [max_iter] = 30
+[rho] = 0.4
+[backend] = filtered_v2
+ [Timing] CSV saved to /scratch/x3319a05/Filtered_TDMA/apps/heat_gpu/results/scaling_profile/h200/refine/timing_refine_256x256x1024_np2_filtered_v2_rho040.csv
+   [wall 5s]  -> timing_refine_256x256x1024_np2_filtered_v2_rho040.csv
+
+==== DONE 2026-06-28 17:00:29 ====
+  strong: 64 CSVs
+  weak: 48 CSVs
+  refine: 36 CSVs

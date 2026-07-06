@@ -1,0 +1,10 @@
+nx = 64
+ny = 64
+nz = 64
+npx = 1
+npy = 1
+npz = 1
+rho = 0.40
+eps = 0.005
+option = order
+tdma_backend = filtered_v2

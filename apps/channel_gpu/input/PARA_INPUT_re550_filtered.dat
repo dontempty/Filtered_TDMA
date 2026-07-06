@@ -19,9 +19,9 @@ n2m = 512
 n3m = 384
 
 # === group: MPI_procs ===   ( GPU: 1 x 1 x 4 = 4 ranks, z-split )
-np1 = 1
-np2 = 1
-np3 = 4
+np1 = 2
+np2 = 2
+np3 = 2
 
 # === group: periodic_boundary ===
 pbc1 = true
@@ -50,7 +50,7 @@ MaxCFL = 1.0
 # === group: sim_control ===
 dtStart     = 0.05
 tStart      = 0.0
-Timestepmax = 40000
+Timestepmax = 65000
 
 # === group: sim_continue ===
 ContinueFilein   = 0
@@ -71,13 +71,13 @@ init_mode = vortex
 
 # === group: output ===
 nmonitor     = 10
-nstat_start  = 20000
+nstat_start  = 25000
 nstat        = 1
-nout_stats   = 10000
-nfield_start = 20000
-nout         = 10000
+nout_stats   = 20000
+nfield_start = 25000
+nout         = 20000
 out_stats    = 1
-out_field    = 1
+out_field    = 0
 
 # === group: tdma ===
 tdma_backend = filtered

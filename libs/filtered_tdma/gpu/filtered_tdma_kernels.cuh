@@ -229,7 +229,7 @@ static __global__ void k_cal_J_rhs_bound(int* __restrict__ d_J,
     int tid = threadIdx.x;
 
     double my_rho = 0.0;
-    for (int k = 2 + tid; k < n_row - 1; k += blockDim.x)
+    for (int k = 1 + tid; k < n_row; k += blockDim.x)
         my_rho = fmax(my_rho, fmax(fabs(d_A_rho[k]), fabs(d_C_rho[k])));
 
     double my_D0 = 0.0, my_DN = 0.0;

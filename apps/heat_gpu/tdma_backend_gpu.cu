@@ -22,7 +22,7 @@ TdmaBackendGPU::TdmaBackendGPU(Kind kind, int n_sys, int n_row,
         // (128, 1): warp-aligned, full coalescing.  Replaces legacy (16, 16)
         // which broke warp memory coalescing on modified_thomas / tdma_many.
         // See REPORT_OPTIMIZATION_SUMMARY — modT -33%, total solve -16~20%.
-        pasc_ = std::make_unique<PaScaLTDMAManyCUDA>(n_sys, myrank, nprocs, comm,
+        pasc_ = std::make_unique<PaScaLTDMACUDA>(n_sys, myrank, nprocs, comm,
                                                     128, 1);
     } else {
         filt_ = std::make_unique<FilteredTDMACUDA>(n_sys, n_row,

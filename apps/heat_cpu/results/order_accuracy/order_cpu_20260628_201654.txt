@@ -1,0 +1,36 @@
+============================================================
+ host : glogin01
+ date : 2026-06-28 20:16:54
+ bin  : /scratch/x3319a05/Filtered_TDMA/build/bin/heat.out
+ grid : 32 x 32 x 32  (option=order, z-slab decomp)
+============================================================
+
+################## rho025 ##################
+--- pascal ---
+  np=1: Global L2 error = 0.00153948
+  np=2: Global L2 error = 0.00153948
+  np=4: Global L2 error = 0.00153948
+--- filtered ---
+  np=1: Global L2 error = 0.00153948
+  np=2: Global L2 error = 0.00153948
+  np=4: Global L2 error = 0.0015409
+--- filtered_v2 ---
+  np=1: Global L2 error = 0.00153948
+  np=2: Global L2 error = 0.00153948
+  np=4: Global L2 error = 0.0015409
+
+################## rho040 ##################
+--- pascal ---
+  np=1: Global L2 error = 0.0134171
+  np=2: Global L2 error = 0.0134171
+  np=4: Global L2 error = 0.0134171
+--- filtered ---
+  np=1: Global L2 error = 0.0134171
+  np=2: Global L2 error = 0.0134149
+  np=4: Global L2 error = 0.0136201
+--- filtered_v2 ---
+  np=1: Global L2 error = 0.0134171
+  np=2: Global L2 error = 0.0134149
+  np=4: Global L2 error = 0.0136201
+
+==== DONE 2026-06-28 20:17:05 ====

@@ -1,0 +1,12 @@
+nx = 32
+ny = 32
+nz = 32
+npx = 1
+npy = 1
+npz = 4
+rho = 0.40
+eps = 0.005
+Tmax = 0.003
+dt   = 0.001
+option = order
+tdma_backend = pascal

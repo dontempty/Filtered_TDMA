@@ -22,7 +22,7 @@ source "${PROJ}/env_gpu.sh" 2>/dev/null || true
 # module load nvhpc sets PMIX_INSTALL_PREFIX, which conflicts with the hpcx
 # OMPI's internal PMIx when launched under srun. Drop it so mpirun starts.
 unset PMIX_INSTALL_PREFIX
-BIN="${PROJ}/build_sm90/bin/heat_gpu.out"
+BIN="${PROJ}/build/bin/heat_gpu.out"
 INP="${PROJ}/apps/heat_gpu/inputs/scaling"
 RESBASE="${PROJ}/apps/heat_gpu/results/scaling_profile/h200"
 mkdir -p "${RESBASE}/strong" "${RESBASE}/weak" "${RESBASE}/refine"

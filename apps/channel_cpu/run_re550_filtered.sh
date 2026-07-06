@@ -14,7 +14,7 @@
 set -e
 
 module purge
-module load gcc/11.5.0 mpi/openmpi-4.1.8
+module load gcc/15.2.0 mpi/openmpi-4.1.8 fftw3/3.3.10
 
 if [ -n "${SLURM_SUBMIT_DIR}" ]; then cd "${SLURM_SUBMIT_DIR}"; fi
 PROJ="$(realpath ../..)"

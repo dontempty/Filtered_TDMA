@@ -218,7 +218,10 @@ void FilteredTDMA::solve_filtered_v2(double* __restrict A, double* __restrict B,
                                      double* __restrict C, double* __restrict D) {
     if (nprocs_ == 1) { ftdma_many(A, B, C, D, n_sys_, n_row_); return; }
 
-    const int J  = cal_J_rhs_bound(D);
+    // Clamp J so it stays within [0, n_row-2]: matches v1's min/max guards.
+    // When J >= n_row-2 (very small subdomain), fwd_elim_v2/bwd_subst_v2
+    // would access A/D beyond the array bounds, producing wrong results.
+    const int J  = std::min(cal_J_rhs_bound(D), n_row_ - 2);
     const int lo = (n_row_ - 2) - J;
 
     fwd_elim_v2(A, B, C, D, n_sys_, n_row_, J);
@@ -230,14 +233,15 @@ void FilteredTDMA::solve_filtered_v2(double* __restrict A, double* __restrict B,
                      left_rank_  != MPI_PROC_NULL,
                      right_rank_ != MPI_PROC_NULL, n_sys_, n_row_);
 
-    final_solve(A, C, D, n_sys_, n_row_, /*left_end=*/J, /*right_beg=*/lo + 1);
+    final_solve(A, C, D, n_sys_, n_row_, /*left_end=*/J,
+                                         /*right_beg=*/std::max(1, lo + 1));
 }
 
 void FilteredTDMA::solve_cycl_filtered_v2(double* __restrict A, double* __restrict B,
                                           double* __restrict C, double* __restrict D) {
     if (nprocs_ == 1) { ftdma_cyclic_many(A, B, C, D, n_sys_, n_row_); return; }
 
-    const int J  = cal_J_rhs_bound(D);
+    const int J  = std::min(cal_J_rhs_bound(D), n_row_ - 2);
     const int lo = (n_row_ - 2) - J;
 
     fwd_elim_v2(A, B, C, D, n_sys_, n_row_, J);
@@ -249,5 +253,6 @@ void FilteredTDMA::solve_cycl_filtered_v2(double* __restrict A, double* __restri
                      left_rank_  != MPI_PROC_NULL,
                      right_rank_ != MPI_PROC_NULL, n_sys_, n_row_);
 
-    final_solve(A, C, D, n_sys_, n_row_, /*left_end=*/J, /*right_beg=*/lo + 1);
+    final_solve(A, C, D, n_sys_, n_row_, /*left_end=*/J,
+                                         /*right_beg=*/std::max(1, lo + 1));
 }

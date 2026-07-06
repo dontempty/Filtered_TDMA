@@ -1,0 +1,10 @@
+nx = 256
+ny = 256
+nz = 256
+npx = 1
+npy = 1
+npz = 1
+rho = 0.40
+eps = 0.005
+option = order
+tdma_backend = pascal
