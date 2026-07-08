@@ -33,6 +33,12 @@ public:
     double momentum_time() const { return momentum_time_; }
     void write_timing_csv(const std::string& path) const;
 
+    /// Truncation depth J used by the most recent x/y/z TDMA solve
+    /// (FILTERED backend only; -1 for PASCAL).
+    int last_Jx() const { return fdma_x_->last_J(); }
+    int last_Jy() const { return fdma_y_->last_J(); }
+    int last_Jz() const { return fdma_z_->last_J(); }
+
 private:
     enum Component { COMP_U = 0, COMP_V = 1, COMP_W = 2 };
 

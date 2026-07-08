@@ -80,6 +80,12 @@ void FilteredTDMACUDA::set_rho_device(const double* d_A,
     k_set_rho<<<grid, block>>>(d_A_rho_, d_C_rho_, d_A, d_B, d_C, n_sys_, n_row_);
 }
 
+int FilteredTDMACUDA::last_J() const {
+    int h_J = -1;
+    CUDA_CHECK(cudaMemcpy(&h_J, d_J_, sizeof(int), cudaMemcpyDeviceToHost));
+    return h_J;
+}
+
 // =============================================================================
 //  MPI neighbor exchange (bidirectional, blocking)
 // =============================================================================

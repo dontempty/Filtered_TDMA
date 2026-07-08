@@ -56,8 +56,11 @@ void laminar_init(channel::Field<double>& U, channel::Field<double>& V,
 
     int rank = 0;
     MPI_Comm_rank(comm, &rank);
-    std::random_device rd;
-    std::uint64_t seed = static_cast<std::uint64_t>(rd())
+    // Fixed base seed (not std::random_device) so runs are reproducible across
+    // hardware/servers for direct comparison; per-rank offset still varies the
+    // perturbation spatially.
+    constexpr std::uint64_t kBaseSeed = 1234567891ULL;
+    std::uint64_t seed = kBaseSeed
                        ^ (static_cast<std::uint64_t>(rank) * 0x9E3779B97F4A7C15ULL);
     std::mt19937 rng(seed);
     std::uniform_real_distribution<double> rnd(-0.5, 0.5);

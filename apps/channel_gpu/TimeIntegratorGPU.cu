@@ -15,6 +15,7 @@
 #include <cstdio>
 #include <cstdlib>
 #include <utility>
+#include <vector>
 #include <mpi.h>
 
 namespace channel {
@@ -271,7 +272,14 @@ void TimeIntegratorGPU::run(DeviceField& U, DeviceField& V, DeviceField& W,
         if (root) std::printf("[dbg] step=%ld %-15s maxDiv=%.9e Ub=%.9e\n", s, label, v, ub);
     };
     std::FILE* wss_fp = nullptr;
+    std::FILE* jlog_fp = nullptr;
     if (root) {
+        std::string jlog_path = cfg_.dir_statistics + "/J_monitoring.log";
+        jlog_fp = std::fopen(jlog_path.c_str(), "a");
+        if (jlog_fp && std::ftell(jlog_fp) == 0)
+            std::fprintf(jlog_fp, "%10s %6s %6s %6s %6s\n",
+                         "step", "rank", "Jx", "Jy", "Jz");
+
         std::string p = cfg_.dir_instantfield + "Monitor_Channel.plt";
         mon_fp = std::fopen(p.c_str(), "a");
         if (mon_fp && std::ftell(mon_fp) == 0)
@@ -360,6 +368,20 @@ void TimeIntegratorGPU::run(DeviceField& U, DeviceField& V, DeviceField& W,
                     std::fflush(wss_fp);
                 }
             }
+
+            // Per-rank FilteredTDMA truncation depth (x/y/z), gathered to root.
+            int j_loc[3] = { momentum_.last_Jx(), momentum_.last_Jy(), momentum_.last_Jz() };
+            int nprocs = topo_.nprocs();
+            std::vector<int> j_all(root ? 3 * nprocs : 0);
+            MPI_Gather(j_loc, 3, MPI_INT,
+                       root ? j_all.data() : nullptr, 3, MPI_INT, 0, topo_.cart());
+            if (root && jlog_fp) {
+                for (int r = 0; r < nprocs; ++r) {
+                    std::fprintf(jlog_fp, "%10ld %6d %6d %6d %6d\n",
+                                 step, r, j_all[3*r+0], j_all[3*r+1], j_all[3*r+2]);
+                }
+                std::fflush(jlog_fp);
+            }
         }
 
         if (cfg_.out_stats && step >= cfg_.nstat_start
@@ -402,6 +424,7 @@ void TimeIntegratorGPU::run(DeviceField& U, DeviceField& V, DeviceField& W,
     momentum_.write_timing_csv(timing_path);
     if (root && mon_fp) std::fclose(mon_fp);
     if (root && wss_fp) std::fclose(wss_fp);
+    if (root && jlog_fp) std::fclose(jlog_fp);
 }
 
 } // namespace channel

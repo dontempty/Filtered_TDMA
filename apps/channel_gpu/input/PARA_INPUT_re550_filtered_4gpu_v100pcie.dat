@@ -1,0 +1,83 @@
+# ============================================================
+#  Channel solver — Re_tau ~ 550 case.
+#  Reference physics:
+#    Re_b   = 10000   (nu = 1e-4, delta = 1, U_mean = 1)
+#    Lx     = 8 pi    streamwise
+#    Lz     = 3 pi    spanwise
+#    Grid   = 1536 (streamwise) x 1024 (spanwise) x 384 (wall-normal)
+#    u_tau  ~ 5.435e-2  -> Re_tau ~ 543.5
+#
+#  Coordinate convention (this code, fixed):
+#    x : streamwise  (periodic, FFT direction, dP/dx forcing)
+#    y : spanwise    (periodic, FFT direction)
+#    z : wall-normal (no-slip wall, TDMA direction)
+# ============================================================
+
+# === group: meshes ===
+n1m = 768
+n2m = 512
+n3m = 384
+
+# === group: MPI_procs ===   ( GPU: 1 x 1 x 4 = 4 ranks, z-split )
+np1 = 2
+np2 = 1
+np3 = 2
+
+# === group: periodic_boundary ===
+pbc1 = true
+pbc2 = true
+pbc3 = false
+
+# === group: uniform_mesh ===
+uniform1 = 1
+uniform2 = 1
+uniform3 = 0
+
+# === group: mesh_stretch ===
+gamma1 = 0.0
+gamma2 = 0.0
+gamma3 = 1.5
+
+# === group: aspect_ratio ===
+H       = 2.0
+Aspect1 = 6.283185307179586     # 2pi    (-> Lx = H*Aspect1 = 4 pi)
+Aspect2 = 3.141592653589793     # pi  (-> Ly = H*Aspect2 = 2 pi)
+
+# === group: sim_parameter ===
+Re_b   = 10000.0
+MaxCFL = 1.0
+
+# === group: sim_control ===
+dtStart     = 0.05
+tStart      = 0.0
+Timestepmax = 40000
+
+# === group: sim_continue ===
+ContinueFilein   = 0
+ContinueFileout  = 1
+dir_cont_filein  = ./restart_in/re550_f_4gpu_v100pcie/
+dir_cont_fileout = ./restart_out/re550_f_4gpu_v100pcie/
+dir_instantfield = ./instant/re550_f_4gpu_v100pcie/
+dir_statistics   = ./statistics/re550_f_4gpu_v100pcie/
+
+# === group: channel_forcing ===
+forcing_mode         = MASS_FLOW
+target_bulk_velocity = 1.0
+target_dPdx          = 0.0
+
+# === group: initial_condition ===
+pert_amp = 0.5
+init_mode = vortex
+
+# === group: output ===
+nmonitor     = 10
+nstat_start  = 20000
+nstat        = 1
+nout_stats   = 10000
+nfield_start = 20000
+nout         = 10000
+out_stats    = 1
+out_field    = 0
+
+# === group: tdma ===
+tdma_backend = filtered

@@ -30,6 +30,10 @@ public:
     double last_comm_ms() const;
     double last_gpu_ms() const;
 
+    /// Truncation depth J from the most recent solve() (FILTERED only).
+    /// Returns -1 for PASCAL (no truncation concept applies).
+    int last_J() const;
+
 private:
     Backend backend_;
     int n_sys_ = 0;

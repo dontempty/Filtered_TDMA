@@ -71,4 +71,9 @@ double TdmaSolverGPU::last_gpu_ms() const
     return backend_ == Backend::FILTERED ? filt_->last_gpu_ms() : pasc_->last_gpu_ms();
 }
 
+int TdmaSolverGPU::last_J() const
+{
+    return backend_ == Backend::FILTERED ? filt_->last_J() : -1;
+}
+
 } // namespace channel

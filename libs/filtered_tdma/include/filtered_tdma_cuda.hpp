@@ -69,6 +69,10 @@ public:
     /// the GPU dispatcher.
     void set_rho_device(const double* d_A, const double* d_B, const double* d_C);
 
+    /// Truncation depth J computed by the most recent solve_filtered_v1/v2
+    /// call (blocking device->host copy of d_J_).
+    int last_J() const;
+
 private:
     void mpi_exchange_();   // bidirectional neighbour MPI exchange (no timing)
 
